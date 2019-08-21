@@ -19,7 +19,7 @@ The `-s` flag (currently not implemented as actual flag check but rather by thir
 
 These numbers can be used to configure memory preallocation to speed up further processing. The `ors-preprocessor.cfg` file is used to set up the tool.
 
-During the second pass, a new PBF file `[file].ors.pbf` is written, containing only the relevant elements for the ORS graphs.
+During the second pass, a new PBF file `[file].ors.pbf` is written, containing only the relevant elements for the ORS graphs. This also removes all metadata (timestamps, user info, version etc.) from all elements and strips away unneeded tags (configurable, tags like notes, URLs, source info etc.).
 
 ## Limitations
 This tool is under development and still experimental. Use at own risk.
@@ -30,4 +30,5 @@ This tool is under development and still experimental. Use at own risk.
 ## TODO
 - test with reasonably big graphs if routing results stay the same
 - test & profile on server with enough memory with PLANET
-- make tags configurable
+- make tags for validating/invalidating ways&relations configurable
+- ...
