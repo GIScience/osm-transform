@@ -11,23 +11,35 @@ make
 
 ## Usage
 ```
-./ors-preprocessor [OSM file] [-s]
+./ors-preprocessor [OSM file]
 ```
 The tool processes OSM data in two steps. During the first pass, it filters way and relation elements and records their IDs and those of all referenced nodes.
 
-The `-s` flag (currently not implemented as actual flag check but rather by third argv present) only does the first processing step and  outputs the detected numbers of valid elements of each type. The count of nodes here is only an estimate, since in this mode the calculations do not take into account the fact that nodes might be referenced by multiple ways/relations.
+The `ors-preprocessor.cfg` file is used to set up the tool. The default configuration is as follows:
+```
+# regex for detecting tags that can safely be removed
+remove_tag = "(.*:)?source(:.*)?|(.*:)?note(:.*)?|url|created_by|fixme|wikipedia";
 
-These numbers can be used to configure memory preallocation to speed up further processing. The `ors-preprocessor.cfg` file is used to set up the tool.
+# max IDs
+nodes_max_id = 6800000000L;
+ways_max_id =   800000000L;
+rels_max_id =    10000000L;
 
-During the second pass, a new PBF file `[file].ors.pbf` is written, containing only the relevant elements for the ORS graphs.
+#debug mode
+#debug_output = true;
+#debug_no_filter = true;
+#debug_no_tag_filter = true;
+```
+
+During the second pass, a new PBF file `[file].ors.pbf` is written, containing only the relevant elements for the ORS graphs. From the retained elements, all tags matching the `remove_tag` regular expression (see configuration file example above) as well as irrelevant metadata (version, user_id, timestamp etc.) are stripped.
+
+Overall, a 60-65% file size reduction is achieved.
 
 ## Limitations
 This tool is under development and still experimental. Use at own risk.
-- On smaller files this tool already works well, Baden-Württemberg (from [geofabrik](http://download.geofabrik.de/europe/germany/baden-wuerttemberg.html)) runs in about 40 seconds on my ThinkPad.
-- For OSM planet file, the `valid_nodes` set has to contain close to 3 billion node ID entries (long long = 8 bytes each, so something like 22.3 Gb). Need to see if a better solution can be found than putting them all in an `unordered_set`.
-- Need to detect lack of memory, dying with a `bad_alloc` is not good...
+- Baden-Württemberg (from [geofabrik](http://download.geofabrik.de/europe/germany/baden-wuerttemberg.html)) runs in about 35 seconds on my ThinkPad, the OSM planet file in under an hour.
+- The max IDs settings must be adjusted when OSM data grows. The configured number must be higher than the highest ID number for each category of elements. Note that memory consumption grows proportionally. The settings above are enough for current OSM planet file.
 
 ## TODO
 - test with reasonably big graphs if routing results stay the same
-- test & profile on server with enough memory with PLANET
-- make tags configurable
+- make tags for way/relation filtering configurable

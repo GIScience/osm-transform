@@ -21,15 +21,35 @@
 #include <libconfig.h++>
 
 using namespace std;
+typedef unsigned long long llu;
+typedef vector<int> vi;
+
+void setBit(vi &A, llu k) {
+  if (k < 0) return;
+  A[k/32] |= 1 << (k%32);  // Set the bit at the k-th position in A
+}
+
+bool testBit(vector<int> &A, llu k) {
+  if (k < 0) return 0;
+  return (A[k/32] & (1 << (k%32))) != 0;
+}
+
+llu countBits(vector<int> &A) {
+  llu count = 0;
+  for (auto &intval : A) {
+    count += __builtin_popcount(intval);
+  }
+  return count;
+}
 
 bool file_exists(const string& filename) {
   ifstream ifile(filename.c_str());
   return (bool)ifile;
 }
 
-int filesize(const string& filename) {
+llu filesize(const string& filename) {
     ifstream in(filename.c_str(), std::ifstream::ate | std::ifstream::binary);
-    return (int)in.tellg();
+    return (llu)in.tellg();
 }
 
 string remove_extension(const string& filename) {
@@ -38,12 +58,33 @@ string remove_extension(const string& filename) {
     return filename.substr(0, lastdot);
 }
 
+
+class MaxIDHandler : public osmium::handler::Handler {
+  public:
+    llu node_max_id = 0;
+    llu way_max_id = 0;
+    llu relation_max_id = 0;
+
+    void node(const osmium::Node& node) {
+      if (node.id() < 0) return;
+      node_max_id = node.id() > node_max_id ? node.id() : node_max_id;
+    }
+
+    void way(const osmium::Way& way) {
+      if (way.id() < 0) return;
+      way_max_id = way.id() > way_max_id ? way.id() : way_max_id;
+    }
+
+    void relation(const osmium::Relation& rel) {
+      if (rel.id() < 0) return;
+      relation_max_id = rel.id() > relation_max_id ? rel.id() : relation_max_id;
+    }
+};
+
 class FirstPassHandler : public osmium::handler::Handler {
   friend ostream& operator<<(ostream& out, const FirstPassHandler& ce);
   const set<string> invalidating_tags{"building", "landuse"};
-
   boost::regex* remove_tags;
-  bool first = true;
 
   bool validating_tags(const string& tag, const string& value) {
     if (tag == "highway") return true;
@@ -72,48 +113,37 @@ class FirstPassHandler : public osmium::handler::Handler {
 
   public:
 
-    unsigned long long node_count = 0;
-    unsigned long long valid_node_count = 0;
-    unsigned long long relation_count = 0;
-    unsigned long long valid_relation_count = 0;
-    unsigned long long way_count = 0;
-    unsigned long long valid_way_count = 0;
+    llu node_count = 0;
+    llu relation_count = 0;
+    llu way_count = 0;
 
-    boost::unordered_set<long long> valid_nodes;
-    boost::unordered_set<long long> valid_ways;
-    boost::unordered_set<long long> valid_relations;
+    vector<int>* valid_nodes;
+    vector<int>* valid_ways;
+    vector<int>* valid_relations;
 
     bool DEBUG_NO_FILTER = false;
-    bool ONLY_COUNT = false;
 
-    void init(boost::regex* re, unsigned long long i_nodes_reserve, unsigned long long i_ways_reserve, unsigned long long i_rels_reserve, bool debug_no_filter, bool only_count) {
+    void init(boost::regex* re, vector<int>* i_valid_nodes, vector<int>* i_valid_ways, vector<int>* i_valid_relations, bool debug_no_filter) {
       remove_tags = re;
+      valid_nodes = i_valid_nodes;
+      valid_ways = i_valid_ways;
+      valid_relations = i_valid_relations;
       DEBUG_NO_FILTER = debug_no_filter;
-      ONLY_COUNT = only_count;
-      if (!only_count) {
-        valid_nodes.reserve(i_nodes_reserve);
-        valid_ways.reserve(i_ways_reserve);
-        valid_relations.reserve(i_rels_reserve);
-      }
     }
 
-    void node (const osmium::Node& node) {
+    void node(const osmium::Node& node) {
       node_count++;
     }
 
-    void way (const osmium::Way& way) {
+    void way(const osmium::Way& way) {
       way_count++;
       if (DEBUG_NO_FILTER || way.nodes().size() < 2 || check_tags(way.tags())) {
         return;
       }
       for (const osmium::NodeRef& n : way.nodes()) {
-        valid_node_count++;
-        if (!ONLY_COUNT)
-          valid_nodes.emplace(n.ref());
+        setBit(*valid_nodes, n.ref());
       }
-      valid_way_count++;
-      if (!ONLY_COUNT)
-        valid_ways.emplace(way.id());
+      setBit(*valid_ways, way.id());
     }
 
     void relation (const osmium::Relation& rel) {
@@ -123,23 +153,19 @@ class FirstPassHandler : public osmium::handler::Handler {
       }
       for (const auto& member : rel.members()) {
         if (member.type() == osmium::item_type::node) {
-          valid_node_count++;
-          if (!ONLY_COUNT)
-            valid_nodes.emplace(member.ref());
+          setBit(*valid_nodes, member.ref());
         }
       }
-      valid_relation_count++;
-      if (!ONLY_COUNT)
-        valid_relations.emplace(rel.id());
+      setBit(*valid_relations, rel.id());
     }
 };
 
 class RewriteHandler : public osmium::handler::Handler {
   friend ostream& operator<<(ostream& out, const RewriteHandler& ce);
   osmium::memory::Buffer* m_buffer;
-  boost::unordered_set<long long>* valid_nodes;
-  boost::unordered_set<long long>* valid_ways;
-  boost::unordered_set<long long>* valid_relations;
+  vector<int>* valid_nodes;
+  vector<int>* valid_ways;
+  vector<int>* valid_relations;
   boost::regex* remove_tags;
   bool DEBUG_NO_FILTER = false;
   bool DEBUG_NO_TAG_FILTER = false;
@@ -157,10 +183,10 @@ class RewriteHandler : public osmium::handler::Handler {
 
   public:
 
-    unsigned long long valid_elements = 0;
-    unsigned long long processed_elements = 0;
-    unsigned long long total_tags = 0;
-    unsigned long long valid_tags = 0;
+    llu valid_elements = 0;
+    llu processed_elements = 0;
+    llu total_tags = 0;
+    llu valid_tags = 0;
 
     void set_buffer(osmium::memory::Buffer* buffer) {
       m_buffer = buffer;
@@ -170,7 +196,7 @@ class RewriteHandler : public osmium::handler::Handler {
       valid_tags = 0;
     }
 
-    void init(boost::regex* re, boost::unordered_set<long long>* i_valid_nodes, boost::unordered_set<long long>* i_valid_ways, boost::unordered_set<long long>* i_valid_relations, bool debug_no_filter, bool debug_no_tag_filter) {
+    void init(boost::regex* re, vector<int>* i_valid_nodes, vector<int>* i_valid_ways, vector<int>* i_valid_relations, bool debug_no_filter, bool debug_no_tag_filter) {
       remove_tags = re;
       valid_nodes = i_valid_nodes;
       valid_ways = i_valid_ways;
@@ -183,7 +209,7 @@ class RewriteHandler : public osmium::handler::Handler {
     void node(const osmium::Node& node) {
       processed_elements++;
       {
-        if (DEBUG_NO_FILTER || valid_nodes->count(node.id()) > 0) {
+        if (DEBUG_NO_FILTER || testBit(*valid_nodes, node.id()) > 0) {
           osmium::builder::NodeBuilder builder{*m_buffer};
           builder.set_id(node.id());
           builder.set_location(node.location());
@@ -196,7 +222,7 @@ class RewriteHandler : public osmium::handler::Handler {
     void way(const osmium::Way& way) {
       processed_elements++;
       {
-        if (DEBUG_NO_FILTER || valid_ways->count(way.id()) > 0) {
+        if (DEBUG_NO_FILTER || testBit(*valid_ways, way.id()) > 0) {
           osmium::builder::WayBuilder builder{*m_buffer};
           builder.set_id(way.id());
           builder.add_item(way.nodes());
@@ -209,7 +235,7 @@ class RewriteHandler : public osmium::handler::Handler {
     void relation(const osmium::Relation& relation) {
       processed_elements++;
       {
-        if (DEBUG_NO_FILTER || valid_relations->count(relation.id()) > 0) {
+        if (DEBUG_NO_FILTER || testBit(*valid_relations, relation.id()) > 0) {
           osmium::builder::RelationBuilder builder{*m_buffer};
           builder.set_id(relation.id());
           builder.add_item(relation.members());
@@ -221,9 +247,9 @@ class RewriteHandler : public osmium::handler::Handler {
 };
 
 ostream& operator<<(ostream& out, const FirstPassHandler& handler) {
-  return out  << "valid nodes: " << handler.valid_nodes.size() << " (" << handler.node_count << "), "
-              << "valid ways: " << handler.valid_ways.size() << " (" << handler.way_count << "), "
-              << "valid relations: " << handler.valid_relations.size() << " (" << handler.relation_count << ")";
+  return out  << "valid nodes: " << countBits(*handler.valid_nodes) << " (" << handler.node_count << "), "
+              << "valid ways: " << countBits(*handler.valid_ways) << " (" << handler.way_count << "), "
+              << "valid relations: " << countBits(*handler.valid_relations) << " (" << handler.relation_count << ")";
 }
 
 ostream& operator<<(ostream& out, const RewriteHandler& handler) {
@@ -233,29 +259,25 @@ ostream& operator<<(ostream& out, const RewriteHandler& handler) {
 
 int main (int argc, char** argv) {
   if (argc < 2 || !file_exists(argv[1])) {
-    cerr << "Usage: " << argv[0] << " [OSM file] [-s]" << endl;
+    cerr << "Usage: " << argv[0] << " [OSM file]" << endl;
     return 1;
   }
 
   string remove_tag_regex_str = "REMOVE NO TAGS";
-  unsigned long long nodes_reserve = 1;
-  unsigned long long ways_reserve = 1;
-  unsigned long long rels_reserve = 1;
   bool debug_output = false;
   bool debug_no_filter = false;
   bool debug_no_tag_filter = false;
-
-  // TODO: implement actual flag checking...
-  bool only_count = argc >= 3;
-
+  llu nodes_max_id;
+  llu ways_max_id;
+  llu rels_max_id;
   try {
     libconfig::Config cfg;
     cfg.readFile("ors-preprocessor.cfg");
     const libconfig::Setting& root = cfg.getRoot();
     root.lookupValue("remove_tag", remove_tag_regex_str);
-    root.lookupValue("nodes_reserve", nodes_reserve);
-    root.lookupValue("ways_reserve", ways_reserve);
-    root.lookupValue("rels_reserve", rels_reserve);
+    root.lookupValue("nodes_max_id", nodes_max_id);
+    root.lookupValue("ways_max_id", ways_max_id);
+    root.lookupValue("rels_max_id", rels_max_id);
     root.lookupValue("debug_output", debug_output);
     root.lookupValue("debug_no_filter", debug_no_filter);
     root.lookupValue("debug_no_tag_filter", debug_no_tag_filter);
@@ -279,41 +301,34 @@ int main (int argc, char** argv) {
 
   try {
     boost::regex remove_tag_regex(remove_tag_regex_str, boost::regex::icase);
-    auto start = chrono::steady_clock::now();
-    cout << "Processing first pass: validate ways & relations..." << endl;
 
-    osmium::io::Reader reader{argv[1]};
-    long unsigned int insize = reader.file_size();
+    printf("Allocating memory: %llu (%.2f Mb) nodes, %llu (%.2f Mb) ways, %llu (%.2f Mb) relations\n", nodes_max_id / 32 + 1, nodes_max_id / (1024*1024*8.0), ways_max_id / 32 + 1, ways_max_id / (1024*1024*8.0), rels_max_id / 32 + 1, rels_max_id / (1024*1024*8.0));
+    vector<int> valid_nodes(nodes_max_id / 32 + 1, 0);
+    vector<int> valid_ways(ways_max_id / 32 + 1, 0);
+    vector<int> valid_relations(rels_max_id / 32 + 1, 0);
+
+    cout << "Processing first pass: validate ways & relations..." << endl;
+    auto start = chrono::steady_clock::now();
+    osmium::io::Reader first_pass_reader{argv[1]};
+    llu insize = first_pass_reader.file_size();
     osmium::ProgressBar progress{insize, osmium::isatty(2)};
     FirstPassHandler first_pass;
-    first_pass.init(&remove_tag_regex, nodes_reserve, ways_reserve, rels_reserve, debug_no_filter, only_count);
-    if (!only_count)
-      printf("Preallocating: %llu nodes, %llu ways, %llu relations\n", nodes_reserve, ways_reserve, rels_reserve);
-    while (osmium::memory::Buffer input_buffer = reader.read()) {
+    first_pass.init(&remove_tag_regex, &valid_nodes, &valid_ways, &valid_relations, debug_no_filter);
+    while (osmium::memory::Buffer input_buffer = first_pass_reader.read()) {
       osmium::apply(input_buffer, first_pass);
-      progress.update(reader.offset());
+      progress.update(first_pass_reader.offset());
     }
     progress.done();
     progress.remove();
-    reader.close();
-    if (only_count) {
-      cout  << "valid nodes: " << first_pass.valid_node_count << " (" << first_pass.node_count << "), "
-                  << "valid ways: " << first_pass.valid_way_count << " (" << first_pass.way_count << "), "
-                  << "valid relations: " << first_pass.valid_relation_count << " (" << first_pass.relation_count << ")\n\nWARNING: valid node count is an estimate and most likely higher than the actual number!\n";
-    } else {
-      cout << first_pass << endl;
-    }
+    first_pass_reader.close();
+    cout << first_pass << endl;
     auto end = chrono::steady_clock::now();
-    printf("Processed in %.3f s\n", chrono::duration_cast<chrono::milliseconds>(end - start).count() / 1000.0);
-    cout << endl;
-    if (only_count) {
-      return 0;
-    }
+    printf("Processed in %.3f s\n\n", chrono::duration_cast<chrono::milliseconds>(end - start).count() / 1000.0);
 
     string output = remove_extension(basename(argv[1])) + ".ors.pbf";
-    unsigned long long total_elements = first_pass.node_count + first_pass.way_count + first_pass.relation_count;
-    unsigned long long processed_elements = 0;
-    unsigned long long processed_nanos = 0;
+    llu total_elements = first_pass.node_count + first_pass.way_count + first_pass.relation_count;
+    llu processed_elements = 0;
+    llu processed_nanos = 0;
 
     start = chrono::steady_clock::now();
     cout << "Processing second pass: rebuild data..." << endl;
@@ -322,7 +337,7 @@ int main (int argc, char** argv) {
     header.set("generator", "ORS Proprocessor v1.0");
     osmium::io::Writer writer{output, header, osmium::io::overwrite::allow};
     RewriteHandler handler;
-    handler.init(&remove_tag_regex, &first_pass.valid_nodes, &first_pass.valid_ways, &first_pass.valid_relations, debug_no_filter, debug_no_tag_filter);
+    handler.init(&remove_tag_regex, first_pass.valid_nodes, first_pass.valid_ways, first_pass.valid_relations, debug_no_filter, debug_no_tag_filter);
 
     while (osmium::memory::Buffer input_buffer = second_reader.read()) {
       auto step_start = chrono::steady_clock::now();
@@ -347,9 +362,9 @@ int main (int argc, char** argv) {
     end = chrono::steady_clock::now();
     printf("\nProcessed in %.3f s\n", chrono::duration_cast<chrono::milliseconds>(end - start).count() / 1000.0);
 
-    int outsize = filesize(output);
-    int reduction = insize - outsize;
-    printf("\nOriginal: %15lu b\nReduced: %16d b\nReduction: %14d b (= %3.2f %%)\n\n", insize, outsize, reduction, (float) reduction / insize * 100);
+    llu outsize = filesize(output);
+    llu reduction = insize - outsize;
+    printf("\nOriginal: %20llu b\nReduced: %21llu b\nReduction: %19llu b (= %3.2f %%)\n\n", insize, outsize, reduction, (float) reduction / insize * 100);
 
   } catch (const exception& e) {
     cerr << e.what() << '\n';
