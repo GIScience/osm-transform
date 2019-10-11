@@ -1,5 +1,5 @@
 #include <string>
-#include <filesystem>
+#include <boost/filesystem.hpp>
 #include <fstream>
 #include <iostream>
 #include <chrono>
@@ -137,7 +137,7 @@ class FirstPassHandler : public osmium::handler::Handler {
 
     void way(const osmium::Way& way) {
       way_count++;
-      if (DEBUG_NO_FILTER || way.nodes().size() < 2 || check_tags(way.tags())) {
+      if (DEBUG_NO_FILTER || way.id() < 0 || way.nodes().size() < 2 || check_tags(way.tags())) {
         return;
       }
       for (const osmium::NodeRef& n : way.nodes()) {
@@ -148,7 +148,7 @@ class FirstPassHandler : public osmium::handler::Handler {
 
     void relation (const osmium::Relation& rel) {
       relation_count++;
-      if (DEBUG_NO_FILTER || check_tags(rel.tags())) {
+      if (DEBUG_NO_FILTER || rel.id() < 0 || check_tags(rel.tags())) {
         return;
       }
       for (const auto& member : rel.members()) {
@@ -208,6 +208,7 @@ class RewriteHandler : public osmium::handler::Handler {
 
     void node(const osmium::Node& node) {
       processed_elements++;
+      if (node.id() < 0) return;
       {
         if (DEBUG_NO_FILTER || testBit(*valid_nodes, node.id()) > 0) {
           osmium::builder::NodeBuilder builder{*m_buffer};
@@ -221,6 +222,7 @@ class RewriteHandler : public osmium::handler::Handler {
 
     void way(const osmium::Way& way) {
       processed_elements++;
+      if (way.id() < 0) return;
       {
         if (DEBUG_NO_FILTER || testBit(*valid_ways, way.id()) > 0) {
           osmium::builder::WayBuilder builder{*m_buffer};
@@ -234,6 +236,7 @@ class RewriteHandler : public osmium::handler::Handler {
 
     void relation(const osmium::Relation& relation) {
       processed_elements++;
+      if (relation.id() < 0) return;
       {
         if (DEBUG_NO_FILTER || testBit(*valid_relations, relation.id()) > 0) {
           osmium::builder::RelationBuilder builder{*m_buffer};
