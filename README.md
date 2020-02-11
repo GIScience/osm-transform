@@ -43,3 +43,17 @@ This tool is under development and still experimental. Use at own risk.
 ## TODO
 - test with reasonably big graphs if routing results stay the same
 - make tags for way/relation filtering configurable
+
+## WIP
+Installing [GDAL](https://gdal.org/download.html) requires compiling current version of [PROJ.4](https://proj.org/download.html) (Ubuntu 19.10). Download both packages, unpack, then in the PROJ dir
+```
+./configure
+make
+sudo make install
+```
+then in the GDAL dir
+```
+CPPFLAGS=-I/usr/local/include LDFLAGS=-L/usr/local/lib ./configure --with-proj=/usr/local
+make
+sudo make install
+```

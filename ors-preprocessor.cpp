@@ -3,9 +3,16 @@
 #include <fstream>
 #include <iostream>
 #include <chrono>
+#include <unordered_map>
 
 #include <boost/regex.hpp>
 #include <boost/unordered_set.hpp>
+
+#include "gdal.h"
+#include "gdal_priv.h"
+#include "gdal_utils.h"
+#include "cpl_conv.h"
+
 #include <osmium/io/any_input.hpp>
 #include <osmium/io/any_output.hpp>
 #include <osmium/handler.hpp>
@@ -17,6 +24,7 @@
 #include <osmium/osm/relation.hpp>
 #include <osmium/util/file.hpp>
 #include <osmium/util/progress_bar.hpp>
+
 #include <libgen.h>
 #include <libconfig.h++>
 
@@ -57,7 +65,6 @@ string remove_extension(const string& filename) {
     if (lastdot == string::npos) return filename;
     return filename.substr(0, lastdot);
 }
-
 
 class MaxIDHandler : public osmium::handler::Handler {
   public:
@@ -169,9 +176,14 @@ class RewriteHandler : public osmium::handler::Handler {
   boost::regex* remove_tags;
   bool DEBUG_NO_FILTER = false;
   bool DEBUG_NO_TAG_FILTER = false;
+  static const int NO_DATA_VALUE = -32768;
+  unordered_map<string, GDALDataset*> elevationData;
 
-  void copy_tags(osmium::builder::Builder& parent, const osmium::TagList& tags) {
+  void copy_tags(osmium::builder::Builder& parent, const osmium::TagList& tags, int ele = NO_DATA_VALUE) {
     osmium::builder::TagListBuilder builder{parent};
+    if (ele > NO_DATA_VALUE) {
+      builder.add_tag("ele", to_string(ele));
+    }
     for (const auto& tag : tags) {
       total_tags++;
       if (DEBUG_NO_TAG_FILTER || !boost::regex_match(tag.key(), *remove_tags)) {
@@ -181,12 +193,103 @@ class RewriteHandler : public osmium::handler::Handler {
     }
   }
 
+  double getElevationCGIAR(double lat, double lng, bool debug = false) {
+    int lngIndex = static_cast<int>(floor((180 + lng) / 5)) + 1;
+    int latIndex = static_cast<int>(floor((59.9999999 - lat) / 5)) + 1;
+    char pszFilename[100];
+    sprintf(pszFilename, "srtmdata/srtm_%02d_%02d.tif", lngIndex, latIndex);
+    if (debug)
+      printf("Filename for coordinates %.6f - %.6f : %s\n", lng, lat, pszFilename);
+    return getElevationFromFile(lat, lng, pszFilename, debug);
+  }
+
+  double getElevationGMTED(double lat, double lng, bool debug = false) {
+    int lngIndex = static_cast<int>(-180 + floor((180 + lng) / 30) * 30);
+    int latIndex = static_cast<int>(-70 + floor((70 + lat) / 20) * 20);
+    char lngPre = lngIndex < 0 ? 'W' : 'E';
+    char latPre = latIndex < 0 ? 'S' : 'N';
+    char pszFilename[100];
+    sprintf(pszFilename, "gmteddata/%02d%c%03d%c_20101117_gmted_mea075.tif", abs(latIndex), latPre, abs(lngIndex), lngPre);
+    if (debug)
+      printf("Filename for coordinates %.6f - %.6f : %s\n", lng, lat, pszFilename);
+    return getElevationFromFile(lat, lng, pszFilename, debug);
+  }
+
+  double getElevationFromFile(double lat, double lng, char* pszFilename, bool debug = false) {
+    GDALDataset  *poDataset;
+    auto search = elevationData.find(pszFilename);
+    if (search != elevationData.end()) {
+      poDataset = elevationData.at(pszFilename);
+    } else {
+      if (!file_exists(pszFilename)) {
+        if (debug)
+          cout << "File does not exist: " << pszFilename << endl;
+        return NO_DATA_VALUE;
+      }
+      poDataset = (GDALDataset*)GDALOpen(pszFilename, GA_ReadOnly);
+      elevationData.insert(make_pair(pszFilename, poDataset));
+      if(poDataset == NULL) {
+        if (debug)
+          cout << "Failed to read input data, existing." << endl;
+        return NO_DATA_VALUE;
+      }
+      if (debug)
+        printf( "Dataset opened. (format: %s; size: %d x %d x %d)\n", poDataset->GetDriver()->GetDescription(), poDataset->GetRasterXSize(), poDataset->GetRasterYSize(), poDataset->GetRasterCount());
+    }
+    double adfGeoTransform[6];
+    double adfInvGeoTransform[6];
+    if(poDataset->GetGeoTransform(adfGeoTransform) != CE_None) {
+      if (debug)
+        cout << "Failed to get transformation from input data." << endl;
+        return NO_DATA_VALUE;
+    }
+    if (!GDALInvGeoTransform(adfGeoTransform, adfInvGeoTransform)) {
+      if (debug)
+        cout << "Failed to get reverse transformation." << endl;
+        return NO_DATA_VALUE;
+    }
+    int iPixel = static_cast<int>(floor(adfInvGeoTransform[0] + adfInvGeoTransform[1] * lng + adfInvGeoTransform[2] * lat));
+    int iLine = static_cast<int>(floor(adfInvGeoTransform[3] + adfInvGeoTransform[4] * lng + adfInvGeoTransform[5] * lat));
+
+    if (iPixel == poDataset->GetRasterXSize()) {
+      iPixel = poDataset->GetRasterXSize() - 1;
+    }
+    if (iLine == poDataset->GetRasterYSize()) {
+      iLine = poDataset->GetRasterYSize() - 1;
+    }
+    if (iPixel < 0) {
+      iPixel = 0;
+    }
+    if (iLine < 0) {
+      iLine = 0;
+    }
+
+    if (iPixel > poDataset->GetRasterXSize() || iLine > poDataset->GetRasterYSize()) {
+     printf( "Coordinates: %.6f %.6f\n", lat, lng);
+     printf( "Image coordinates: %d %d\n", iPixel, iLine);
+    }
+    if (debug) {
+      printf( "Coordinates: %.6f %.6f\n", lat, lng);
+      printf( "Image coordinates: %d %d\n", iPixel, iLine);
+    }
+
+    double adfPixel[2];
+    if (poDataset->GetRasterBand(1)->RasterIO(GF_Read, iPixel, iLine, 1, 1, adfPixel, 1, 1, GDT_CFloat64, 0, 0) != CE_None) {
+      if (debug) {
+        cout << "Failed to read data at coordinates." << endl;
+      }
+      return NO_DATA_VALUE;
+    }
+    return adfPixel[0];
+  }
+
   public:
 
     llu valid_elements = 0;
     llu processed_elements = 0;
     llu total_tags = 0;
     llu valid_tags = 0;
+    bool addElevation = false;
 
     void set_buffer(osmium::memory::Buffer* buffer) {
       m_buffer = buffer;
@@ -204,6 +307,7 @@ class RewriteHandler : public osmium::handler::Handler {
       valid_elements = valid_nodes->size() + valid_ways->size() + valid_relations->size();
       DEBUG_NO_FILTER = debug_no_filter;
       DEBUG_NO_TAG_FILTER = debug_no_tag_filter;
+      GDALAllRegister();
     }
 
     void node(const osmium::Node& node) {
@@ -214,7 +318,14 @@ class RewriteHandler : public osmium::handler::Handler {
           osmium::builder::NodeBuilder builder{*m_buffer};
           builder.set_id(node.id());
           builder.set_location(node.location());
-          copy_tags(builder, node.tags());
+          int ele = NO_DATA_VALUE;
+          if (addElevation && !node.tags().has_key("ele")) {
+            ele = getElevationCGIAR(node.location().lat(), node.location().lon());
+            if (ele == NO_DATA_VALUE) {
+              ele = getElevationGMTED(node.location().lat(), node.location().lon());
+            }
+          }
+          copy_tags(builder, node.tags(), ele);
         }
       }
       m_buffer->commit();
@@ -261,8 +372,20 @@ ostream& operator<<(ostream& out, const RewriteHandler& handler) {
 }
 
 int main (int argc, char** argv) {
-  if (argc < 2 || !file_exists(argv[1])) {
-    cerr << "Usage: " << argv[0] << " [OSM file]" << endl;
+  char* filename;
+  bool doMemoryCheck = false;
+  bool addElevation = false;
+  for (char **arg = argv; *arg; ++arg) {
+    if (strcmp(*arg, "-c") == 0) {
+      doMemoryCheck = true;
+    } else if (strcmp(*arg, "-e") == 0) {
+      addElevation = true;
+    } else {
+      filename = *arg;
+    }
+  }
+  if (!file_exists(filename)) {
+    cerr << "Usage: " << argv[0] << "[-e] [-c] [OSM file]" << endl;
     return 1;
   }
 
@@ -303,8 +426,27 @@ int main (int argc, char** argv) {
   }
 
   try {
-    boost::regex remove_tag_regex(remove_tag_regex_str, boost::regex::icase);
+    if (doMemoryCheck) {
+      osmium::io::Reader check_reader{filename};
+      llu insize = check_reader.file_size();
+      osmium::ProgressBar check_progress{insize, osmium::isatty(2)};
+      MaxIDHandler maxIDHandler;
+      while (osmium::memory::Buffer input_buffer = check_reader.read()) {
+        osmium::apply(input_buffer, maxIDHandler);
+        check_progress.update(check_reader.offset());
+      }
+      check_progress.done();
+      check_progress.remove();
+      check_reader.close();
 
+      cout << "Max IDs: Node " << maxIDHandler.node_max_id << " Way " << maxIDHandler.way_max_id << " Relation " << maxIDHandler.relation_max_id << endl;
+      if (maxIDHandler.node_max_id > nodes_max_id || maxIDHandler.way_max_id > ways_max_id || maxIDHandler.relation_max_id > rels_max_id) {
+        cout << "Insufficient memory settings." << endl;
+        return 1;
+      }
+    }
+
+    boost::regex remove_tag_regex(remove_tag_regex_str, boost::regex::icase);
     printf("Allocating memory: %llu (%.2f Mb) nodes, %llu (%.2f Mb) ways, %llu (%.2f Mb) relations\n", nodes_max_id / 32 + 1, nodes_max_id / (1024*1024*8.0), ways_max_id / 32 + 1, ways_max_id / (1024*1024*8.0), rels_max_id / 32 + 1, rels_max_id / (1024*1024*8.0));
     vector<int> valid_nodes(nodes_max_id / 32 + 1, 0);
     vector<int> valid_ways(ways_max_id / 32 + 1, 0);
@@ -312,7 +454,7 @@ int main (int argc, char** argv) {
 
     cout << "Processing first pass: validate ways & relations..." << endl;
     auto start = chrono::steady_clock::now();
-    osmium::io::Reader first_pass_reader{argv[1]};
+    osmium::io::Reader first_pass_reader{filename};
     llu insize = first_pass_reader.file_size();
     osmium::ProgressBar progress{insize, osmium::isatty(2)};
     FirstPassHandler first_pass;
@@ -335,12 +477,13 @@ int main (int argc, char** argv) {
 
     start = chrono::steady_clock::now();
     cout << "Processing second pass: rebuild data..." << endl;
-    osmium::io::Reader second_reader{argv[1]};
+    osmium::io::Reader second_reader{filename};
     osmium::io::Header header;
     header.set("generator", "ORS Proprocessor v1.0");
     osmium::io::Writer writer{output, header, osmium::io::overwrite::allow};
     RewriteHandler handler;
     handler.init(&remove_tag_regex, first_pass.valid_nodes, first_pass.valid_ways, first_pass.valid_relations, debug_no_filter, debug_no_tag_filter);
+    handler.addElevation = addElevation;
 
     while (osmium::memory::Buffer input_buffer = second_reader.read()) {
       auto step_start = chrono::steady_clock::now();
