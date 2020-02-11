@@ -1,0 +1,12 @@
+*.pbf
+*.osm
+*.gz
+*.zip
+*.old
+ors-preprocessor
+srtm
+srtm*/*
+srtmdata
+gmted
+gmted*/*
+gmteddata
