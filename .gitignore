@@ -1,12 +1,13 @@
 *.pbf
 *.osm
+*.log
 *.gz
 *.zip
 *.old
 ors-preprocessor
-srtm
+test/srtm
 srtm*/*
-srtmdata
-gmted
+cgiardata
+test/gmted
 gmted*/*
 gmteddata

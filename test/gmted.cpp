@@ -15,7 +15,7 @@ double getElevation(double lat, double lng, bool debug = false) {
   char latPre = latIndex < 0 ? 'S' : 'N';
 
   char pszFilename[100];
-  sprintf(pszFilename, "gmteddata/%02d%c%03d%c_20101117_gmted_mea075.tif", abs(latIndex), latPre, abs(lngIndex), lngPre);
+  sprintf(pszFilename, "../gmteddata/%02d%c%03d%c_20101117_gmted_mea075.tif", abs(latIndex), latPre, abs(lngIndex), lngPre);
   if (debug)
     printf("Filename for coordinates %.6f - %.6f : %s\n", lng, lat, pszFilename);
 

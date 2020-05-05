@@ -9,12 +9,20 @@
 using namespace std;
 
 double getElevation(double lat, double lng, bool debug = false) {
-  int lngIndex = static_cast<int>(floor((180 + lng) / 5)) + 1;
-  int latIndex = static_cast<int>(floor((59.999999 - lat) / 5)) + 1;
-  char pszFilename[100];
-  sprintf(pszFilename, "srtmdata/srtm_%02d_%02d.tif", lngIndex, latIndex);
+  // lng = (double)((int)(lng * 1e7) / 1e7);
+  // lat = (double)((int)(lat * 1e7) / 1e7);
   if (debug)
-    printf("Filename for coordinates %.6f - %.6f : %s\n", lng, lat, pszFilename);
+    printf("Original coordinates %.7f - %.7f\n", lng, lat);
+  int lngIndex = floor(1 + (180 + lng) / 5);
+  double latIndexDouble = 1 + (60 - lat) / 5;
+  int latIndex = floor(latIndexDouble);
+  // if (abs(latIndexDouble - latIndex) < 1 / 1e7 / 5) {
+  //   latIndex--;
+  // }
+  char pszFilename[100];
+  sprintf(pszFilename, "cgiardata/srtm_%02d_%02d.tif", lngIndex, latIndex);
+  if (debug)
+    printf("Filename for coordinates %.7f - %.7f : %s\n", lng, lat, pszFilename);
 
   GDALDataset  *poDataset;
   GDALAllRegister();
@@ -39,7 +47,8 @@ double getElevation(double lat, double lng, bool debug = false) {
       cout << "Failed to get reverse transformation." << endl;
     return 0;
   }
-
+  // int pixelOffset = adfInvGeoTransform[0];
+  // int lineOffset = adfInvGeoTransform[3];
   int iPixel = static_cast<int>(floor(adfInvGeoTransform[0] + adfInvGeoTransform[1] * lng + adfInvGeoTransform[2] * lat));
   int iLine = static_cast<int>(floor(adfInvGeoTransform[3] + adfInvGeoTransform[4] * lng + adfInvGeoTransform[5] * lat));
   if (debug)
@@ -57,7 +66,9 @@ double getElevation(double lat, double lng, bool debug = false) {
 }
 
 int main (int argc, char** argv) {
-  cout << getElevation(-9.111483, 148.758735, true) << endl;
+  // Node: 4353241011
+  cout << getElevation(48.6456794, 8.2324622, true) << endl;
+  // cout << getElevation(-9.111483, 148.758735, true) << endl;
   // cout << getElevation(49.949784, 11.57517, true) << endl; //337
   // cout << getElevation(49.968668, 11.575127, true) << endl; //466
   // cout << getElevation(49.968682, 11.574842, true) << endl; //455

@@ -3,10 +3,10 @@ ors-preprocessor:
 #-ltcmalloc
 
 srtm:
-	g++ srtm.cpp -o srtm --std=c++11 -m64 -lpthread -lz -lexpat -lbz2 -lconfig++ -lgdal -lboost_system -lboost_filesystem -O3
+	g++ test/srtm.cpp -o srtm --std=c++11 -m64 -lpthread -lz -lexpat -lbz2 -lconfig++ -lgdal -lboost_system -lboost_filesystem -O3
 
 gmted:
-	g++ gmted.cpp -o gmted --std=c++11 -m64 -lpthread -lz -lexpat -lbz2 -lconfig++ -lgdal -lboost_system -lboost_filesystem -O3
+	g++ test/gmted.cpp -o gmted --std=c++11 -m64 -lpthread -lz -lexpat -lbz2 -lconfig++ -lgdal -lboost_system -lboost_filesystem -O3
 
 .PHONY:
 clean:
