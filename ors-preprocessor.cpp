@@ -158,6 +158,7 @@ class FirstPassHandler : public osmium::handler::Handler {
     }
 
     void node(const osmium::Node& node) {
+      if (node.id() < 0) return;
       if (node.id() > node_max_id) {
         exitSegfault("Node", node.id());
       }
@@ -165,6 +166,7 @@ class FirstPassHandler : public osmium::handler::Handler {
     }
 
     void way(const osmium::Way& way) {
+      if (way.id() < 0) return;
       if (way.id() > way_max_id) {
         exitSegfault("Way", way.id());
       }
@@ -179,6 +181,7 @@ class FirstPassHandler : public osmium::handler::Handler {
     }
 
     void relation (const osmium::Relation& rel) {
+      if (rel.id() < 0) return;
       if (rel.id() > relation_max_id) {
         exitSegfault("Relation", rel.id());
       }
