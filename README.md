@@ -108,5 +108,6 @@ A log file is written containing all coordinates where no elevation value could 
 ## Limitations & future development
 This tool is under development and still experimental, though it has been successfully tested on several OSM subsets (Germany, DACH). Use at own risk.
 - Baden-Württemberg (from [geofabrik](http://download.geofabrik.de/europe/germany/baden-wuerttemberg.html)) runs in about 90 seconds on my ThinkPad, the OSM planet file in ca. 3 hours. The caching of elevation tile files might influence this, could be further optimized.
+- The tags removal currently just removes a few typical ignorable tags, but a thorough statistical analysis of tags in OSM to identify the most frequently used tags could yield better results.  
 - The elevation code is not precise in how the corresponding tiles file is determined from the queried coordinates, and needs further work. The current solution is in some cases effectively off by around 0.000139 degrees (ca. 10 m) and returns the value of a neighboring pixel, but since that error is smaller than the resolution of the elevation data itself and occurs only a small fraction of cases, it is arguable if this is a problem at all. Needs further investigation and potentially a fix.
 - The downloading of elevation GTIF files might be integrated into the tool for convenience. It was just quicker to write a python script...
