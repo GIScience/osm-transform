@@ -2,11 +2,18 @@
 Tool for reduction of OSM data and processing cost for elevation data extraction during graph building. Removes metadata, unused elements and tags, and adds `ele` tags to all retained nodes.
 
 ## Installation
-Clone and `make` (Makefile is configured for g++). Requires [libgdal](https://gdal.org/), [libosmium](https://osmcode.org/libosmium/) and [boost](https://www.boost.org/).
-
-On Ubuntu, run
+Simplest way is to use docker. Make sure you have docker installed on your system, clone the repository and and run the docker compile script. On Ubuntu, run
 ```
-sudo apt install g++ libgdal-dev libosmium-dev libboost-all-dev
+sudo apt install docker
+git clone https://gitlab.gistools.geog.uni-heidelberg.de/giscience/openrouteservice-infrastructure/ors-preprocessor.git
+cd ors-preprocessor
+./docker_compile.sh
+```
+
+Alternatively, you can `make` (Makefile is configured for g++). Requires [libgdal](https://gdal.org/), [libosmium](https://osmcode.org/libosmium/), [boost](https://www.boost.org/) and [libconfig](https://github.com/hyperrealm/libconfig).
+
+```
+sudo apt install g++ libgdal-dev libosmium-dev libboost-all-dev libconfig-dev
 git clone https://gitlab.gistools.geog.uni-heidelberg.de/giscience/openrouteservice-infrastructure/ors-preprocessor.git
 cd ors-preprocessor
 make
@@ -14,24 +21,10 @@ make
 
 For the elevation data merge, also download the elevations tiles for CGIAR SRTM data (see [srtm.csi.cgiar.org](http://srtm.csi.cgiar.org/)) and GMTED2010 data (as a fallback option, see [GMTED2010](https://www.usgs.gov/land-resources/eros/coastal-changes-and-impacts/gmted2010)). Two python scripts are provided that download (and, in the case of CGIAR data, unpack) these resources. Be aware those require approx. 63.1 Gb and 26.3 Gb drive space respectively.
 
-The downloaded files must be located in subdirs of where the tool is run from. In the desired directory, run 
+The downloaded files must be located in subdirs of where the tool is run from. In the desired directory, run
 ```
 python getCGIAR.py
 python getGMTED.py
-```
-
-## Installation caveat: GDAL
-On some systems, installing [GDAL](https://gdal.org/download.html) manually is required, which in turn requires compiling current version of [PROJ.4](https://proj.org/download.html) (Ubuntu 19.10). Download both packages, unpack, then in the PROJ dir
-```
-./configure
-make
-sudo make install
-```
-then in the GDAL dir
-```
-CPPFLAGS=-I/usr/local/include LDFLAGS=-L/usr/local/lib ./configure --with-proj=/usr/local
-make
-sudo make install
 ```
 
 ## Usage
