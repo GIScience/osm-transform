@@ -38,5 +38,5 @@ RUN mkdir /osm
 
 WORKDIR /elevation
 #ENTRYPOINT ["/bin/bash"]
-ENTRYPOINT ["/src/ors-preprocessor" "options" "osm"]
+ENTRYPOINT ["/src/ors-preprocessor", "options", "osm"]
 
