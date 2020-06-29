@@ -17,6 +17,6 @@ if [ -z ${OSM_FILE+x} ]; then OSM_FILE=planet-latest.osm.pbf; fi
 if [ -z ${ROOT_PATH+x} ]; then ROOT_PATH=/opt/ors/ors-preprocessor; fi
 
 cd $ROOT_PATH
+docker rm ors-preprocessor_$OSM_FILE
 docker build -t ors-preprocessor -f Dockerfile .
-docker run -it -v $ELEVATION_PATH:/elevation -v $OSM_PATH:/osm --name ors-preprocessor ors-preprocessor -m -o /osm/$OSM_FILE 
-docker rm ors-preprocessor
+docker run -it -v $ELEVATION_PATH:/elevation -v $OSM_PATH:/osm --name ors-preprocessor_$OSM_FILE ors-preprocessor -m -o /osm/$OSM_FILE 
