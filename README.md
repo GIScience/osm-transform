@@ -2,13 +2,20 @@
 Tool for reduction of OSM data and processing cost for elevation data extraction during graph building. Removes metadata, unused elements and tags, and adds `ele` tags to all retained nodes.
 
 ## Installation
-Simplest way is to use docker. Make sure you have docker installed on your system, clone the repository and and run the docker compile script. On Ubuntu, run
+The simplest way of installing the proprocessor is via Docker. First, make sure that Docker is installed on the machine, clone this repository and then build the Docker image. 
+
 ```
-sudo apt install docker
-git clone https://gitlab.gistools.geog.uni-heidelberg.de/giscience/openrouteservice-infrastructure/ors-preprocessor.git
-cd ors-preprocessor
-./docker_compile.sh
+sudo docker build -t ors-preprocessor .
 ```
+
+Once built, you can run the preprocessor as a container with the following command:
+
+```
+sudo docker run -i -v /opt/ors/elevation/preprocessor:/elevation -v /opt/ors/osm/preprocessor:/osm ors-preprocessor mo /osm/planet-latest.osm.pbf 
+```
+
+where the first `-v` option is the mapping to the folder containing the `cgiar_srtm` an `cgiar_geotiff` folders, and the second `-v` option is the mapping to the folder on the host containing the osm data. `mo` is the string reperesenting the script options (see below) and the last item (`/osm/planet-latest.osm.pbf`) is the osm file to use (note that the `/osm/` part must remain the same as this is internal to the Docker container). 
+
 
 Alternatively, you can `make` (Makefile is configured for g++). Requires [libgdal](https://gdal.org/), [libosmium](https://osmcode.org/libosmium/), [boost](https://www.boost.org/) and [libconfig](https://github.com/hyperrealm/libconfig).
 
