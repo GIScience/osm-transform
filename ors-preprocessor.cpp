@@ -4,6 +4,7 @@
 #include <chrono>
 #include <ctime>
 #include <unordered_map>
+#include <limits>
 
 #include <boost/regex.hpp>
 #include <boost/filesystem.hpp>
@@ -30,19 +31,21 @@
 
 using namespace std;
 typedef unsigned long long llu;
-typedef vector<int> vi;
+typedef vector<unsigned int> vi;
+const int BITWIDTH_INT = std::numeric_limits<unsigned int>::digits;
+
 
 void setBit(vi &A, llu k) {
   if (k < 0) return;
-  A[k/32] |= 1 << (k%32);  // Set the bit at the k-th position in A
+  A[k / BITWIDTH_INT] |= 1 << (k % BITWIDTH_INT);  // Set the bit at the k-th position in A
 }
 
-bool testBit(vector<int> &A, llu k) {
+bool testBit(vi &A, llu k) {
   if (k < 0) return 0;
-  return (A[k/32] & (1 << (k%32))) != 0;
+  return (A[k / BITWIDTH_INT] & (1 << (k % BITWIDTH_INT))) != 0;
 }
 
-llu countBits(vector<int> &A) {
+llu countBits(vi &A) {
   llu count = 0;
   for (auto &intval : A) {
     count += __builtin_popcount(intval);
@@ -87,11 +90,23 @@ class MaxIDHandler : public osmium::handler::Handler {
     void way(const osmium::Way& way) {
       if (way.id() < 0) return;
       way_max_id = way.id() > way_max_id ? way.id() : way_max_id;
+      for (const auto& node_ref : way.nodes()) {
+        node_max_id = node_ref.ref() > node_max_id ? node_ref.ref() : node_max_id;
+      }
     }
 
     void relation(const osmium::Relation& rel) {
       if (rel.id() < 0) return;
       relation_max_id = rel.id() > relation_max_id ? rel.id() : relation_max_id;
+
+      for (const auto& member : rel.members()) {
+  			if (member.type() == osmium::item_type::node) {
+          node_max_id = member.ref() > node_max_id ? member.ref() : node_max_id;
+        }
+  			if (member.type() == osmium::item_type::way) {
+          way_max_id = member.ref() > way_max_id ? member.ref() : way_max_id;
+        }
+      }
     }
 };
 
@@ -140,13 +155,13 @@ class FirstPassHandler : public osmium::handler::Handler {
     llu relation_count = 0;
     llu way_count = 0;
 
-    vector<int>* valid_nodes;
-    vector<int>* valid_ways;
-    vector<int>* valid_relations;
+    vi* valid_nodes;
+    vi* valid_ways;
+    vi* valid_relations;
 
     bool DEBUG_NO_FILTER = false;
 
-    void init(boost::regex* re, vector<int>* i_valid_nodes, vector<int>* i_valid_ways, vector<int>* i_valid_relations, bool debug_no_filter, llu i_node_max_id, llu i_way_max_id, llu i_relation_max_id) {
+    void init(boost::regex* re, vi* i_valid_nodes, vi* i_valid_ways, vi* i_valid_relations, bool debug_no_filter, llu i_node_max_id, llu i_way_max_id, llu i_relation_max_id) {
       remove_tags = re;
       valid_nodes = i_valid_nodes;
       valid_ways = i_valid_ways;
@@ -201,9 +216,9 @@ class FirstPassHandler : public osmium::handler::Handler {
 class RewriteHandler : public osmium::handler::Handler {
   friend ostream& operator<<(ostream& out, const RewriteHandler& ce);
   osmium::memory::Buffer* m_buffer;
-  vector<int>* valid_nodes;
-  vector<int>* valid_ways;
-  vector<int>* valid_relations;
+  vi* valid_nodes;
+  vi* valid_ways;
+  vi* valid_relations;
   boost::regex* remove_tags;
   boost::regex non_digit_regex;
   bool DEBUG_NO_FILTER = false;
@@ -352,7 +367,7 @@ class RewriteHandler : public osmium::handler::Handler {
       valid_tags = 0;
     }
 
-    void init(int i_cache_size, boost::regex* re, vector<int>* i_valid_nodes, vector<int>* i_valid_ways, vector<int>* i_valid_relations, ofstream* logref, bool debug_no_filter, bool debug_no_tag_filter) {
+    void init(int i_cache_size, boost::regex* re, vi* i_valid_nodes, vi* i_valid_ways, vi* i_valid_relations, ofstream* logref, bool debug_no_filter, bool debug_no_tag_filter) {
       cache_size = i_cache_size;
       remove_tags = re;
       valid_nodes = i_valid_nodes;
@@ -493,7 +508,7 @@ int main (int argc, char** argv) {
       cout << "DEBUG MODE: Tag filtering disabled" << endl << endl;
     }
   } catch(const libconfig::FileIOException& fioex) {
-    std::cerr << "I/O error while reading file." << std::endl;
+    std::cerr << "I/O error while reading config file." << std::endl;
     return 2;
   } catch(const libconfig::ParseException &pex) {
     std::cerr << "Parse error at " << pex.getFile() << ":" << pex.getLine()
@@ -533,9 +548,9 @@ int main (int argc, char** argv) {
 
     boost::regex remove_tag_regex(remove_tag_regex_str, boost::regex::icase);
     printf("Allocating memory: %.2f Mb nodes, %.2f Mb ways, %.2f Mb relations\n\n", nodes_max_id / (1024*1024*8.0), ways_max_id / (1024*1024*8.0), rels_max_id / (1024*1024*8.0));
-    vector<int> valid_nodes(nodes_max_id / 32 + 1, 0);
-    vector<int> valid_ways(ways_max_id / 32 + 1, 0);
-    vector<int> valid_relations(rels_max_id / 32 + 1, 0);
+    vi valid_nodes((nodes_max_id / BITWIDTH_INT) + 1, 0);
+    vi valid_ways((ways_max_id / BITWIDTH_INT) + 1, 0);
+    vi valid_relations((rels_max_id / BITWIDTH_INT) + 1, 0);
 
     cout << "Processing first pass: validate ways & relations..." << endl;
     auto start = chrono::steady_clock::now();

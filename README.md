@@ -11,10 +11,10 @@ sudo docker build -t ors-preprocessor .
 Once built, you can run the preprocessor as a container with the following command:
 
 ```
-sudo docker run -i -v /opt/ors/elevation/preprocessor:/elevation -v /opt/ors/osm/preprocessor:/osm ors-preprocessor mo /osm/planet-latest.osm.pbf 
+sudo docker run -i -v /[your local absolute path to the dir of the]/ors-preprocessor:/osm ors-preprocessor -m -o planet-latest.osm.pbf 
 ```
 
-where the first `-v` option is the mapping to the folder containing the `cgiar_srtm` an `cgiar_geotiff` folders, and the second `-v` option is the mapping to the folder on the host containing the osm data. `mo` is the string reperesenting the script options (see below) and the last item (`/osm/planet-latest.osm.pbf`) is the osm file to use (note that the `/osm/` part must remain the same as this is internal to the Docker container). 
+where the `-v` option is the mapping to the folder containing the required files: `cgiar_srtm` and `cgiar_geotiff` folders, the osm data, and the `ors-preprocessor.cfg` file. `-o` is the string reperesenting the script options (see below) and the last item (`planet-latest.osm.pbf`) is the osm file to use. 
 
 
 Alternatively, you can `make` (Makefile is configured for g++). Requires [libgdal](https://gdal.org/), [libosmium](https://osmcode.org/libosmium/), [boost](https://www.boost.org/) and [libconfig](https://github.com/hyperrealm/libconfig).
@@ -53,9 +53,9 @@ cache_size = 10;
 remove_tag = "(.*:)?source(:.*)?|(.*:)?note(:.*)?|url|created_by|fixme|wikipedia";
 
 # max IDs default values (fallback if memory check is skipped)
-nodes_max_id = 9000000000L;
-ways_max_id =  1000000000L;
-rels_max_id =    20000000L;
+nodes_max_id = 11000000000L;
+ways_max_id =   1200000000L;
+rels_max_id =     20000000L;
 
 #debug mode
 #debug_output = true;
