@@ -9,6 +9,7 @@ from typing import Optional
 import typer
 
 from . import __app_name__, __version__, logger
+from .logging import initialize_logging
 
 app = typer.Typer()
 
@@ -59,6 +60,7 @@ def main(
 ) -> None:
     if logging is None:
         logging = "INFO"
+    initialize_logging(logging)
     logger.info("############ Run info ############")
     logger.info(f"Log level: {logging}")
     logger.info(f"Number of cores: {cores}")
