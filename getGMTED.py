@@ -2,10 +2,8 @@
 # storage required: ca. 26.3 Gb
 
 import sys
-import sys
 import os.path
-import json
-import urllib
+import urllib.request
 
 storage_path = 'gmteddata/'
 if not os.path.exists(storage_path):
@@ -32,7 +30,7 @@ for lng_index in range(12):
         if not os.path.isfile(storage_path + file):
             print('downloading {}'.format(file))
             sys.stdout.flush()
-            urllib.urlretrieve('https://edcintl.cr.usgs.gov/downloads/sciweb1/shared/topo/downloads/GMTED/Global_tiles_GMTED/075darcsec/mea/{}{:03}/{}'.format(lngPre, abs(minLng), file), storage_path + file)
+            urllib.request.urlretrieve('https://edcintl.cr.usgs.gov/downloads/sciweb1/shared/topo/downloads/GMTED/Global_tiles_GMTED/075darcsec/mea/{}{:03}/{}'.format(lngPre, abs(minLng), file), storage_path + file)
             downloaded_files+=1
         else:
             existing_files+=1
