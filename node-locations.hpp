@@ -12,6 +12,7 @@
 
 #include "ordered-index.hpp"
 #include "osmtypes.hpp"
+#include "NodeWithElevation.h"
 
 #include <osmium/osm/location.hpp>
 #include <osmium/util/delta.hpp>
@@ -54,13 +55,13 @@ public:
      * \pre id must be strictly larger than all ids stored before.
      * \return True if the entry was added, false if the index is full.
      */
-    bool set(osmid_t id, osmium::Location location);
+    bool set(osmid_t id, osmium::Location location, int32_t ele);
 
     /**
      * Retrieve a node location. If the location wasn't stored before, an
      * invalid Location will be returned.
      */
-    osmium::Location get(osmid_t id) const;
+    NodeWithElevation get(osmid_t id) const;
 
     /// The number of locations stored.
     std::size_t size() const noexcept { return m_count; }
@@ -85,7 +86,7 @@ private:
 
     /// The maximum number of bytes an entry will need in storage.
     constexpr static std::size_t max_bytes_per_entry() noexcept {
-        return 10U /*max varint length*/ * 3U /*id, x, y*/;
+        return 10U /*max varint length*/ * 4U /*id, x, y, z*/;
     }
 
     bool will_resize() const noexcept
@@ -112,6 +113,7 @@ private:
     osmium::DeltaEncode<osmid_t> m_did;
     osmium::DeltaEncode<int64_t> m_dx;
     osmium::DeltaEncode<int64_t> m_dy;
+    osmium::DeltaEncode<int64_t> m_dz;
 }; // class node_locations_t
 
 #endif // OSM2PGSQL_NODE_LOCATIONS_HPP

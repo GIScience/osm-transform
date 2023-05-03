@@ -18,7 +18,7 @@
 
 #include <cassert>
 
-bool node_locations_t::set(osmid_t id, osmium::Location location)
+bool node_locations_t::set(osmid_t id, osmium::Location location, int32_t ele)
 {
     if (used_memory() >= m_max_size && will_resize()) {
         return false;
@@ -28,6 +28,7 @@ bool node_locations_t::set(osmid_t id, osmium::Location location)
         m_did.clear();
         m_dx.clear();
         m_dy.clear();
+        m_dz.clear();
         m_index.add(id, m_data.size());
     }
 
@@ -40,17 +41,19 @@ bool node_locations_t::set(osmid_t id, osmium::Location location)
         &m_data, protozero::encode_zigzag64(m_dx.update(location.x())));
     protozero::add_varint_to_buffer(
         &m_data, protozero::encode_zigzag64(m_dy.update(location.y())));
+    protozero::add_varint_to_buffer(
+            &m_data, protozero::encode_zigzag64(m_dz.update(ele)));
 
     ++m_count;
 
     return true;
 }
 
-osmium::Location node_locations_t::get(osmid_t id) const
+NodeWithElevation node_locations_t::get(osmid_t id) const
 {
     auto const offset = m_index.get_block(id);
     if (offset == ordered_index_t::not_found_value()) {
-        return osmium::Location{};
+        return NodeWithElevation{};
     }
 
     assert(offset < m_data.size());
@@ -61,6 +64,7 @@ osmium::Location node_locations_t::get(osmid_t id) const
     osmium::DeltaDecode<osmid_t> did;
     osmium::DeltaDecode<int64_t> dx;
     osmium::DeltaDecode<int64_t> dy;
+    osmium::DeltaDecode<int64_t> dz;
 
     for (std::size_t n = 0; n < block_size && begin != end; ++n) {
         auto const bid = did.update(
@@ -69,14 +73,16 @@ osmium::Location node_locations_t::get(osmid_t id) const
             protozero::decode_zigzag64(protozero::decode_varint(&begin, end))));
         auto const y = static_cast<int32_t>(dy.update(
             protozero::decode_zigzag64(protozero::decode_varint(&begin, end))));
+        auto const z = static_cast<int32_t>(dz.update(
+                protozero::decode_zigzag64(protozero::decode_varint(&begin, end))));
         if (bid == id) {
-            return osmium::Location{x, y};
+            return NodeWithElevation{id, x, y, z};
         }
         if (bid > id) {
             break;
         }
     }
-    return osmium::Location{};
+    return NodeWithElevation{};
 }
 
 void node_locations_t::clear()
