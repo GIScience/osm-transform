@@ -16,6 +16,7 @@
 #include "gdal_priv.h"
 #include "gdal_utils.h"
 #include "cpl_conv.h"
+#include "node-locations.hpp"
 
 #include <osmium/io/any_input.hpp>
 #include <osmium/io/any_output.hpp>
@@ -234,6 +235,10 @@ class RewriteHandler : public osmium::handler::Handler {
     list<string> cache_queue;
     ofstream *log;
 
+    osmium::memory::Buffer *m_new_node_buffer;
+    osmid_t m_next_node_id;
+    shared_ptr<node_locations_t> m_cache;
+
     void copy_tags(osmium::builder::Builder &parent, const osmium::TagList &tags, int ele = NO_DATA_VALUE) {
         osmium::builder::TagListBuilder builder{parent};
         for (const auto &tag: tags) {
@@ -369,12 +374,18 @@ public:
     llu nodes_with_elevation = 0;
     llu nodes_with_elevation_not_found = 0;
 
+    explicit RewriteHandler(const osmid_t next_node_id) : m_next_node_id(next_node_id), m_cache(std::make_unique<node_locations_t>()) {}
+
     void set_buffer(osmium::memory::Buffer *buffer) {
         m_buffer = buffer;
         valid_elements = 0;
         processed_elements = 0;
         total_tags = 0;
         valid_tags = 0;
+    }
+
+    void set_new_node_buffer(osmium::memory::Buffer *buffer) {
+        m_new_node_buffer = buffer;
     }
 
     void init(int i_cache_size, boost::regex *re, vi *i_valid_nodes, vi *i_valid_ways, vi *i_valid_relations,
@@ -418,6 +429,7 @@ public:
                     }
                 }
                 copy_tags(builder, node.tags(), ele);
+                m_cache->set(node.id(), node.location(), ele);
             }
         }
         m_buffer->commit();
@@ -430,7 +442,31 @@ public:
             if (DEBUG_NO_FILTER || testBit(*valid_ways, way.id()) > 0) {
                 osmium::builder::WayBuilder builder{*m_buffer};
                 builder.set_id(way.id());
-                builder.add_item(way.nodes());
+
+                std::vector<NodeWithElevation> nodes(way.nodes().size());
+                for (const auto &node: way.nodes()) {
+                    nodes.push_back(m_cache->get(node.ref()));
+                }
+
+                // nodes = splitway(nodes);
+
+                osmium::builder::WayNodeListBuilder wnl_builder{builder};
+                for (const auto &node : nodes) {
+                    if (node.id() < 0) {
+
+                        osmium::builder::NodeBuilder nodeBuilder(*m_new_node_buffer);
+                        nodeBuilder.set_id(m_next_node_id);
+                        nodeBuilder.set_location(osmium::Location(node.x(), node.y()));
+                        osmium::builder::TagListBuilder nodeTagsBuilder{nodeBuilder};
+                        nodeTagsBuilder.add_tag("ele", to_string(node.elevation()));
+                        m_new_node_buffer->commit();
+
+                        wnl_builder.add_node_ref(m_next_node_id++);
+                    } else {
+                        wnl_builder.add_node_ref(node.id());
+                    }
+                }
+
                 copy_tags(builder, way.tags());
             }
         }
@@ -598,11 +634,14 @@ int main(int argc, char **argv) {
         osmium::io::Header header;
         header.set("generator", "osm-transform v0.1.0");
         osmium::io::Writer writer{output, header, osmium::io::overwrite::allow};
-        RewriteHandler handler;
+        RewriteHandler handler(nodes_max_id + 1000000000);
         handler.init(cache_size, &remove_tag_regex, first_pass.valid_nodes, first_pass.valid_ways,
                      first_pass.valid_relations, &logFile, debug_no_filter, debug_no_tag_filter);
         handler.addElevation = addElevation;
         handler.overrideValues = overrideValues;
+
+        string new_node_output = remove_extension(basename(filename)) + ".ors.pbf.new_nodes";
+        osmium::io::Writer new_node_writer{new_node_output, header, osmium::io::overwrite::allow};
 
         while (osmium::memory::Buffer input_buffer = second_reader.read()) {
             auto step_start = chrono::steady_clock::now();
@@ -610,8 +649,14 @@ int main(int argc, char **argv) {
             int bytes_per_cycle = input_buffer.committed();
             osmium::memory::Buffer output_buffer{input_buffer.committed()};
             handler.set_buffer(&output_buffer);
+
+            osmium::memory::Buffer new_node_output_buffer{input_buffer.committed()};
+            handler.set_new_node_buffer(&new_node_output_buffer);
+
             osmium::apply(input_buffer, handler);
             writer(move(output_buffer));
+
+            new_node_writer(move(new_node_output_buffer));
 
             auto step_end = chrono::steady_clock::now();
             processed_elements += handler.processed_elements;
@@ -627,6 +672,9 @@ int main(int argc, char **argv) {
         }
         second_reader.close();
         writer.close();
+
+        new_node_writer.close();
+
         end = chrono::steady_clock::now();
         printf("\nProcessed in %.3f s\n", chrono::duration_cast<chrono::milliseconds>(end - start).count() / 1000.0);
 
