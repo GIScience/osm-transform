@@ -1,5 +1,7 @@
 cmake_minimum_required(VERSION 3.16)
-project(osm-transform)
+project(osm-transform
+        VERSION 0.1.0
+        DESCRIPTION "Package to customize OSM files")
 
 
 set(CMAKE_CXX_STANDARD 14)
