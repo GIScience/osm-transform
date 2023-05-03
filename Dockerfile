@@ -11,10 +11,10 @@ RUN DEBIAN_FRONTEND=noninteractive apt-get -y -qq install \
 
 COPY . /src
 WORKDIR /src
-RUN g++ ors-preprocessor.cpp -o ors-preprocessor --std=c++11 -m64 -lpthread -lz -lexpat -lbz2 -lconfig++ -I/usr/include/gdal -lgdal -lboost_regex -lboost_system -O3
+RUN g++ osm-transform.cpp -o osm-transform --std=c++11 -m64 -lpthread -lz -lexpat -lbz2 -lconfig++ -I/usr/include/gdal -lgdal -lboost_regex -lboost_system -O3
 
 RUN mkdir /osm
 WORKDIR /osm
 
-ENTRYPOINT ["/src/ors-preprocessor", "options", "osm"]
+ENTRYPOINT ["/src/osm-transform", "options", "osm"]
 

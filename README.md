@@ -2,27 +2,27 @@
 Tool for reduction of OSM data and processing cost for elevation data extraction during graph building. Removes metadata, unused elements and tags, and adds `ele` tags to all retained nodes.
 
 ## Installation
-The simplest way of installing the proprocessor is via Docker. First, make sure that Docker is installed on the machine, clone this repository and then build the Docker image. 
+The simplest way of installing is via Docker. First, make sure that Docker is installed on the machine, clone this repository and then build the Docker image. 
 
 ```
-sudo docker build -t ors-preprocessor .
+sudo docker build -t osm-transform .
 ```
 
 Once built, you can run the preprocessor as a container with the following command:
 
 ```
-sudo docker run -i -v /[your local absolute path to the dir of the]/ors-preprocessor:/osm ors-preprocessor -m -o planet-latest.osm.pbf 
+sudo docker run -i -v /[your local absolute path to the dir of the]/osm-transform:/osm osm-transform -m -o planet-latest.osm.pbf 
 ```
 
-where the `-v` option is the mapping to the folder containing the required files: `cgiar_srtm` and `cgiar_geotiff` folders, the osm data, and the `ors-preprocessor.cfg` file. `-o` is the string reperesenting the script options (see below) and the last item (`planet-latest.osm.pbf`) is the osm file to use. 
+where the `-v` option is the mapping to the folder containing the required files: `cgiar_srtm` and `cgiar_geotiff` folders, the osm data, and the `osm-transform.cfg` file. `-o` is the string reperesenting the script options (see below) and the last item (`planet-latest.osm.pbf`) is the osm file to use. 
 
 
 Alternatively, you can `make` (Makefile is configured for g++). Requires [libgdal](https://gdal.org/), [libosmium](https://osmcode.org/libosmium/), [boost](https://www.boost.org/) and [libconfig](https://github.com/hyperrealm/libconfig).
 
 ```
 sudo apt install g++ libgdal-dev libosmium-dev libboost-all-dev libconfig-dev
-git clone https://gitlab.gistools.geog.uni-heidelberg.de/giscience/openrouteservice-infrastructure/ors-preprocessor.git
-cd ors-preprocessor
+git clone https://gitlab.gistools.geog.uni-heidelberg.de/giscience/openrouteservice-infrastructure/osm-transform.git
+cd osm-transform
 make
 ```
 
@@ -36,7 +36,7 @@ python getGMTED.py
 
 ## Usage
 ```
-./ors-preprocessor [OPTIONS] [OSM file]
+./osm-transform [OPTIONS] [OSM file]
 
 Options:
 -m    do memory requirement check
@@ -44,7 +44,7 @@ Options:
 -e    skip elevation data merge
 -o    keep original elevation tags where present
 ```
-The `ors-preprocessor.cfg` file is used to set up the tool. The default configuration is as follows:
+The `osm-transform.cfg` file is used to set up the tool. The default configuration is as follows:
 ```
 # number of elevation tiles to keep open in memory simultaneously
 cache_size = 10;
