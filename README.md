@@ -1,4 +1,4 @@
-# ors-preprocessor
+# `osm-transform`
 Tool for reduction of OSM data and processing cost for elevation data extraction during graph building. Removes metadata, unused elements and tags, and adds `ele` tags to all retained nodes.
 
 ## Installation
@@ -111,3 +111,70 @@ This tool is under development and still experimental, though it has been succes
 - The tags removal currently just removes a few typical ignorable tags, but a thorough statistical analysis of tags in OSM to identify the most frequently used tags could yield better results.  
 - The elevation code is not precise in how the corresponding tiles file is determined from the queried coordinates, and needs further work. The current solution is in some cases effectively off by around 0.000139 degrees (ca. 10 m) and returns the value of a neighboring pixel, but since that error is smaller than the resolution of the elevation data itself and occurs only a small fraction of cases, it is arguable if this is a problem at all. Needs further investigation and potentially a fix.
 - The downloading of elevation GTIF files might be integrated into the tool for convenience. It was just quicker to write a python script...
+
+## Documentation
+**Usage**:
+
+```console
+$ osm-transform [OPTIONS] COMMAND [ARGS]...
+```
+
+**Options**:
+
+* `--logging [debug|info|warning|error|critical]`: [default: info]
+* `--cores INTEGER`: Set the number of cores to use for processing.  [default: 14]
+* `-v, --version`: Show the application's version and exit.
+* `--install-completion`: Install completion for the current shell.
+* `--show-completion`: Show completion for the current shell, to copy it or customize the installation.
+* `--help`: Show this message and exit.
+
+**Commands**:
+
+* `docs`: Generate documentation
+* `foo`
+
+## `osm-transform docs`
+
+Generate documentation
+
+**Usage**:
+
+```console
+$ osm-transform docs [OPTIONS] COMMAND [ARGS]...
+```
+
+**Options**:
+
+* `--help`: Show this message and exit.
+
+**Commands**:
+
+* `generate`: Generate markdown version of usage...
+
+### `osm-transform docs generate`
+
+Generate markdown version of usage documentation
+
+**Usage**:
+
+```console
+$ osm-transform docs generate [OPTIONS]
+```
+
+**Options**:
+
+* `--name TEXT`: The name of the CLI program to use in docs.
+* `--output FILE`: An output file to write docs to, like README.md.
+* `--help`: Show this message and exit.
+
+## `osm-transform foo`
+
+**Usage**:
+
+```console
+$ osm-transform foo [OPTIONS]
+```
+
+**Options**:
+
+* `--help`: Show this message and exit.

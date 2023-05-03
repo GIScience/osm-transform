@@ -3,6 +3,7 @@ from __future__ import annotations
 import os
 import time
 from dataclasses import dataclass
+from .docs import app as docs_app
 
 from typing import Optional
 
@@ -13,6 +14,7 @@ from .logging.logging import initialize_logging, LogLevel
 
 app = typer.Typer()
 
+app.add_typer(docs_app, name="docs", help="Generate documentation")
 script_start_time = time.time()
 
 cpu_count: int | None = os.cpu_count()
@@ -38,7 +40,9 @@ class Shared:
 def foo() -> int:
     logger.info("#################################")
     logger.info("########## Foo Start ############")
-    logger.info("Successfully ran foo command")
+    logger.info("INFO: Successfully ran foo command")
+    logger.debug("DEBUG: Successfully ran foo command")
+    logger.error("ERROR: Successfully ran foo command")
     logger.info("#################################")
     return 0
 
