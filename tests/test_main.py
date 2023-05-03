@@ -1,7 +1,6 @@
 from typer.testing import CliRunner
 
-from osm_transform import main
-from src.osm_transform import __app_name__, __version__
+from cli.osm_transform import __app_name__, __version__, main
 
 runner = CliRunner()
 

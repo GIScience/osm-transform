@@ -4,7 +4,7 @@ version = "0.1.0"
 description = ""
 authors = ["Takara Baumbach <Takara.Baumbach@heigit.org>", "Julian Psotta <julian.psotta@heigit.org>"]
  readme = "README.md"
-packages = [{ include = "osm_transform", from = "src" }]
+packages = [{ include = "osm_transform", from = "cli" }]
 
 [tool.poetry.scripts]
 osm-transform = "osm_transform.main:app"
