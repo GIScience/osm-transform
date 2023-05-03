@@ -20,7 +20,15 @@ jobs:
       - name: Check the commit style against the 'conventional commit styling'
         uses: MichaelsJP/action-conventional-commits@master
         with:
-          VALID_LABELS: '["feat","fix","docs","style","refactor","test","build","perf","ci","chore","revert","merge","wip","graphbreak", "apigreak"]'
+          VALID_LABELS: '["feat","fix","docs","style","refactor","test","build","perf","ci","chore","revert","merge","wip"]'
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Add conventional release labels
+        uses: bcoe/conventional-release-labels@v1.3.0
+        with:
+          type_labels: '{"feat": "feature", "fix": "fix", "perf": "performance improvement", "revert": "revert", "docs": "documentation", "style": "style", "refactor": "refactor", "test": "test", "build": "build", "ci": "ci", "wip": "wip"}'
+          ignored_types: '["chore"]'
+          ignore_label: 'ignore-for-release'
+        env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
   run_tests:
     needs:
