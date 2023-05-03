@@ -440,37 +440,43 @@ public:
         if (way.id() < 0) return;
         {
             if (DEBUG_NO_FILTER || testBit(*valid_ways, way.id()) > 0) {
-                osmium::builder::WayBuilder builder{*m_buffer};
-                builder.set_id(way.id());
+                auto next_node_id = m_next_node_id;
 
                 std::vector<NodeWithElevation> nodes(way.nodes().size());
                 for (const auto &node: way.nodes()) {
                     nodes.push_back(m_cache->get(node.ref()));
                 }
 
-                // nodes = splitway(nodes);
+                // nodes = splitWay(nodes);
 
-                osmium::builder::WayNodeListBuilder wnl_builder{builder};
-                for (const auto &node : nodes) {
-                    if (node.id() < 0) {
-
+                {
+                    osmium::builder::WayBuilder builder{*m_buffer};
+                    builder.set_id(way.id());
+                    copy_tags(builder, way.tags());
+                    {
+                        osmium::builder::WayNodeListBuilder wnl_builder{builder};
+                        for (const auto &node: nodes) {
+                            if (node.id() < 0) {
+                                wnl_builder.add_node_ref(m_next_node_id++);
+                            } else {
+                                wnl_builder.add_node_ref(node.id());
+                            }
+                        }
+                    }
+                }
+                for (const auto &node: nodes) {
+                    {
                         osmium::builder::NodeBuilder nodeBuilder(*m_new_node_buffer);
-                        nodeBuilder.set_id(m_next_node_id);
+                        nodeBuilder.set_id(next_node_id++);
                         nodeBuilder.set_location(osmium::Location(node.x(), node.y()));
                         osmium::builder::TagListBuilder nodeTagsBuilder{nodeBuilder};
                         nodeTagsBuilder.add_tag("ele", to_string(node.elevation()));
-                        m_new_node_buffer->commit();
-
-                        wnl_builder.add_node_ref(m_next_node_id++);
-                    } else {
-                        wnl_builder.add_node_ref(node.id());
                     }
+                    m_new_node_buffer->commit();
                 }
-
-                copy_tags(builder, way.tags());
             }
+            m_buffer->commit();
         }
-        m_buffer->commit();
     }
 
     void relation(const osmium::Relation &relation) {
@@ -640,7 +646,7 @@ int main(int argc, char **argv) {
         handler.addElevation = addElevation;
         handler.overrideValues = overrideValues;
 
-        string new_node_output = remove_extension(basename(filename)) + ".ors.pbf.new_nodes";
+        string new_node_output = remove_extension(basename(filename)) + ".ors.new_nodes.pbf";
         osmium::io::Writer new_node_writer{new_node_output, header, osmium::io::overwrite::allow};
 
         while (osmium::memory::Buffer input_buffer = second_reader.read()) {
