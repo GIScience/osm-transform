@@ -1,0 +1,3 @@
+**/*.tif
+Dockerfile
+.venv*
