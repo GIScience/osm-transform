@@ -233,6 +233,9 @@ class RewriteHandler : public osmium::handler::Handler {
     unordered_map<string, GDALDataset *> elevationData;
     int cache_size = -1;
     list<string> cache_queue;
+    GDALDataset *loaded_custom_geotiff = nullptr;
+    OGRCoordinateTransformation *custom_coord_trans = nullptr;
+
     ofstream *log;
 
     osmium::memory::Buffer *m_new_node_buffer;
@@ -249,7 +252,7 @@ class RewriteHandler : public osmium::handler::Handler {
                     if (ele == NO_DATA_VALUE) {
                         valid_tags++;
                         string tagval(tag.value());
-                        string empty = "";
+                        string empty;
                         string value = regex_replace(tagval, non_digit_regex, empty);
                         builder.add_tag("ele", value);
                     }
@@ -262,6 +265,48 @@ class RewriteHandler : public osmium::handler::Handler {
         if (ele > NO_DATA_VALUE) {
             builder.add_tag("ele", to_string(ele));
         }
+    }
+
+
+    double getElevationNRW(const basic_string<char> &geotiff_filename, double lat, double lng, bool debug = false) {
+        char pszFilename[100];
+        sprintf(pszFilename, "%s", geotiff_filename.c_str());
+
+        if (loaded_custom_geotiff == nullptr) {
+            loaded_custom_geotiff = (GDALDataset *) GDALOpenShared(pszFilename, GA_ReadOnly);
+            if (loaded_custom_geotiff == nullptr) {
+                if (debug)
+                    cout << "Failed to read input data from file " << pszFilename << endl;
+                return NO_DATA_VALUE;
+            } else {
+                printf("Dataset opened. (format: %s; size: %d x %d x %d)\n",
+                       loaded_custom_geotiff->GetDriver()->GetDescription(),
+                       loaded_custom_geotiff->GetRasterXSize(), loaded_custom_geotiff->GetRasterYSize(),
+                       loaded_custom_geotiff->GetRasterCount());
+            }
+            printf("Success loading custom geotiff: %s \n", geotiff_filename.c_str());
+        }
+        if (custom_coord_trans == nullptr) {
+            OGRSpatialReference srFrom;
+            OGRSpatialReference srTo;
+            srFrom.SetWellKnownGeogCS("WGS84");
+
+            const char *srToWKT = loaded_custom_geotiff->GetProjectionRef();
+            srTo.importFromWkt(srToWKT);
+
+            custom_coord_trans = OGRCreateCoordinateTransformation(&srFrom, &srTo);
+
+            printf("Success initializing OGRSpatialReference: WGS84 to EPSG:%d\n", srTo.GetEPSGGeogCS());
+        }
+
+        if (debug) {
+            printf("Normal coordinates %.6f - %.6f\n", lng, lat);
+        }
+        custom_coord_trans->Transform(1, &lat, &lng);
+        if (debug) {
+            printf("Reprojected coordinates %.6f - %.6f\n", lng, lat);
+        }
+        return getElevationFromCustomFile(loaded_custom_geotiff, lat, lng, debug);
     }
 
     double getElevationCGIAR(double lat, double lng, bool debug = false) {
@@ -353,12 +398,71 @@ class RewriteHandler : public osmium::handler::Handler {
         }
 
         double adfPixel[2];
-        if (poDataset->GetRasterBand(1)->RasterIO(GF_Read, iPixel, iLine, 1, 1, adfPixel, 1, 1, GDT_CFloat64, 0, 0) !=
-            CE_None) {
+        if (poDataset->GetRasterBand(1)->RasterIO(GF_Read, iPixel, iLine, 1, 1, adfPixel, 1, 1, GDT_CFloat64, 0, 0)
+            != CE_None) {
             if (debug) {
-                cout << "Failed to read data at coordinates." << endl;
+                cout << "Failed to read data at coordinates: POINT (" << lat << " " << lng << ")" << endl;
             }
             return NO_DATA_VALUE;
+        }
+        return adfPixel[0];
+    }
+
+    double getElevationFromCustomFile(GDALDataset *geo_tiff, double lat, double lng, bool debug = false) {
+        if (geo_tiff == nullptr) {
+            return NO_DATA_VALUE;
+        }
+        double adfGeoTransform[6];
+        double adfInvGeoTransform[6];
+        if (geo_tiff->GetGeoTransform(adfGeoTransform) != CE_None) {
+            if (debug)
+                cout << "Failed to get transformation from input data." << endl;
+            return NO_DATA_VALUE;
+        }
+        if (!GDALInvGeoTransform(adfGeoTransform, adfInvGeoTransform)) {
+            if (debug)
+                cout << "Failed to get reverse transformation." << endl;
+            return NO_DATA_VALUE;
+        }
+
+        double originX = adfGeoTransform[0];
+        double originY = adfGeoTransform[3];
+        double pixelWidth = adfGeoTransform[1];
+        double pixelHeight = adfGeoTransform[5];
+
+        auto x_offset = int((lat - originX) / pixelWidth);
+        auto y_offset = int((lng - originY) / pixelHeight);
+        if (x_offset < 0 or y_offset < 0 or x_offset >= geo_tiff->GetRasterXSize()
+            or y_offset >= geo_tiff->GetRasterYSize()) {
+            if (debug) {
+                cout << "Coordinate out of bounds: POINT (" << lat << " " << lng << ")" << endl;
+            }
+            return NO_DATA_VALUE;
+        }
+
+        if (debug) {
+            printf("Coordinates: %.7f %.7f\n", lat, lng);
+            printf("Image coordinates: x_offset %d | y_offset %d\n", x_offset, y_offset);
+        }
+
+        double adfPixel[2];
+        if (geo_tiff->GetRasterBand(1)
+                    ->RasterIO(GF_Read, x_offset, y_offset, 1, 1, adfPixel, 1, 1, GDT_CFloat64, 0, 0)
+            != CE_None) {
+            if (debug) {
+                cout << "Failed to read data at coordinates: POINT (" << lat << " " << lng << ")" << endl;
+            }
+            return NO_DATA_VALUE;
+        }
+
+        int raster_has_nodata = 0;
+        double noDataValue = geo_tiff->GetRasterBand(1)->GetNoDataValue(&raster_has_nodata);
+        if (raster_has_nodata && adfPixel[0] <= noDataValue) {
+            return NO_DATA_VALUE;
+        }
+
+        if (debug) {
+            printf("Pixel value: %f", adfPixel[0]);
         }
         return adfPixel[0];
     }
@@ -371,6 +475,10 @@ public:
     llu valid_tags = 0;
     bool addElevation = false;
     bool overrideValues = false;
+    string custom_geotiff;
+    llu nodes_with_elevation_custom_precision = 0;
+    llu nodes_with_elevation_srtm_precision = 0;
+    llu nodes_with_elevation_gmted_precision = 0;
     llu nodes_with_elevation = 0;
     llu nodes_with_elevation_not_found = 0;
 
@@ -507,6 +615,7 @@ ostream &operator<<(ostream &out, const RewriteHandler &handler) {
 
 int main(int argc, char **argv) {
     char *filename;
+    char *customGeoTIFF = nullptr;
     bool doMemoryCheck = false;
     bool stopAfterMemoryCheck = false;
     bool addElevation = true;
@@ -522,6 +631,8 @@ int main(int argc, char **argv) {
             addElevation = false;
         } else if (strcmp(*arg, "-o") == 0) {
             overrideValues = false;
+        } else if (strcmp(*arg, "-f") == 0) {
+            customGeoTIFF = *arg;
         } else {
             filename = *arg;
         }
@@ -532,6 +643,7 @@ int main(int argc, char **argv) {
         cerr << "\t\t-c\tonly perform memory requirement check" << endl;
         cerr << "\t\t-e\tskip elevation data merge" << endl;
         cerr << "\t\t-o\tkeep original elevation tags where present" << endl;
+        cerr << "\t\t-f\tprovide a custom GeoTIFF file" << endl;
         return 1;
     }
 
@@ -543,6 +655,7 @@ int main(int argc, char **argv) {
     llu ways_max_id;
     llu rels_max_id;
     int cache_size = -1;
+    string custom_geotiff;
     try {
         libconfig::Config cfg;
         cfg.readFile("osm-transform.cfg");
@@ -555,6 +668,10 @@ int main(int argc, char **argv) {
         root.lookupValue("debug_no_filter", debug_no_filter);
         root.lookupValue("debug_no_tag_filter", debug_no_tag_filter);
         root.lookupValue("cache_size", cache_size);
+        root.lookupValue("custom_geotiff", custom_geotiff);
+        if (custom_geotiff.length() > 0) {
+            cout << "CUSTOM GEOTIFF MODE: " << custom_geotiff << endl << endl;
+        }
         if (debug_no_filter) {
             cout << "DEBUG MODE: Filtering disabled" << endl << endl;
         }
@@ -689,9 +806,21 @@ int main(int argc, char **argv) {
         printf("\nOriginal: %20llu b\nReduced: %21llu b\nReduction: %19llu b (= %3.2f %%)\n", insize, outsize,
                reduction, (float) reduction / static_cast<float>(insize) * 100);
         if (addElevation) {
-            printf("Elevation: %19.2f %% failed (%lld)\n", ((float) handler.nodes_with_elevation_not_found /
-                                                            static_cast<float>(countBits(*first_pass.valid_nodes))) *
-                                                           100.0, handler.nodes_with_elevation_not_found);
+            printf("All Nodes: %19llu Nodes\n",
+                   countBits(*first_pass.valid_nodes));
+            printf("Custom Elevation: %12.2f %% (%lld)\n",
+                   ((double) handler.nodes_with_elevation_custom_precision) /
+                   (double) countBits(*first_pass.valid_nodes) * 100, handler.nodes_with_elevation_custom_precision);
+            printf("SRTM Elevation: %14.2f %% (%lld)\n",
+                   ((double) handler.nodes_with_elevation_srtm_precision) /
+                   (double) countBits(*first_pass.valid_nodes) * 100, handler.nodes_with_elevation_srtm_precision);
+            printf("GMTED Elevation: %13.2f %% (%lld)\n",
+                   ((double) handler.nodes_with_elevation_gmted_precision) /
+                   (double) countBits(*first_pass.valid_nodes) * 100, handler.nodes_with_elevation_gmted_precision);
+            printf("Failed Elevation: %12.2f %% (%lld)\n",
+                   ((double) handler.nodes_with_elevation_not_found /
+                    (double) countBits(*first_pass.valid_nodes)) * 100,
+                   handler.nodes_with_elevation_not_found);
             if (!overrideValues)
                 printf("%30.2f %% already present (%lld)\n",
                        ((float) handler.nodes_with_elevation / static_cast<float>(countBits(*first_pass.valid_nodes))) *
