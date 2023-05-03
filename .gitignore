@@ -5,10 +5,11 @@
 *.gz
 *.zip
 *.old
-ors-preprocessor
+osm-transform
 test/srtm
 srtm*/*
 cgiardata
 test/gmted
 gmted*/*
 gmteddata
+cmake-build-debug

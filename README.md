@@ -1,30 +1,31 @@
-# ors-preprocessor
+# `osm-transform`
 Tool for reduction of OSM data and processing cost for elevation data extraction during graph building. Removes metadata, unused elements and tags, and adds `ele` tags to all retained nodes.
 
 ## Installation
-The simplest way of installing the proprocessor is via Docker. First, make sure that Docker is installed on the machine, clone this repository and then build the Docker image. 
+The simplest way of installing is via Docker. First, make sure that Docker is installed on the machine, clone this repository and then build the Docker image. 
 
 ```
-sudo docker build -t ors-preprocessor .
+sudo docker build -t osm-transform .
 ```
 
 Once built, you can run the preprocessor as a container with the following command:
 
 ```
-sudo docker run -i -v /[your local absolute path to the dir of the]/ors-preprocessor:/osm ors-preprocessor -m -o planet-latest.osm.pbf 
+sudo docker run -i -v /[your local absolute path to the dir of the]/osm-transform:/osm osm-transform -m -o planet-latest.osm.pbf 
 ```
 
-where the `-v` option is the mapping to the folder containing the required files: `cgiar_srtm` and `cgiar_geotiff` folders, the osm data, and the `ors-preprocessor.cfg` file. `-o` is the string reperesenting the script options (see below) and the last item (`planet-latest.osm.pbf`) is the osm file to use. 
+where the `-v` option is the mapping to the folder containing the required files: `cgiar_srtm` and `cgiar_geotiff` folders, the osm data, and the `osm-transform.cfg` file. `-o` is the string reperesenting the script options (see below) and the last item (`planet-latest.osm.pbf`) is the osm file to use. 
 
 
-Alternatively, you can `make` (Makefile is configured for g++). Requires [libgdal](https://gdal.org/), [libosmium](https://osmcode.org/libosmium/), [boost](https://www.boost.org/) and [libconfig](https://github.com/hyperrealm/libconfig).
+Alternatively, you can compile using `g++` (requires [libgdal](https://gdal.org/), [libosmium](https://osmcode.org/libosmium/), [boost](https://www.boost.org/) and [libconfig](https://github.com/hyperrealm/libconfig)).
 
 ```
+# on ubuntu
 sudo apt install g++ libgdal-dev libosmium-dev libboost-all-dev libconfig-dev
-git clone https://gitlab.gistools.geog.uni-heidelberg.de/giscience/openrouteservice-infrastructure/ors-preprocessor.git
-cd ors-preprocessor
-make
+g++ osm-transform.cpp -o osm-transform --std=c++11 -m64 -lpthread -lz -lexpat -lbz2 -lconfig++ -I/usr/include/gdal -lgdal -lboost_regex -lboost_system -O3
 ```
+
+Or use `cmake` which should be automatically configured by your IDE through the `CMakeLists.txt` file.
 
 For the elevation data merge, also download the elevations tiles for CGIAR SRTM data (see [srtm.csi.cgiar.org](http://srtm.csi.cgiar.org/)) and GMTED2010 data (as a fallback option, see [GMTED2010](https://www.usgs.gov/land-resources/eros/coastal-changes-and-impacts/gmted2010)). Two python scripts are provided that download (and, in the case of CGIAR data, unpack) these resources. Be aware those require approx. 63.1 Gb and 26.3 Gb drive space respectively.
 
@@ -36,7 +37,7 @@ python getGMTED.py
 
 ## Usage
 ```
-./ors-preprocessor [OPTIONS] [OSM file]
+./osm-transform [OPTIONS] [OSM file]
 
 Options:
 -m    do memory requirement check
@@ -44,7 +45,7 @@ Options:
 -e    skip elevation data merge
 -o    keep original elevation tags where present
 ```
-The `ors-preprocessor.cfg` file is used to set up the tool. The default configuration is as follows:
+The `osm-transform.cfg` file is used to set up the tool. The default configuration is as follows:
 ```
 # number of elevation tiles to keep open in memory simultaneously
 cache_size = 10;
@@ -111,3 +112,70 @@ This tool is under development and still experimental, though it has been succes
 - The tags removal currently just removes a few typical ignorable tags, but a thorough statistical analysis of tags in OSM to identify the most frequently used tags could yield better results.  
 - The elevation code is not precise in how the corresponding tiles file is determined from the queried coordinates, and needs further work. The current solution is in some cases effectively off by around 0.000139 degrees (ca. 10 m) and returns the value of a neighboring pixel, but since that error is smaller than the resolution of the elevation data itself and occurs only a small fraction of cases, it is arguable if this is a problem at all. Needs further investigation and potentially a fix.
 - The downloading of elevation GTIF files might be integrated into the tool for convenience. It was just quicker to write a python script...
+
+## Documentation
+**Usage**:
+
+```console
+$ osm-transform [OPTIONS] COMMAND [ARGS]...
+```
+
+**Options**:
+
+* `--logging [debug|info|warning|error|critical]`: [default: info]
+* `--cores INTEGER`: Set the number of cores to use for processing.  [default: 14]
+* `-v, --version`: Show the application's version and exit.
+* `--install-completion`: Install completion for the current shell.
+* `--show-completion`: Show completion for the current shell, to copy it or customize the installation.
+* `--help`: Show this message and exit.
+
+**Commands**:
+
+* `docs`: Generate documentation
+* `foo`
+
+## `osm-transform docs`
+
+Generate documentation
+
+**Usage**:
+
+```console
+$ osm-transform docs [OPTIONS] COMMAND [ARGS]...
+```
+
+**Options**:
+
+* `--help`: Show this message and exit.
+
+**Commands**:
+
+* `generate`: Generate markdown version of usage...
+
+### `osm-transform docs generate`
+
+Generate markdown version of usage documentation
+
+**Usage**:
+
+```console
+$ osm-transform docs generate [OPTIONS]
+```
+
+**Options**:
+
+* `--name TEXT`: The name of the CLI program to use in docs.
+* `--output FILE`: An output file to write docs to, like README.md.
+* `--help`: Show this message and exit.
+
+## `osm-transform foo`
+
+**Usage**:
+
+```console
+$ osm-transform foo [OPTIONS]
+```
+
+**Options**:
+
+* `--help`: Show this message and exit.

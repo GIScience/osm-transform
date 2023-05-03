@@ -491,7 +491,7 @@ int main (int argc, char** argv) {
   int cache_size = -1;
   try {
     libconfig::Config cfg;
-    cfg.readFile("ors-preprocessor.cfg");
+    cfg.readFile("osm-transform.cfg");
     const libconfig::Setting& root = cfg.getRoot();
     root.lookupValue("remove_tag", remove_tag_regex_str);
     root.lookupValue("nodes_max_id", nodes_max_id);
@@ -520,7 +520,7 @@ int main (int argc, char** argv) {
   }
 
   ofstream logFile;
-  logFile.open("ors-preprocessor.log");
+  logFile.open("osm-transform.log");
   try {
     if (doMemoryCheck) {
       cout << "Calculating required memory..." << endl;
@@ -579,7 +579,7 @@ int main (int argc, char** argv) {
     cout << "Processing second pass: rebuild data..." << endl;
     osmium::io::Reader second_reader{filename};
     osmium::io::Header header;
-    header.set("generator", "ORS Proprocessor v1.0");
+    header.set("generator", "osm-transform v0.1.0");
     osmium::io::Writer writer{output, header, osmium::io::overwrite::allow};
     RewriteHandler handler;
     handler.init(cache_size, &remove_tag_regex, first_pass.valid_nodes, first_pass.valid_ways, first_pass.valid_relations, &logFile, debug_no_filter, debug_no_tag_filter);
