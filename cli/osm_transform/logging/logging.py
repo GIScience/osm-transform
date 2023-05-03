@@ -2,7 +2,7 @@ import logging
 import sys
 from enum import Enum
 
-from src.osm_transform import logger
+from cli.osm_transform import logger
 
 from enum import Enum
 
