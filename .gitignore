@@ -12,3 +12,4 @@ cgiardata
 test/gmted
 gmted*/*
 gmteddata
+cmake-build-debug
