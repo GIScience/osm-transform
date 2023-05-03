@@ -13,5 +13,5 @@ def test_version() -> None:
 
 
 def test_foo():
-    result = runner.invoke(main.app, ["foo"])
+    result = runner.invoke(main.app, ["--logging=debug", "foo"])
     assert result.exit_code == 0

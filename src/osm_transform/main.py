@@ -9,7 +9,7 @@ from typing import Optional
 import typer
 
 from . import __app_name__, __version__, logger
-from .logging import initialize_logging
+from .logging.logging import initialize_logging, LogLevel
 
 app = typer.Typer()
 
@@ -46,7 +46,7 @@ def foo() -> int:
 @app.callback()
 def main(
         ctx: typer.Context,
-        logging: Optional[str] = "INFO",
+        logging: LogLevel = LogLevel.INFO,
         cores: int = typer.Option(cpu_count - 1 if cpu_count else 1,
                                   help="Set the number of cores to use for processing."),
         version: Optional[bool] = typer.Option(
@@ -59,7 +59,7 @@ def main(
         ),
 ) -> None:
     if logging is None:
-        logging = "INFO"
+        logging = LogLevel.INFO
     initialize_logging(logging)
     logger.info("############ Run info ############")
     logger.info(f"Log level: {logging}")

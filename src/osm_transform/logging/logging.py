@@ -1,7 +1,27 @@
 import logging
 import sys
+from enum import Enum
 
 from src.osm_transform import logger
+
+from enum import Enum
+
+
+class LogLevel(str, Enum):
+    """
+    An enumeration of log levels, from least to most severe.
+    """
+    DEBUG = "debug"
+    INFO = "info"
+    WARNING = "warning"
+    ERROR = "error"
+    CRITICAL = "critical"
+
+    def __str__(self) -> str:
+        return self.value
+
+    def get_level(self) -> int:
+        return getattr(logging, self.value.upper())
 
 
 class CustomFormatter(logging.Formatter):
@@ -27,8 +47,8 @@ class CustomFormatter(logging.Formatter):
         return formatter.format(record)
 
 
-def initialize_logging(level: str = "info") -> None:
-    correct_level = logging.getLevelName(level)
+def initialize_logging(log_level: LogLevel = LogLevel.INFO) -> None:
+    correct_level = logging.getLevelName(log_level.get_level())
     logger.setLevel(correct_level)
 
     stdout_handler = logging.StreamHandler(sys.stdout)
