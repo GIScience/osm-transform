@@ -17,14 +17,15 @@ sudo docker run -i -v /[your local absolute path to the dir of the]/osm-transfor
 where the `-v` option is the mapping to the folder containing the required files: `cgiar_srtm` and `cgiar_geotiff` folders, the osm data, and the `osm-transform.cfg` file. `-o` is the string reperesenting the script options (see below) and the last item (`planet-latest.osm.pbf`) is the osm file to use. 
 
 
-Alternatively, you can `make` (Makefile is configured for g++). Requires [libgdal](https://gdal.org/), [libosmium](https://osmcode.org/libosmium/), [boost](https://www.boost.org/) and [libconfig](https://github.com/hyperrealm/libconfig).
+Alternatively, you can compile using `g++` (requires [libgdal](https://gdal.org/), [libosmium](https://osmcode.org/libosmium/), [boost](https://www.boost.org/) and [libconfig](https://github.com/hyperrealm/libconfig)).
 
 ```
+# on ubuntu
 sudo apt install g++ libgdal-dev libosmium-dev libboost-all-dev libconfig-dev
-git clone https://gitlab.gistools.geog.uni-heidelberg.de/giscience/openrouteservice-infrastructure/osm-transform.git
-cd osm-transform
-make
+g++ osm-transform.cpp -o osm-transform --std=c++11 -m64 -lpthread -lz -lexpat -lbz2 -lconfig++ -I/usr/include/gdal -lgdal -lboost_regex -lboost_system -O3
 ```
+
+Or use `cmake` which should be automatically configured by your IDE through the `CMakeLists.txt` file.
 
 For the elevation data merge, also download the elevations tiles for CGIAR SRTM data (see [srtm.csi.cgiar.org](http://srtm.csi.cgiar.org/)) and GMTED2010 data (as a fallback option, see [GMTED2010](https://www.usgs.gov/land-resources/eros/coastal-changes-and-impacts/gmted2010)). Two python scripts are provided that download (and, in the case of CGIAR data, unpack) these resources. Be aware those require approx. 63.1 Gb and 26.3 Gb drive space respectively.
 
