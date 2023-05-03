@@ -4,7 +4,7 @@ project(osm-transform
         DESCRIPTION "Package to customize OSM files")
 
 
-set(CMAKE_CXX_STANDARD 14)
+set(CMAKE_CXX_STANDARD 20)
 
 
 if (CMAKE_HOST_WIN32)
@@ -13,7 +13,7 @@ else ()
     set(libname "config")
 endif ()
 
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11 -m64")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -m64")
 add_executable(osm-transform osm-transform.cpp node-locations.cpp ordered-index.cpp)
 target_link_libraries(osm-transform ${libname}++ pthread z expat bz2 config++ gdal boost_regex boost_system)
 include_directories(${CPLUS_INCLUDE_PATH} ${C_INCLUDE_PATH} /usr/include/gdal)

@@ -617,10 +617,11 @@ int main(int argc, char **argv) {
             processed_elements += handler.processed_elements;
             processed_nanos += chrono::duration_cast<chrono::nanoseconds>(step_end - step_start).count();
             printf("\rProgress: %llu / %llu (%3.2f %%)", processed_elements, total_elements,
-                   ((float) processed_elements / total_elements) * 100.0d);
+                   ((float) processed_elements / static_cast<float>(total_elements)) * 100.0);
             if (debug_output) {
                 printf(" - Average element process time: %.3f ms - bytes / cycle: %d, %llu elements / cycle",
-                       processed_nanos / processed_elements / 1000.0d, bytes_per_cycle, handler.processed_elements);
+                       static_cast<float>(processed_nanos) / processed_elements / 1000.0, bytes_per_cycle,
+                       handler.processed_elements);
             }
             fflush(stdout);
         }
@@ -632,14 +633,15 @@ int main(int argc, char **argv) {
         llu outsize = filesize(output);
         llu reduction = insize - outsize;
         printf("\nOriginal: %20llu b\nReduced: %21llu b\nReduction: %19llu b (= %3.2f %%)\n", insize, outsize,
-               reduction, (float) reduction / insize * 100);
+               reduction, (float) reduction / static_cast<float>(insize) * 100);
         if (addElevation) {
-            printf("Elevation: %19.2f %% failed (%lld)\n",
-                   ((float) handler.nodes_with_elevation_not_found / countBits(*first_pass.valid_nodes)) * 100.0d,
-                   handler.nodes_with_elevation_not_found);
+            printf("Elevation: %19.2f %% failed (%lld)\n", ((float) handler.nodes_with_elevation_not_found /
+                                                            static_cast<float>(countBits(*first_pass.valid_nodes))) *
+                                                           100.0, handler.nodes_with_elevation_not_found);
             if (!overrideValues)
                 printf("%30.2f %% already present (%lld)\n",
-                       ((float) handler.nodes_with_elevation / countBits(*first_pass.valid_nodes)) * 100.0d,
+                       ((float) handler.nodes_with_elevation / static_cast<float>(countBits(*first_pass.valid_nodes))) *
+                       100.0,
                        handler.nodes_with_elevation);
         }
         cout << endl;
