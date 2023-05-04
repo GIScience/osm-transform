@@ -11,6 +11,7 @@ import typer
 
 from . import __app_name__, __version__, logger
 from .logging.logging import initialize_logging, LogLevel
+from .srtm_data import download_all, process_x_y_info
 
 app = typer.Typer()
 
@@ -36,7 +37,7 @@ class Shared:
     cpu_count: int
 
 
-@app.command()
+@app.command(help="Foo example implementation")
 def foo() -> int:
     logger.info("#################################")
     logger.info("########## Foo Start ############")
@@ -45,6 +46,37 @@ def foo() -> int:
     logger.error("ERROR: Successfully ran foo command")
     logger.info("#################################")
     return 0
+
+
+@app.command(help="Download SRTM CGIAR tiles")
+def srtm_download(
+    ctx: typer.Context,
+    x: Optional[int] = typer.Option(None, help="Column ID of the CGIAR tile to download. All by default", min=1, max=72),
+    y: Optional[int] = typer.Option(None, help="Row ID of the CGIAR tile to download. All by default", min=1, max=24)
+) -> None:
+
+    feedback = {
+        "requested": 0,
+        "existing": 0,
+        "downloaded": 0
+    }
+
+    if not x and not y:
+        logger.info('Downloading all valid CGIAR tiles')
+        download_all(feedback)
+
+    elif x and y:
+        logger.info('Downloading single CGIAR tile')
+        try:
+            process_x_y_info(x, y, feedback)
+        except:
+            # Error logged in srtm_data.download_tile()
+            pass
+    elif x and not y:
+        logger.info('Column set. Not implemented')
+    elif y and not x:
+        logger.info('Row set.  Not implemented')
+    logger.info(f"Files downloaded {feedback['downloaded']} of {feedback['requested']} ({feedback['existing']} files already present)")
 
 
 @app.callback()
@@ -68,5 +100,6 @@ def main(
     logger.info("############ Run info ############")
     logger.info(f"Log level: {logging}")
     logger.info(f"Number of cores: {cores}")
+    logger.info("############ End info ############")
     ctx.obj = Shared(cpu_count=cores)
     return
