@@ -519,7 +519,6 @@ public:
         DEBUG_NO_FILTER = debug_no_filter;
         DEBUG_NO_TAG_FILTER = debug_no_tag_filter;
         non_digit_regex = boost::regex("[^0-9.]");
-        GDALAllRegister();
     }
 
     void node(const osmium::Node &node) {
@@ -673,6 +672,8 @@ class GeoTiff {
 };
 
 int main(int argc, char **argv) {
+    GDALAllRegister();
+
     char *filename;
     char *customGeoTIFF = nullptr;
     bool doMemoryCheck = false;
