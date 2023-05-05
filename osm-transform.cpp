@@ -389,7 +389,6 @@ public:
         DEBUG_NO_FILTER = debug_no_filter;
         DEBUG_NO_TAG_FILTER = debug_no_tag_filter;
         non_digit_regex = boost::regex("[^0-9.]");
-        GDALAllRegister();
     }
 
     void node(const osmium::Node &node) {
@@ -464,6 +463,8 @@ ostream &operator<<(ostream &out, const RewriteHandler &handler) {
 }
 
 int main(int argc, char **argv) {
+    GDALAllRegister();
+
     char *filename;
     bool doMemoryCheck = false;
     bool stopAfterMemoryCheck = false;
