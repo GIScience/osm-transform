@@ -77,6 +77,16 @@ std::string getTimeStr() {
     return s;
 }
 
+static OGRSpatialReference getReference(const char * crs) {
+    OGRSpatialReference reference;
+    reference.SetWellKnownGeogCS(crs);
+    reference.SetAxisMappingStrategy(OAMS_TRADITIONAL_GIS_ORDER);
+    return reference;
+}
+
+static auto WGS84 = getReference("WGS84");
+static const int NO_DATA_VALUE = -32768;
+
 class MaxIDHandler : public osmium::handler::Handler {
 public:
     llu node_max_id = 0;
@@ -229,7 +239,8 @@ class RewriteHandler : public osmium::handler::Handler {
     boost::regex non_digit_regex;
     bool DEBUG_NO_FILTER = false;
     bool DEBUG_NO_TAG_FILTER = false;
-    static const int NO_DATA_VALUE = -32768;
+
+
     unordered_map<string, GDALDataset *> elevationData;
     int cache_size = -1;
     list<string> cache_queue;
@@ -611,6 +622,54 @@ ostream &operator<<(ostream &out, const RewriteHandler &handler) {
     return out << "valid elements: " << handler.valid_elements << " (" << handler.processed_elements << "), "
                << "valid tags: " << handler.valid_tags << " (" << handler.total_tags << ")";
 }
+
+
+class GeoTiff {
+    GDALDataset* dataSet;
+    OGRCoordinateTransformation* transformation;
+    double transform[6] = {};
+    int rasterHasNoData = 0;
+    double rasterNoDataValue = 0.0;
+
+    public:
+        explicit GeoTiff(const char* filename) {
+            dataSet = (GDALDataset *) GDALOpenShared(filename, GA_ReadOnly);
+            auto reference = getSpatialReference(dataSet->GetProjectionRef());
+            transformation = OGRCreateCoordinateTransformation(&WGS84, &reference);
+            dataSet->GetGeoTransform(transform);
+            rasterNoDataValue = dataSet->GetRasterBand(1)->GetNoDataValue(&rasterHasNoData);
+        }
+
+    static OGRSpatialReference getSpatialReference(const char * crs) {
+        OGRSpatialReference reference;
+        reference.importFromWkt(crs);
+        reference.SetAxisMappingStrategy(OAMS_TRADITIONAL_GIS_ORDER);
+        return reference;
+    }
+
+    double elevation(double lng, double lat) {
+            transformation->Transform(1, &lng, &lat);
+            auto x = static_cast<int>(floor((lng - transform[0]) / transform[1]));
+            auto y = static_cast<int>(floor((lat - transform[3]) / transform[5]));
+            auto maxX = dataSet->GetRasterXSize();
+            auto maxY = dataSet->GetRasterYSize();
+            if (x < -1 || y < -1 || x > maxX || y > maxY) {
+                cout << "Coordinate out of bounds: POINT (" << lat << " " << lng << ")" << endl;
+                return NO_DATA_VALUE;
+            }
+
+            // for some coordinates close to the borders of the tile space the transformation returns invalid coordinates,
+            // because the tiles of the dataset are not cut along full degree lines.
+            x = max(min(x, dataSet->GetRasterXSize()), 0);
+            y = max(min(y, dataSet->GetRasterYSize()), 0);
+            double pixel[2];
+            if (dataSet->GetRasterBand(1)->RasterIO(GF_Read, x, y, 1, 1, pixel, 1, 1, GDT_CFloat64, 0, 0) != CE_None ||
+                    (rasterHasNoData && pixel[0] <= rasterNoDataValue)) {
+                return NO_DATA_VALUE;
+            }
+            return pixel[0];
+        }
+};
 
 int main(int argc, char **argv) {
     GDALAllRegister();
