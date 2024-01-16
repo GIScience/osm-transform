@@ -1,4 +1,6 @@
 FROM ubuntu:jammy
+# For Mac with amd chip use
+#FROM --platform=linux/amd64 ubuntu:jammy
 
 RUN apt-get -qq update && apt-get -y -qq install apt-utils
 
