@@ -263,7 +263,7 @@ class RewriteHandler : public osmium::handler::Handler {
         int lngIndex = floor(1 + (180 + lng) / 5);
         int latIndex = floor(1 + (60 - lat) / 5);
         char pszFilename[100];
-        sprintf(pszFilename, "srtmdata/srtm_%02d_%02d.tif", lngIndex, latIndex);
+        snprintf(pszFilename, 24,"srtmdata/srtm_%02d_%02d.tif", lngIndex, latIndex);
         if (debug)
             printf("Filename for coordinates %.6f - %.6f : %s\n", lng, lat, pszFilename);
         return getElevationFromFile(lat, lng, pszFilename, debug);
@@ -275,7 +275,7 @@ class RewriteHandler : public osmium::handler::Handler {
         char lngPre = lngIndex < 0 ? 'W' : 'E';
         char latPre = latIndex < 0 ? 'S' : 'N';
         char pszFilename[100];
-        sprintf(pszFilename, "gmteddata/%02d%c%03d%c_20101117_gmted_mea075.tif", abs(latIndex), latPre, abs(lngIndex),
+        snprintf(pszFilename, 43, "gmteddata/%02d%c%03d%c_20101117_gmted_mea075.tif", abs(latIndex), latPre, abs(lngIndex),
                 lngPre);
         if (debug)
             printf("Filename for coordinates %.6f - %.6f : %s\n", lng, lat, pszFilename);
@@ -611,7 +611,7 @@ int main(int argc, char **argv) {
             osmium::memory::Buffer output_buffer{input_buffer.committed()};
             handler.set_buffer(&output_buffer);
             osmium::apply(input_buffer, handler);
-            writer(move(output_buffer));
+            writer(std::move(output_buffer));
 
             auto step_end = chrono::steady_clock::now();
             processed_elements += handler.processed_elements;
