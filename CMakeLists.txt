@@ -1,21 +1,15 @@
-cmake_minimum_required(VERSION 3.16)
+cmake_minimum_required(VERSION 3.27)
 project(osm-transform
         VERSION 0.1.0
         DESCRIPTION "Package to customize OSM files")
 
-
 set(CMAKE_CXX_STANDARD 20)
 
+find_package(libconfig CONFIG REQUIRED)
+# https://cmake.org/cmake/help/git-master/module/FindBoost.html
+find_package(Boost REQUIRED system regex)
+find_package(GDAL CONFIG REQUIRED)
 
-if (CMAKE_HOST_WIN32)
-    set(libname "libconfig")
-else ()
-    set(libname "config")
-endif ()
-
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -m64")
 add_executable(osm-transform osm-transform.cpp node-locations.cpp ordered-index.cpp NodeWithElevation.h)
-target_link_libraries(osm-transform ${libname}++ pthread z expat bz2 config++ gdal boost_regex boost_system)
-include_directories(${CPLUS_INCLUDE_PATH} ${C_INCLUDE_PATH} /usr/include/gdal)
 
-set(EXECUTABLE_OUTPUT_PATH ${PROJECT_SOURCE_DIR}/)
+target_link_libraries(osm-transform PRIVATE z bz2 expat GDAL::GDAL Boost::system Boost::regex libconfig::config++)

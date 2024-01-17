@@ -4,8 +4,6 @@ from enum import Enum
 
 from cli.osm_transform import logger
 
-from enum import Enum
-
 
 class LogLevel(str, Enum):
     """
