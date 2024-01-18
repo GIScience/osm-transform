@@ -311,7 +311,7 @@ class RewriteHandler : public osmium::handler::Handler {
                 return NO_DATA_VALUE;
             }
             poDataset = (GDALDataset *) GDALOpenShared(pszFilename, GA_ReadOnly);
-            if (poDataset == NULL) {
+            if (poDataset == nullptr) {
                 if (debug)
                     cout << "Failed to read input data from file " << pszFilename << endl;
                 return NO_DATA_VALUE;
