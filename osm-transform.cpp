@@ -36,26 +36,26 @@ typedef vector<unsigned int> vi;
 const int BITWIDTH_INT = std::numeric_limits<unsigned int>::digits;
 
 
-void setBit(vi &A, llu k) {
+void setBit(vi &A, const llu k) {
     if (k < 0) return;
     A[k / BITWIDTH_INT] |= 1 << (k % BITWIDTH_INT);  // Set the bit at the k-th position in A
 }
 
-bool testBit(vi &A, llu k) {
+bool testBit(vi &A, const llu k) {
     if (k < 0) return 0;
     return (A[k / BITWIDTH_INT] & (1 << (k % BITWIDTH_INT))) != 0;
 }
 
 llu countBits(vi &A) {
     llu count = 0;
-    for (auto &intval: A) {
+    for (const auto &intval: A) {
         count += __builtin_popcount(intval);
     }
     return count;
 }
 
 bool file_exists(const string &filename) {
-    ifstream ifile(filename.c_str());
+    const ifstream ifile(filename.c_str());
     return (bool) ifile;
 }
 
@@ -65,13 +65,13 @@ llu filesize(const string &filename) {
 }
 
 string remove_extension(const string &filename) {
-    size_t lastdot = filename.find_first_of(".");
+    const size_t lastdot = filename.find_first_of(".");
     if (lastdot == string::npos) return filename;
     return filename.substr(0, lastdot);
 }
 
 std::string getTimeStr() {
-    std::time_t now = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
+    const std::time_t now = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
     std::string s(30, '\0');
     std::strftime(&s[0], s.size(), "%Y-%m-%d %H:%M:%S", std::localtime(&now));
     return s;
@@ -132,7 +132,7 @@ class FirstPassHandler : public osmium::handler::Handler {
     llu way_max_id = 0;
     llu relation_max_id = 0;
 
-    void exitSegfault(string type, llu id) {
+    void exitSegfault(string type, const llu id) {
         printf("%s ID %lld exceeds the allocated flag memory. Please increase the value in the config file. \nTo determine the exact value required, run this tool with the -c option.\n",
                type.c_str(), id);
         exit(4);
@@ -175,8 +175,8 @@ public:
 
     bool DEBUG_NO_FILTER = false;
 
-    void init(boost::regex *re, vi *i_valid_nodes, vi *i_valid_ways, vi *i_valid_relations, bool debug_no_filter,
-              llu i_node_max_id, llu i_way_max_id, llu i_relation_max_id) {
+    void init(boost::regex *re, vi *i_valid_nodes, vi *i_valid_ways, vi *i_valid_relations, const bool debug_no_filter,
+              const llu i_node_max_id, const llu i_way_max_id, const llu i_relation_max_id) {
         remove_tags = re;
         valid_nodes = i_valid_nodes;
         valid_ways = i_valid_ways;
@@ -250,7 +250,7 @@ class RewriteHandler : public osmium::handler::Handler {
     osmid_t m_next_node_id;
     shared_ptr<node_locations_t> m_cache;
 
-    void copy_tags(osmium::builder::Builder &parent, const osmium::TagList &tags, int ele = NO_DATA_VALUE) {
+    void copy_tags(osmium::builder::Builder &parent, const osmium::TagList &tags, const int ele = NO_DATA_VALUE) {
         osmium::builder::TagListBuilder builder{parent};
         for (const auto &tag: tags) {
             total_tags++;
@@ -260,7 +260,7 @@ class RewriteHandler : public osmium::handler::Handler {
                     if (ele == NO_DATA_VALUE) {
                         valid_tags++;
                         string tagval(tag.value());
-                        string empty = "";
+                        const string empty = "";
                         string value = regex_replace(tagval, non_digit_regex, empty);
                         builder.add_tag("ele", value);
                     }
@@ -275,9 +275,9 @@ class RewriteHandler : public osmium::handler::Handler {
         }
     }
 
-    double getElevationCGIAR(double lat, double lng, bool debug = false) {
-        int lngIndex = floor(1 + (180 + lng) / 5);
-        int latIndex = floor(1 + (60 - lat) / 5);
+    double getElevationCGIAR(const double lat, const double lng, const bool debug = false) {
+        const int lngIndex = floor(1 + (180 + lng) / 5);
+        const int latIndex = floor(1 + (60 - lat) / 5);
         char pszFilename[100];
         snprintf(pszFilename, 24,"srtmdata/srtm_%02d_%02d.tif", lngIndex, latIndex);
         if (debug)
@@ -285,11 +285,11 @@ class RewriteHandler : public osmium::handler::Handler {
         return getElevationFromFile(lat, lng, pszFilename, debug);
     }
 
-    double getElevationGMTED(double lat, double lng, bool debug = false) {
-        int lngIndex = static_cast<int>(-180 + floor((180 + lng) / 30) * 30);
-        int latIndex = static_cast<int>(-70 + floor((70 + lat) / 20) * 20);
-        char lngPre = lngIndex < 0 ? 'W' : 'E';
-        char latPre = latIndex < 0 ? 'S' : 'N';
+    double getElevationGMTED(const double lat, const double lng, const bool debug = false) {
+        const int lngIndex = static_cast<int>(-180 + floor((180 + lng) / 30) * 30);
+        const int latIndex = static_cast<int>(-70 + floor((70 + lat) / 20) * 20);
+        const char lngPre = lngIndex < 0 ? 'W' : 'E';
+        const char latPre = latIndex < 0 ? 'S' : 'N';
         char pszFilename[100];
         snprintf(pszFilename, 43, "gmteddata/%02d%c%03d%c_20101117_gmted_mea075.tif", abs(latIndex), latPre, abs(lngIndex),
                 lngPre);
@@ -298,9 +298,9 @@ class RewriteHandler : public osmium::handler::Handler {
         return getElevationFromFile(lat, lng, pszFilename, debug);
     }
 
-    double getElevationFromFile(double lat, double lng, char *pszFilename, bool debug = false) {
+    double getElevationFromFile(const double lat, const double lng, char *pszFilename, const bool debug = false) {
         GDALDataset *poDataset;
-        auto search = elevationData.find(pszFilename);
+        const auto search = elevationData.find(pszFilename);
         if (search != elevationData.end()) {
             poDataset = elevationData.at(pszFilename);
             cache_queue.remove(pszFilename);
@@ -399,8 +399,8 @@ public:
         m_new_node_buffer = buffer;
     }
 
-    void init(int i_cache_size, boost::regex *re, vi *i_valid_nodes, vi *i_valid_ways, vi *i_valid_relations,
-              ofstream *logref, bool debug_no_filter, bool debug_no_tag_filter) {
+    void init(const int i_cache_size, boost::regex *re, vi *i_valid_nodes, vi *i_valid_ways, vi *i_valid_relations,
+              ofstream *logref, const bool debug_no_filter, const bool debug_no_tag_filter) {
         cache_size = i_cache_size;
         remove_tags = re;
         valid_nodes = i_valid_nodes;
@@ -526,7 +526,7 @@ class GeoTiff {
     public:
         explicit GeoTiff(const char* filename) {
             dataSet = (GDALDataset *) GDALOpenShared(filename, GA_ReadOnly);
-            auto reference = getSpatialReference(dataSet->GetProjectionRef());
+            const auto reference = getSpatialReference(dataSet->GetProjectionRef());
             transformation = OGRCreateCoordinateTransformation(&WGS84, &reference);
             dataSet->GetGeoTransform(transform);
             rasterNoDataValue = dataSet->GetRasterBand(1)->GetNoDataValue(&rasterHasNoData);
@@ -543,8 +543,8 @@ class GeoTiff {
             transformation->Transform(1, &lng, &lat);
             auto x = static_cast<int>(floor((lng - transform[0]) / transform[1]));
             auto y = static_cast<int>(floor((lat - transform[3]) / transform[5]));
-            auto maxX = dataSet->GetRasterXSize();
-            auto maxY = dataSet->GetRasterYSize();
+            const auto maxX = dataSet->GetRasterXSize();
+            const auto maxY = dataSet->GetRasterYSize();
             if (x < -1 || y < -1 || x > maxX || y > maxY) {
                 cout << "Coordinate out of bounds: POINT (" << lat << " " << lng << ")" << endl;
                 return NO_DATA_VALUE;
