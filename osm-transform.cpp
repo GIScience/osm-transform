@@ -382,6 +382,8 @@ public:
     llu valid_tags = 0;
     bool addElevation = false;
     bool overrideValues = false;
+    llu nodes_with_elevation_srtm_precision = 0;
+    llu nodes_with_elevation_gmted_precision = 0;
     llu nodes_with_elevation = 0;
     llu nodes_with_elevation_not_found = 0;
 
@@ -423,19 +425,23 @@ public:
                 builder.set_location(node.location());
                 int ele = NO_DATA_VALUE;
                 if (addElevation) {
-                    if (overrideValues || !node.tags().has_key("ele")) {
+                    if (!overrideValues && node.tags().has_key("ele")) {
+                        nodes_with_elevation++;
+                    } else {
                         ele = getElevationCGIAR(node.location().lat(), node.location().lon());
-                        if (ele == NO_DATA_VALUE) {
+                        if (ele != NO_DATA_VALUE) {
+                            nodes_with_elevation_srtm_precision++;
+                        } else {
                             ele = getElevationGMTED(node.location().lat(), node.location().lon());
-                            if (ele == NO_DATA_VALUE) {
+                            if (ele != NO_DATA_VALUE) {
+                                nodes_with_elevation_gmted_precision++;
+                            } else {
                                 nodes_with_elevation_not_found++;
                                 *log << getTimeStr() << " ele retrieval failed: " << node.location().lat() << " "
-                                     << node.location().lon() << endl;
-                                ele = 0.0; // GH elevation code defaults to 0
+                                        << node.location().lon() << endl;
+                                ele = 0.0;// GH elevation code defaults to 0
                             }
                         }
-                    } else {
-                        nodes_with_elevation++;
                     }
                 }
                 copy_tags(builder, node.tags(), ele);
@@ -753,9 +759,18 @@ int main(int argc, char **argv) {
         printf("\nOriginal: %20llu b\nReduced: %21llu b\nReduction: %19llu b (= %3.2f %%)\n", insize, outsize,
                reduction, (float) reduction / static_cast<float>(insize) * 100);
         if (addElevation) {
-            printf("Elevation: %19.2f %% failed (%lld)\n", ((float) handler.nodes_with_elevation_not_found /
-                                                            static_cast<float>(countBits(*first_pass.valid_nodes))) *
-                                                           100.0, handler.nodes_with_elevation_not_found);
+            printf("All Nodes: %19llu Nodes\n",
+                   countBits(*first_pass.valid_nodes));
+            printf("SRTM Elevation: %14.2f %% (%lld)\n",
+                   ((double) handler.nodes_with_elevation_srtm_precision) /
+                   (double) countBits(*first_pass.valid_nodes) * 100, handler.nodes_with_elevation_srtm_precision);
+            printf("GMTED Elevation: %13.2f %% (%lld)\n",
+                   ((double) handler.nodes_with_elevation_gmted_precision) /
+                   (double) countBits(*first_pass.valid_nodes) * 100, handler.nodes_with_elevation_gmted_precision);
+            printf("Failed Elevation: %12.2f %% (%lld)\n",
+                   ((double) handler.nodes_with_elevation_not_found /
+                    (double) countBits(*first_pass.valid_nodes)) * 100,
+                   handler.nodes_with_elevation_not_found);
             if (!overrideValues)
                 printf("%30.2f %% already present (%lld)\n",
                        ((float) handler.nodes_with_elevation / static_cast<float>(countBits(*first_pass.valid_nodes))) *
