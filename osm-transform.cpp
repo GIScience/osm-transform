@@ -56,7 +56,7 @@ llu countBits(vi &A) {
 
 bool file_exists(const string &filename) {
     const ifstream ifile(filename.c_str());
-    return (bool) ifile;
+    return static_cast<bool>(ifile);
 }
 
 llu filesize(const string &filename) {
@@ -310,7 +310,7 @@ class RewriteHandler : public osmium::handler::Handler {
                     cout << "File does not exist: " << pszFilename << endl;
                 return NO_DATA_VALUE;
             }
-            poDataset = (GDALDataset *) GDALOpenShared(pszFilename, GA_ReadOnly);
+            poDataset = static_cast<GDALDataset *>(GDALOpenShared(pszFilename, GA_ReadOnly));
             if (poDataset == nullptr) {
                 if (debug)
                     cout << "Failed to read input data from file " << pszFilename << endl;
@@ -531,7 +531,7 @@ class GeoTiff {
 
     public:
         explicit GeoTiff(const char* filename) {
-            dataSet = (GDALDataset *) GDALOpenShared(filename, GA_ReadOnly);
+            dataSet = static_cast<GDALDataset *>(GDALOpenShared(filename, GA_ReadOnly));
             const auto reference = getSpatialReference(dataSet->GetProjectionRef());
             transformation = OGRCreateCoordinateTransformation(&WGS84, &reference);
             dataSet->GetGeoTransform(transform);
@@ -738,7 +738,7 @@ int main(int argc, char **argv) {
             processed_elements += handler.processed_elements;
             processed_nanos += chrono::duration_cast<chrono::nanoseconds>(step_end - step_start).count();
             printf("\rProgress: %llu / %llu (%3.2f %%)", processed_elements, total_elements,
-                   ((float) processed_elements / static_cast<float>(total_elements)) * 100.0);
+                   (static_cast<float>(processed_elements) / static_cast<float>(total_elements)) * 100.0);
             if (debug_output) {
                 printf(" - Average element process time: %.3f ms - bytes / cycle: %d, %llu elements / cycle",
                        static_cast<float>(processed_nanos) / processed_elements / 1000.0, bytes_per_cycle,
@@ -757,23 +757,23 @@ int main(int argc, char **argv) {
         llu outsize = filesize(output);
         llu reduction = insize - outsize;
         printf("\nOriginal: %20llu b\nReduced: %21llu b\nReduction: %19llu b (= %3.2f %%)\n", insize, outsize,
-               reduction, (float) reduction / static_cast<float>(insize) * 100);
+               reduction, static_cast<float>(reduction) / static_cast<float>(insize) * 100);
         if (addElevation) {
             printf("All Nodes: %19llu Nodes\n",
                    countBits(*first_pass.valid_nodes));
             printf("SRTM Elevation: %14.2f %% (%lld)\n",
-                   ((double) handler.nodes_with_elevation_srtm_precision) /
-                   (double) countBits(*first_pass.valid_nodes) * 100, handler.nodes_with_elevation_srtm_precision);
+                   static_cast<double>(handler.nodes_with_elevation_srtm_precision) /
+                   static_cast<double>(countBits(*first_pass.valid_nodes)) * 100, handler.nodes_with_elevation_srtm_precision);
             printf("GMTED Elevation: %13.2f %% (%lld)\n",
-                   ((double) handler.nodes_with_elevation_gmted_precision) /
-                   (double) countBits(*first_pass.valid_nodes) * 100, handler.nodes_with_elevation_gmted_precision);
+                   static_cast<double>(handler.nodes_with_elevation_gmted_precision) /
+                   static_cast<double>(countBits(*first_pass.valid_nodes)) * 100, handler.nodes_with_elevation_gmted_precision);
             printf("Failed Elevation: %12.2f %% (%lld)\n",
-                   ((double) handler.nodes_with_elevation_not_found /
-                    (double) countBits(*first_pass.valid_nodes)) * 100,
+                   (static_cast<double>(handler.nodes_with_elevation_not_found) /
+                    static_cast<double>(countBits(*first_pass.valid_nodes))) * 100,
                    handler.nodes_with_elevation_not_found);
             if (!overrideValues)
                 printf("%30.2f %% already present (%lld)\n",
-                       ((float) handler.nodes_with_elevation / static_cast<float>(countBits(*first_pass.valid_nodes))) *
+                       (static_cast<float>(handler.nodes_with_elevation) / static_cast<float>(countBits(*first_pass.valid_nodes))) *
                        100.0,
                        handler.nodes_with_elevation);
         }
