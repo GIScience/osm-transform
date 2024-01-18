@@ -697,8 +697,12 @@ int main(int argc, char **argv) {
         start = chrono::steady_clock::now();
         cout << "Processing second pass: rebuild data..." << endl;
         osmium::io::Reader second_reader{filename};
-        osmium::io::Header header;
+
+        // keep existing headers incluing osm data dates
+        osmium::io::Header header_in = second_reader.header();
+        osmium::io::Header header = header_in;
         header.set("generator", "osm-transform v0.1.0");
+
         osmium::io::Writer writer{output, header, osmium::io::overwrite::allow};
         RewriteHandler handler(nodes_max_id + 1000000000);
         handler.init(cache_size, &remove_tag_regex, first_pass.valid_nodes, first_pass.valid_ways,
