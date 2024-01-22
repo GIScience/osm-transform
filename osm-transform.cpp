@@ -33,7 +33,7 @@
 using namespace std;
 typedef unsigned long long llu;
 typedef vector<unsigned int> vi;
-const int BITWIDTH_INT = std::numeric_limits<unsigned int>::digits;
+constexpr int BITWIDTH_INT = std::numeric_limits<unsigned int>::digits;
 
 
 void setBit(vi &A, const llu k) {
@@ -155,7 +155,7 @@ class FirstPassHandler : public osmium::handler::Handler {
                 tag_count++;
                 if (validating_tags(tag.key(), tag.value())) {
                     return false;
-                } else if (invalidating_tags.count(tag.key()) > 0) {
+                } else if (invalidating_tags.contains(tag.key())) {
                     is_removable = true;
                 }
             }
@@ -325,7 +325,7 @@ class RewriteHandler : public osmium::handler::Handler {
                 printf("Dataset opened. (format: %s; size: %d x %d x %d)\n", poDataset->GetDriver()->GetDescription(),
                        poDataset->GetRasterXSize(), poDataset->GetRasterYSize(), poDataset->GetRasterCount());
         }
-        cache_queue.push_front(pszFilename);
+        cache_queue.emplace_front(pszFilename);
 
         double adfGeoTransform[6];
         double adfInvGeoTransform[6];
