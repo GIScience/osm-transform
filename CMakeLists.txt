@@ -10,6 +10,6 @@ find_package(libconfig CONFIG REQUIRED)
 find_package(Boost REQUIRED system regex)
 find_package(GDAL CONFIG REQUIRED)
 
-add_executable(osm-transform osm-transform.cpp node-locations.cpp ordered-index.cpp NodeWithElevation.h)
+add_executable(osm-transform osm-transform.cpp node-locations.cpp ordered-index.cpp)
 
 target_link_libraries(osm-transform PRIVATE z bz2 expat GDAL::GDAL Boost::system Boost::regex libconfig::config++)
