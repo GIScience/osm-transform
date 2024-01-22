@@ -11,8 +11,7 @@
 #include <boost/geometry/geometries/point.hpp>
 #include <boost/geometry/geometries/box.hpp>
 #include <boost/geometry/index/rtree.hpp>
-#include <libgen.h>
-#include <libconfig.h++>
+#include <boost/program_options.hpp>
 
 #include "gdal.h"
 #include "gdal_priv.h"
@@ -52,83 +51,156 @@ ostream &operator<<(ostream &out, const RewriteHandler &handler) {
 }
 
 
-int main(int argc, char **argv) {
-    // int comment(int argc, char **argv) {
-    GDALAllRegister();
+struct Config {
+    std::string filename;
+    std::string remove_tag_regex_str;
 
-    char *filename;
     bool doMemoryCheck = false;
     bool stopAfterMemoryCheck = false;
     bool addElevation = true;
     bool overrideValues = true;
 
-    for (char **arg = argv; *arg; ++arg) {
-        if (strcmp(*arg, "-m") == 0) {
-            doMemoryCheck = true;
-        } else if (strcmp(*arg, "-c") == 0) {
-            doMemoryCheck = true;
-            stopAfterMemoryCheck = true;
-        } else if (strcmp(*arg, "-e") == 0) {
-            addElevation = false;
-        } else if (strcmp(*arg, "-o") == 0) {
-            overrideValues = false;
-        } else {
-            filename = *arg;
-        }
-    }
-    if (!file_exists(filename)) {
-        cerr << "Usage: " << argv[0] << "[OPTIONS] [OSM file]" << endl;
-        cerr << "Options:\t-m\tperform memory requirement check" << endl;
-        cerr << "\t\t-c\tonly perform memory requirement check" << endl;
-        cerr << "\t\t-e\tskip elevation data merge" << endl;
-        cerr << "\t\t-o\tkeep original elevation tags where present" << endl;
-        return 1;
-    }
-
-    string remove_tag_regex_str = "REMOVE NO TAGS";
     bool debug_output = false;
     bool debug_no_filter = false;
     bool debug_no_tag_filter = false;
+
     llu nodes_max_id;
     llu ways_max_id;
     llu rels_max_id;
+
     int cache_size = -1;
-    try {
-        libconfig::Config cfg;
-        cfg.readFile("osm-transform.cfg");
-        const libconfig::Setting &root = cfg.getRoot();
-        root.lookupValue("remove_tag", remove_tag_regex_str);
-        root.lookupValue("nodes_max_id", nodes_max_id);
-        root.lookupValue("ways_max_id", ways_max_id);
-        root.lookupValue("rels_max_id", rels_max_id);
-        root.lookupValue("debug_output", debug_output);
-        root.lookupValue("debug_no_filter", debug_no_filter);
-        root.lookupValue("debug_no_tag_filter", debug_no_tag_filter);
-        root.lookupValue("cache_size", cache_size);
+
+    auto cmd(int argc, char **argv) {
+
+        namespace po = boost::program_options;
+        string config_file_path;
+
+        // Declare a group of options that will be
+        // allowed only on command line
+        po::options_description generic("Generic options");
+        generic.add_options()
+                ("version,v", "print version string") //
+                ("help", "produce help message") //
+                (",m", "perform memory requirement check") //
+                (",c", "only perform memory requirement check") //
+                (",e", "skip elevation data merge") //
+                (",o", "keep original elevation tags where present") //
+                ("osm-pbf,p", po::value<vector<string>>(), "Absolute file path to osm pbf file to process.") //
+                ("config-file,f", po::value<string>(&config_file_path), "Absolute file path to config file to use");
+
+
+
+        po::options_description config("Configuration");
+        vector<string> geo_tiff_folder;
+        config.add_options()
+                ("remove_tag,T", po::value<string>(&remove_tag_regex_str)->default_value("(.*:)?source(:.*)?|(.*:)?note(:.*)?|url|created_by|fixme|wikipedia"), "Regex to match removable tags")
+                ("geo_tiff_folders,F", po::value<vector<string>>(&geo_tiff_folder)->composing(), "Absolute paths to GeoTiff folders. Default: srtmdata")
+                ("cache_tile_size,S", po::value<int>(&cache_size)->default_value(10), "Maximum amount of tiles stored in cache")
+                ("nodes_max_id,N", po::value<llu>(&nodes_max_id)->default_value(11000000000L), "Max Node Id")
+                ("ways_max_id,W", po::value<llu>(&ways_max_id)->default_value(1200000000L), "Max Ways Id")
+                ("rels_max_id,R", po::value<llu>(&rels_max_id)->default_value(20000000L), "Max Rels Id")
+                ("debug_output", "debug_output")
+                ("debug_no_filter", "debug_no_filter")
+                ("debug_no_tag_filter", "debug_no_tag_filter");
+
+
+
+        // Hidden options, will be allowed both on command line and
+        // in config file, but will not be shown to the user.
+        po::options_description hidden("Hidden options");
+
+        po::options_description cmdline_options;
+        cmdline_options.add(generic).add(config).add(hidden);
+
+        po::options_description config_file_options;
+        config_file_options.add(config).add(hidden);
+
+        po::options_description visible("Allowed options");
+        visible.add(generic).add(config);
+
+        po::positional_options_description p;
+        p.add("osm-pbf", 1);
+        po::variables_map vm;
+
+        try {
+            po::store(po::command_line_parser(argc, argv).options(cmdline_options).positional(p).run(), vm);
+            po::notify(vm);
+        } catch (boost::program_options::unknown_option e) {
+            std::cerr << e.what() << endl;
+            cout << visible << "\n";
+            exit(1);
+        }
+        try {
+            if (file_exists(config_file_path)) {
+                po::store(po::parse_config_file(config_file_path.c_str(), config_file_options, false),vm);
+                po::notify(vm);
+            }
+        } catch (boost::program_options::unknown_option e) {
+            std::cerr << e.what() << "  in config file " << config_file_path << endl;
+            cout << config << "\n";
+            exit(1);
+        }
+
+        if (!vm.contains("osm-pbf")) {
+            std::cerr << "no file name" << endl;
+            exit(1);
+        }
+
+        filename = vm["osm-pbf"].as<std::vector<std::string>>()[0];
+
+        if (!file_exists(filename)) {
+            std::cerr << "osm-pbf does not exist " << filename << std::endl;
+            exit(1);
+        }
+
+        if (vm.contains("help")) {
+            cout << visible << "\n";
+            exit(1);
+        }
+
+        if (vm.contains("m")) {
+            doMemoryCheck = true;
+        }
+
+        if (vm.contains("c")) {
+            doMemoryCheck = true;
+            stopAfterMemoryCheck = true;
+        }
+
+        if (vm.contains("e")) {
+            addElevation = false;
+        }
+
+        if (vm.contains("o")) {
+            overrideValues = false;
+        }
+
+        debug_output = vm.contains("debug_output");
+        debug_no_filter = vm.contains("debug_no_filter");
+        debug_no_tag_filter = vm.contains("debug_no_tag_filter");
+
         if (debug_no_filter) {
             cout << "DEBUG MODE: Filtering disabled" << endl << endl;
         }
         if (debug_no_tag_filter) {
             cout << "DEBUG MODE: Tag filtering disabled" << endl << endl;
         }
-    } catch (const libconfig::FileIOException &fioex) {
-        std::cerr << "I/O error while reading config file." << std::endl;
-        return 2;
-    } catch (const libconfig::ParseException &pex) {
-        std::cerr << "Parse error at " << pex.getFile() << ":" << pex.getLine()
-                << " - " << pex.getError() << std::endl;
-        return 2;
-    } catch (const libconfig::SettingNotFoundException &nfex) {
-        cerr << "Missing setting in configuration file: " << nfex.what() << endl;
-        return 2;
     }
+};
+
+int main(int argc, char **argv) {
+    Config config;
+    config.cmd(argc, argv);
+
+    GDALAllRegister();
+
 
     ofstream logFile;
     logFile.open("osm-transform.log");
     try {
-        if (doMemoryCheck) {
+        if (config.doMemoryCheck) {
             cout << "Calculating required memory..." << endl;
-            osmium::io::Reader check_reader{filename};
+            osmium::io::Reader check_reader{config.filename};
             llu insize = check_reader.file_size();
             osmium::ProgressBar check_progress{insize, osmium::isatty(2)};
             MaxIDHandler maxIDHandler;
@@ -139,35 +211,35 @@ int main(int argc, char **argv) {
             check_progress.done();
             check_progress.remove();
             check_reader.close();
-            nodes_max_id = maxIDHandler.node_max_id;
-            ways_max_id = maxIDHandler.way_max_id;
-            rels_max_id = maxIDHandler.relation_max_id;
+            config.nodes_max_id = maxIDHandler.node_max_id;
+            config.ways_max_id = maxIDHandler.way_max_id;
+            config.rels_max_id = maxIDHandler.relation_max_id;
             cout << "Max IDs: Node " << maxIDHandler.node_max_id << " Way " << maxIDHandler.way_max_id << " Relation "
-                    << maxIDHandler.relation_max_id << endl;
-            if (stopAfterMemoryCheck) {
+                 << maxIDHandler.relation_max_id << endl;
+            if (config.stopAfterMemoryCheck) {
                 return 0;
             }
         } else {
-            cout << "Max IDs from config: Node " << nodes_max_id << " Way " << ways_max_id << " Relation "
-                    << rels_max_id << endl;
+            cout << "Max IDs from config: Node " << config.nodes_max_id << " Way " << config.ways_max_id << " Relation "
+                 << config.rels_max_id << endl;
         }
 
-        boost::regex remove_tag_regex(remove_tag_regex_str, boost::regex::icase);
+        boost::regex remove_tag_regex(config.remove_tag_regex_str, boost::regex::icase);
         printf("Allocating memory: %.2f Mb nodes, %.2f Mb ways, %.2f Mb relations\n\n",
-               nodes_max_id / (1024 * 1024 * 8.0), ways_max_id / (1024 * 1024 * 8.0),
-               rels_max_id / (1024 * 1024 * 8.0));
-        vi valid_nodes((nodes_max_id / BITWIDTH_INT) + 1, 0);
-        vi valid_ways((ways_max_id / BITWIDTH_INT) + 1, 0);
-        vi valid_relations((rels_max_id / BITWIDTH_INT) + 1, 0);
+               config.nodes_max_id / (1024 * 1024 * 8.0), config.ways_max_id / (1024 * 1024 * 8.0),
+               config.rels_max_id / (1024 * 1024 * 8.0));
+        vi valid_nodes((config.nodes_max_id / BITWIDTH_INT) + 1, 0);
+        vi valid_ways((config.ways_max_id / BITWIDTH_INT) + 1, 0);
+        vi valid_relations((config.rels_max_id / BITWIDTH_INT) + 1, 0);
 
         cout << "Processing first pass: validate ways & relations..." << endl;
         auto start = chrono::steady_clock::now();
-        osmium::io::Reader first_pass_reader{filename};
+        osmium::io::Reader first_pass_reader{config.filename};
         llu insize = first_pass_reader.file_size();
         osmium::ProgressBar progress{insize, osmium::isatty(2)};
         FirstPassHandler first_pass;
-        first_pass.init(&remove_tag_regex, &valid_nodes, &valid_ways, &valid_relations, debug_no_filter, nodes_max_id,
-                        ways_max_id, rels_max_id);
+        first_pass.init(&remove_tag_regex, &valid_nodes, &valid_ways, &valid_relations, config.debug_no_filter, config.nodes_max_id,
+                        config.ways_max_id, config.rels_max_id);
         while (osmium::memory::Buffer input_buffer = first_pass_reader.read()) {
             osmium::apply(input_buffer, first_pass);
             progress.update(first_pass_reader.offset());
@@ -179,14 +251,14 @@ int main(int argc, char **argv) {
         auto end = chrono::steady_clock::now();
         printf("Processed in %.3f s\n\n", chrono::duration_cast<chrono::milliseconds>(end - start).count() / 1000.0);
 
-        string output = remove_extension(basename(filename)) + ".ors.pbf";
+        string output = remove_extension(fs::path(config.filename.c_str()).stem()) + ".ors.pbf";
         llu total_elements = first_pass.node_count + first_pass.way_count + first_pass.relation_count;
         llu processed_elements = 0;
         llu processed_nanos = 0;
 
         start = chrono::steady_clock::now();
         cout << "Processing second pass: rebuild data..." << endl;
-        osmium::io::Reader second_reader{filename};
+        osmium::io::Reader second_reader{config.filename};
 
         // keep existing headers incluing osm data dates
         osmium::io::Header header_in = second_reader.header();
@@ -194,13 +266,14 @@ int main(int argc, char **argv) {
         header.set("generator", "osm-transform v0.1.0");
 
         osmium::io::Writer writer{output, header, osmium::io::overwrite::allow};
-        RewriteHandler handler(nodes_max_id + 1000000000);
-        handler.init(cache_size, &remove_tag_regex, first_pass.valid_nodes, first_pass.valid_ways,
-                     first_pass.valid_relations, &logFile, debug_no_filter, debug_no_tag_filter);
-        handler.addElevation = addElevation;
-        handler.overrideValues = overrideValues;
+        RewriteHandler handler(config.nodes_max_id + 1000000000);
+        handler.init(config.cache_size, &remove_tag_regex, first_pass.valid_nodes, first_pass.valid_ways,
+                     first_pass.valid_relations, &logFile, config.debug_no_filter, config.debug_no_tag_filter);
+        handler.addElevation = config.addElevation;
+        handler.overrideValues = config.overrideValues;;
 
-        string new_node_output = remove_extension(basename(filename)) + ".ors.new_nodes.pbf";
+
+        string new_node_output = remove_extension(fs::path(config.filename.c_str()).stem()) + ".ors.new_nodes.pbf";
         osmium::io::Writer new_node_writer{new_node_output, header, osmium::io::overwrite::allow};
 
         while (osmium::memory::Buffer input_buffer = second_reader.read()) {
@@ -223,7 +296,7 @@ int main(int argc, char **argv) {
             processed_nanos += chrono::duration_cast<chrono::nanoseconds>(step_end - step_start).count();
             printf("\rProgress: %llu / %llu (%3.2f %%)", processed_elements, total_elements,
                    (static_cast<float>(processed_elements) / static_cast<float>(total_elements)) * 100.0);
-            if (debug_output) {
+            if (config.debug_output) {
                 printf(" - Average element process time: %.3f ms - bytes / cycle: %d, %llu elements / cycle",
                        static_cast<float>(processed_nanos) / processed_elements / 1000.0, bytes_per_cycle,
                        handler.processed_elements);
@@ -242,7 +315,7 @@ int main(int argc, char **argv) {
         llu reduction = insize - outsize;
         printf("\nOriginal: %20llu b\nReduced: %21llu b\nReduction: %19llu b (= %3.2f %%)\n", insize, outsize,
                reduction, static_cast<float>(reduction) / static_cast<float>(insize) * 100);
-        if (addElevation) {
+        if (config.addElevation) {
             printf("All Nodes: %19llu Nodes\n",
                    countBits(*first_pass.valid_nodes));
             printf("SRTM Elevation: %14.2f %% (%lld)\n",
@@ -255,7 +328,7 @@ int main(int argc, char **argv) {
                    (static_cast<double>(handler.nodes_with_elevation_not_found) /
                     static_cast<double>(countBits(*first_pass.valid_nodes))) * 100,
                    handler.nodes_with_elevation_not_found);
-            if (!overrideValues)
+            if (!config.overrideValues)
                 printf("%30.2f %% already present (%lld)\n",
                        (static_cast<float>(handler.nodes_with_elevation) / static_cast<float>(countBits(*first_pass.valid_nodes))) *
                        100.0,
