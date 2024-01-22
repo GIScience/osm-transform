@@ -6,8 +6,6 @@
 #include <iostream>
 
 
-
-
 class GeoTiff {
     GDALDataset *dataSet;
     OGRCoordinateTransformation *transformation;
@@ -18,8 +16,7 @@ class GeoTiff {
 public:
     explicit GeoTiff(const char *filename) {
         dataSet = static_cast<GDALDataset *>(GDALOpenShared(filename, GA_ReadOnly));
-        if (dataSet == nullptr)
-            return;
+        if (dataSet == nullptr) return;
         const auto reference = getSpatialReference(dataSet->GetProjectionRef());
         transformation = OGRCreateCoordinateTransformation(&WGS84, &reference);
         dataSet->GetGeoTransform(transform);
@@ -48,19 +45,11 @@ public:
         return pixel[0];
     }
 
-    auto GetDescription() const {
-        return dataSet->GetDriver()->GetDescription();
-    }
+    auto GetDescription() const { return dataSet->GetDriver()->GetDescription(); }
 
-    auto GetRasterXSize() const {
-        return dataSet->GetRasterXSize();
-    };
-    auto GetRasterYSize() const {
-        return dataSet->GetRasterYSize();
-    };
-    auto GetRasterCount() const {
-        return dataSet->GetRasterCount();
-    };
+    auto GetRasterXSize() const { return dataSet->GetRasterXSize(); };
+    auto GetRasterYSize() const { return dataSet->GetRasterYSize(); };
+    auto GetRasterCount() const { return dataSet->GetRasterCount(); };
 };
 
 
@@ -80,17 +69,20 @@ typedef bgm::box<point> box;
 typedef std::pair<box, prioAndFileName> rTreeEntry;
 
 
-inline auto sortRTreeEntryByPrio(const rTreeEntry &a, const rTreeEntry &b) {
-    return a.second.prio < b.second.prio;
-};
+inline auto sortRTreeEntryByPrio(const rTreeEntry &a, const rTreeEntry &b) { return a.second.prio < b.second.prio; };
 
 inline auto generate_geo_tiff_index(bgi::rtree<rTreeEntry, bgi::quadratic<16>> &rtree, const std::string &path) {
+    std::vector<string> geotiffs;
+    for (auto &p: fs::recursive_directory_iterator(path)) {
+        auto ext = p.path().extension().string();
+        if (!boost::iequals(ext, ".tif") && !boost::iequals(ext, ".tiff") && !boost::iequals(ext, ".gtiff")) { continue; }
+        const std::string filename{p.path().string()};
+        geotiffs.push_back(filename);
+    }
     auto maxStepWidth = 0.0;
-    for (auto &p : fs::recursive_directory_iterator(path)) {
-        if (auto ext = p.path().extension(); ext != ".tif" || ext != ".tiff" || ext != ".gtiff") {
-            continue;
-        }
-        const auto tif = static_cast<GDALDataset *>(GDALOpen(p.path().c_str(), GA_ReadOnly));
+    osmium::ProgressBar pTiffs{geotiffs.size(), osmium::isatty(2)};
+    for (const auto& geotiff: geotiffs) {
+        const auto tif = static_cast<GDALDataset *>(GDALOpen(geotiff.c_str(), GA_ReadOnly));
 
         auto reference = getSpatialReference(tif->GetProjectionRef());
         const auto transformation = OGRCreateCoordinateTransformation(&reference, &WGS84);
@@ -98,26 +90,25 @@ inline auto generate_geo_tiff_index(bgi::rtree<rTreeEntry, bgi::quadratic<16>> &
         double transform[6] = {};
         tif->GetGeoTransform(transform);
 
-        const double lngMin=transform[0] + 0*transform[1] + 0*transform[2];
-        const double latMax=transform[3] + 0*transform[4] + 0*transform[5];
-        const double lngMax=lngMin + tif->GetRasterXSize()*transform[1] + tif->GetRasterXSize()*transform[2];
-        const double latMin=latMax + tif->GetRasterYSize()*transform[4] + tif->GetRasterYSize()*transform[5];
+        const double lngMin = transform[0] + 0 * transform[1] + 0 * transform[2];
+        const double latMax = transform[3] + 0 * transform[4] + 0 * transform[5];
+        const double lngMax = lngMin + tif->GetRasterXSize() * transform[1] + tif->GetRasterXSize() * transform[2];
+        const double latMin = latMax + tif->GetRasterYSize() * transform[4] + tif->GetRasterYSize() * transform[5];
 
         double lng[2] = {lngMin, lngMax};
         double lat[2] = {latMin, latMax};
         transformation->Transform(2, lng, lat);
 
         box b(point(lng[0], lat[0]), point(lng[1], lat[1]));
-        const std::string fn {p.path().string()};
-        double lngStep = (lng[1] - lng[0] ) / static_cast<double>(tif->GetRasterXSize());
-        double latStep = (lat[1] - lat[0] ) / static_cast<double>(tif->GetRasterYSize());
-        auto prio = std::min(lngStep,latStep);
+        double lngStep = (lng[1] - lng[0]) / static_cast<double>(tif->GetRasterXSize());
+        double latStep = (lat[1] - lat[0]) / static_cast<double>(tif->GetRasterYSize());
+        auto prio = std::min(lngStep, latStep);
         maxStepWidth = std::max(prio, maxStepWidth);
 
-        auto v = std::make_pair(b, prioAndFileName {prio, fn});
-        std::cout << std::fixed << " insert = " <<  bg::wkt<box>(v.first) << " - " << v.second.prio << " - " << v.second.fileName << std::endl;
+        auto v = std::make_pair(b, prioAndFileName{prio, geotiff});
+        //        std::cout << std::fixed << " insert = " << bg::wkt<box>(v.first) << " - " << v.second.prio << " - " << v.second.fileName << std::endl;
         rtree.insert(v);
-        // std::cout << rtree.bounds().max_corner(). << std::endl ;
+        pTiffs.update(1);
     }
     return maxStepWidth;
 }
