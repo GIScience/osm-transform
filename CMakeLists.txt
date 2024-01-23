@@ -9,6 +9,6 @@ set(CMAKE_CXX_STANDARD 20)
 find_package(Boost REQUIRED system regex program_options)
 find_package(GDAL CONFIG REQUIRED)
 
-add_executable(osm-transform osm-transform.cpp node-locations.cpp ordered-index.cpp)
+add_executable(${PROJECT_NAME} osm-transform.cpp node-locations.cpp ordered-index.cpp)
 
-target_link_libraries(osm-transform PRIVATE z bz2 expat GDAL::GDAL Boost::system Boost::regex Boost::program_options)
+target_link_libraries(${PROJECT_NAME} PRIVATE z bz2 expat GDAL::GDAL Boost::system Boost::regex Boost::program_options)
