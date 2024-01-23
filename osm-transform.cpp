@@ -158,6 +158,11 @@ struct Config {
             exit(1);
         }
 
+        if (vm.contains("version")) {
+            cout << PROJECT_NAME << " " << PROJECT_VERSION << "\n";
+            exit(0);
+        }
+
         if (vm.contains("m")) {
             doMemoryCheck = true;
         }
