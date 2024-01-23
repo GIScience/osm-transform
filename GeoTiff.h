@@ -4,10 +4,11 @@
 
 #include <gdal_priv.h>
 #include <iostream>
+#include <filesystem>
 
 
 class GeoTiff {
-    GDALDataset *dataSet;
+    GDALDatasetUniquePtr dataSet;
     OGRCoordinateTransformation *transformation;
     double transform[6] = {};
     int rasterHasNoData = 0;
@@ -15,7 +16,7 @@ class GeoTiff {
 
 public:
     explicit GeoTiff(const char *filename) {
-        dataSet = static_cast<GDALDataset *>(GDALOpenShared(filename, GA_ReadOnly));
+        dataSet = GDALDatasetUniquePtr(GDALDataset::FromHandle(GDALOpenShared(filename, GA_ReadOnly)));
         if (dataSet == nullptr) return;
         const auto reference = getSpatialReference(dataSet->GetProjectionRef());
         transformation = OGRCreateCoordinateTransformation(&WGS84, &reference);
@@ -82,7 +83,7 @@ inline auto generate_geo_tiff_index(bgi::rtree<rTreeEntry, bgi::quadratic<16>> &
     auto maxStepWidth = 0.0;
     osmium::ProgressBar pTiffs{geotiffs.size(), osmium::isatty(2)};
     for (const auto& geotiff: geotiffs) {
-        const auto tif = static_cast<GDALDataset *>(GDALOpen(geotiff.c_str(), GA_ReadOnly));
+        const auto tif = GDALDatasetUniquePtr(GDALDataset::FromHandle(GDALOpen(geotiff.c_str(), GA_ReadOnly)));
 
         auto reference = getSpatialReference(tif->GetProjectionRef());
         const auto transformation = OGRCreateCoordinateTransformation(&reference, &WGS84);
