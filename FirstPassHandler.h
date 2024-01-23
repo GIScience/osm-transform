@@ -11,7 +11,7 @@
 using namespace std;
 
 class FirstPassHandler : public osmium::handler::Handler {
-    friend std::ostream &operator<<(std::ostream &out, const FirstPassHandler &ce);
+    friend std::ostream &operator<<(std::ostream &out, const FirstPassHandler &handler);
 
     const std::set<std::string> invalidating_tags{"building", "landuse", "boundary", "natural", "place", "waterway", "aeroway",
                                                   "aviation", "military", "power", "communication", "man_made"};

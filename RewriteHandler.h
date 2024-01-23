@@ -10,7 +10,7 @@
 #include <iostream>
 
 class RewriteHandler : public osmium::handler::Handler {
-    friend ostream &operator<<(ostream &out, const RewriteHandler &ce);
+    friend ostream &operator<<(ostream &out, const RewriteHandler &handler);
 
     osmium::memory::Buffer *m_buffer;
     vi *valid_nodes;
