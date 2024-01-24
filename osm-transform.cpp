@@ -125,7 +125,7 @@ struct Config {
         try {
             po::store(po::command_line_parser(argc, argv).options(cmdline_options).positional(p).run(), vm);
             po::notify(vm);
-        } catch (boost::program_options::unknown_option e) {
+        } catch (boost::program_options::unknown_option &e) {
             std::cerr << e.what() << endl;
             cout << visible << "\n";
             exit(1);
@@ -135,7 +135,7 @@ struct Config {
                 po::store(po::parse_config_file(config_file_path.c_str(), config_file_options, false),vm);
                 po::notify(vm);
             }
-        } catch (boost::program_options::unknown_option e) {
+        } catch (boost::program_options::unknown_option &e) {
             std::cerr << e.what() << "  in config file " << config_file_path << endl;
             cout << config << "\n";
             exit(1);
