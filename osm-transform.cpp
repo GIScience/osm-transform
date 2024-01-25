@@ -23,6 +23,17 @@
 #include <osmium/io/any_output.hpp>
 #include <osmium/util/file.hpp>
 #include <osmium/util/progress_bar.hpp>
+#include <osmium/index/index.hpp>
+#include <osmium/index/map/flex_mem.hpp>
+#include <osmium/index/map/all.hpp>
+#include <osmium/util/memory.hpp>
+
+#include <osmium/handler.hpp>
+#include <osmium/handler/node_locations_for_ways.hpp>
+#include <osmium/util/progress_bar.hpp>
+#include <osmium/visitor.hpp>
+#include <osmium/osm/node_ref.hpp>
+
 
 #include <vector>
 #include <algorithm>
@@ -193,6 +204,15 @@ struct Config {
     }
 };
 
+
+auto show_memory_used() {
+    const osmium::MemoryUsage mem;
+    if (mem.current() > 0) {
+        std::cout << "Peak memory used: " << mem.peak() << " MBytes\n";
+    }
+}
+
+
 int main(int argc, char **argv) {
     Config config;
     config.cmd(argc, argv);
@@ -203,6 +223,10 @@ int main(int argc, char **argv) {
     ofstream logFile;
     logFile.open("osm-transform.log");
     try {
+
+        boost::regex remove_tag_regex(config.remove_tag_regex_str, boost::regex::icase);
+
+
         if (config.doMemoryCheck) {
             cout << "Calculating required memory..." << endl;
             osmium::io::Reader check_reader{config.filename};
@@ -229,7 +253,7 @@ int main(int argc, char **argv) {
                  << config.rels_max_id << endl;
         }
 
-        boost::regex remove_tag_regex(config.remove_tag_regex_str, boost::regex::icase);
+
         printf("Allocating memory: %.2f Mb nodes, %.2f Mb ways, %.2f Mb relations\n\n",
                config.nodes_max_id / (1024 * 1024 * 8.0), config.ways_max_id / (1024 * 1024 * 8.0),
                config.rels_max_id / (1024 * 1024 * 8.0));
@@ -256,6 +280,13 @@ int main(int argc, char **argv) {
         auto end = chrono::steady_clock::now();
         printf("Processed in %.3f s\n\n", chrono::duration_cast<chrono::milliseconds>(end - start).count() / 1000.0);
 
+        // second pass
+
+
+        using index_type = osmium::index::map::Map<osmium::unsigned_object_id_type, osmium::Location>;
+        const auto& map_factory = osmium::index::MapFactory<osmium::unsigned_object_id_type, osmium::Location>::instance();
+        auto location_index = map_factory.create_map("flex_mem");
+
         string output = remove_extension(fs::path(config.filename.c_str()).stem()) + ".ors.pbf";
         llu total_elements = first_pass.node_count + first_pass.way_count + first_pass.relation_count;
         llu processed_elements = 0;
@@ -271,7 +302,7 @@ int main(int argc, char **argv) {
         header.set("generator", "osm-transform v0.1.0");
 
         osmium::io::Writer writer{output, header, osmium::io::overwrite::allow};
-        RewriteHandler handler(config.nodes_max_id + 1000000000);
+        RewriteHandler handler(config.nodes_max_id + 1000000000, location_index);
         handler.init(config.cache_size, &remove_tag_regex, first_pass.valid_nodes, first_pass.valid_ways,
                      first_pass.valid_relations, &logFile, config.debug_no_filter, config.debug_no_tag_filter);
         handler.addElevation = config.addElevation;
@@ -313,6 +344,9 @@ int main(int argc, char **argv) {
 
         new_node_writer.close();
 
+        const auto mem = location_index->used_memory() / (1024UL );
+        std::cout << "\nAbout " << mem << " KBytes used for node location index (in main memory or on disk).\n";
+
         end = chrono::steady_clock::now();
         printf("\nProcessed in %.3f s\n", chrono::duration_cast<chrono::milliseconds>(end - start).count() / 1000.0);
 
@@ -340,6 +374,9 @@ int main(int argc, char **argv) {
                        handler.nodes_with_elevation);
         }
         cout << endl;
+
+        show_memory_used();
+
     } catch (const exception &e) {
         logFile.close();
         cerr << e.what() << '\n';
@@ -348,7 +385,6 @@ int main(int argc, char **argv) {
     logFile.close();
     return 0;
 }
-
 
 // int main(int argc, char *argv[]) {
 int quickTest(int argc, char *argv[]) {
