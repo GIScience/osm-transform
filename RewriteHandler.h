@@ -250,7 +250,7 @@ public:
         {
             osmium::builder::TagListBuilder nodeTagsBuilder{nodeBuilder};
             nodeTagsBuilder.add_tag("ele", to_string(le.ele));
-//            nodeTagsBuilder.add_tag("barrier", "gate");
+            nodeTagsBuilder.add_tag("highway", "traffic_signal");
         }
 
     }

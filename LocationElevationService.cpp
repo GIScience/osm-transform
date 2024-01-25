@@ -6,7 +6,7 @@ std::vector<LocationElevation> LocationElevationService::interpolate(osmium::Loc
     std::vector<LocationElevation> data;
 
     std::vector<rTreeEntry> result_s;
-  //  rtree.query(bgi::contains(point(from.lon(),from.lat())), std::back_inserter(result_s));
+    rtree.query(bgi::contains(point(from.lon(),from.lat())), std::back_inserter(result_s));
     std::sort(result_s.begin(), result_s.end(), sortRTreeEntryByPrio);
     if (result_s.empty()) {
         return data;
