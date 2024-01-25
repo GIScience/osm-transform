@@ -32,7 +32,8 @@ std::vector<LocationElevation> LocationElevationService::interpolate(osmium::Loc
         double lng = from.lon() + sX * s;
         double lat = from.lat() + sY * s;
         double ele = geo_tiff.elevation(lng, lat);
-        data.emplace_back(LocationElevation(osmium::Location(lng, lat), ele));
+        auto loc = osmium::Location(lng, lat);
+        data.push_back(LocationElevation {loc, ele});
     }
     return data;
 }
