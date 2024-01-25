@@ -141,6 +141,16 @@ struct Config {
             exit(1);
         }
 
+        if (vm.contains("help")) {
+            cout << visible << "\n";
+            exit(1);
+        }
+
+        if (vm.contains("version")) {
+            cout << PROJECT_NAME << " " << PROJECT_VERSION << "\n";
+            exit(0);
+        }
+
         if (!vm.contains("osm-pbf")) {
             std::cerr << "no file name" << endl;
             exit(1);
@@ -151,16 +161,6 @@ struct Config {
         if (!file_exists(filename)) {
             std::cerr << "osm-pbf does not exist " << filename << std::endl;
             exit(1);
-        }
-
-        if (vm.contains("help")) {
-            cout << visible << "\n";
-            exit(1);
-        }
-
-        if (vm.contains("version")) {
-            cout << PROJECT_NAME << " " << PROJECT_VERSION << "\n";
-            exit(0);
         }
 
         if (vm.contains("m")) {
@@ -358,14 +358,14 @@ int quickTest(int argc, char *argv[]) {
 
     const std::string path("tiffs");
 
-    auto maxStepWidth = generate_geo_tiff_index(rtree, path);
+    const auto maxStepWidth = generate_geo_tiff_index(rtree, path);
     // find values intersecting some area defined by a box
     std::cout << "MaxStepWidth: " << maxStepWidth << endl;
     // constexpr box query_box(point(8.852324,49.748482), point(8.852334,49.748492));
     std::vector<rTreeEntry> result_s;
     // auto location = point(15.85232,50.74848);
     // auto location = point(15.85232,50.74848);
-    auto location = point(8.85232, 49.74848);
+    const auto location = point(8.85232, 49.74848);
     rtree.query(bgi::contains(location), std::back_inserter(result_s));
 
     std::cout << "Query output:" << std::endl;
