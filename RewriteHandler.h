@@ -1,14 +1,14 @@
 #ifndef REWRITEHANDLER_H
 #define REWRITEHANDLER_H
 #include "GeoTiff.h"
+#include "LocationElevationService.h"
 #include "utils.h"
-#include <osmium/handler.hpp>
 #include <boost/regex.hpp>
+#include <osmium/handler.hpp>
 
 #include <iostream>
 
 class RewriteHandler : public osmium::handler::Handler {
-    friend ostream &operator<<(ostream &out, const RewriteHandler &handler);
 
     osmium::memory::Buffer *m_buffer;
     vi *valid_nodes;
@@ -19,7 +19,6 @@ class RewriteHandler : public osmium::handler::Handler {
     bool DEBUG_NO_FILTER = false;
     bool DEBUG_NO_TAG_FILTER = false;
 
-
     unordered_map<string, GeoTiff *> elevationData;
     int cache_size = -1;
     list<string> cache_queue;
@@ -28,6 +27,7 @@ class RewriteHandler : public osmium::handler::Handler {
     osmium::memory::Buffer *m_new_node_buffer;
     osmid_t m_next_node_id;
     std::unique_ptr<osmium::index::map::Map<osmium::unsigned_object_id_type, osmium::Location>> &m_location_index;
+    LocationElevationService location_elevation;
 
     void copy_tags(osmium::builder::Builder &parent, const osmium::TagList &tags, const int ele = NO_DATA_VALUE) {
         osmium::builder::TagListBuilder builder{parent};
@@ -73,11 +73,11 @@ class RewriteHandler : public osmium::handler::Handler {
         return getElevationFromFile(lat, lng, pszFilename, debug);
     }
 
-    GeoTiff* get_geotiff_from_cache(char *pszFilename, const bool debug) {
+    GeoTiff *get_geotiff_from_cache(char *pszFilename, const bool debug) {
 
         const auto search = elevationData.find(pszFilename);
         if (search != elevationData.end()) {
-            const auto geoTiff = static_cast<GeoTiff*>(elevationData.at(pszFilename));
+            const auto geoTiff = static_cast<GeoTiff *>(elevationData.at(pszFilename));
             cache_queue.remove(pszFilename);
             cache_queue.emplace_front(pszFilename);
             return geoTiff;
@@ -157,6 +157,9 @@ public:
         DEBUG_NO_FILTER = debug_no_filter;
         DEBUG_NO_TAG_FILTER = debug_no_tag_filter;
         non_digit_regex = boost::regex("[^0-9.]");
+
+        // load
+        location_elevation.load("dgm");
     }
 
     void node(const osmium::Node &node) {
@@ -169,14 +172,20 @@ public:
                 builder.set_location(node.location());
                 int ele = NO_DATA_VALUE;
                 if (addElevation) {
-                    if (!overrideValues && node.tags().has_key("ele")) { nodes_with_elevation++; } else {
+                    if (!overrideValues && node.tags().has_key("ele")) {
+                        nodes_with_elevation++;
+                    } else {
                         ele = getElevationCGIAR(node.location().lat(), node.location().lon());
-                        if (ele != NO_DATA_VALUE) { nodes_with_elevation_srtm_precision++; } else {
+                        if (ele != NO_DATA_VALUE) {
+                            nodes_with_elevation_srtm_precision++;
+                        } else {
                             ele = getElevationGMTED(node.location().lat(), node.location().lon());
-                            if (ele != NO_DATA_VALUE) { nodes_with_elevation_gmted_precision++; } else {
+                            if (ele != NO_DATA_VALUE) {
+                                nodes_with_elevation_gmted_precision++;
+                            } else {
                                 nodes_with_elevation_not_found++;
                                 *log << getTimeStr() << " ele retrieval failed: " << node.location().lat() << " "
-                                        << node.location().lon() << endl;
+                                     << node.location().lon() << endl;
                                 ele = 0.0;// GH elevation code defaults to 0
                             }
                         }
@@ -189,13 +198,17 @@ public:
         m_buffer->commit();
     }
 
+    struct NewNode {
+        osmium::object_id_type id;
+        LocationElevation le;
+    };
+
     void way(const osmium::Way &way) {
         processed_elements++;
         if (way.id() < 0) return;
-        if (DEBUG_NO_FILTER || testBit(*valid_ways, way.id()) > 0) {
-            auto next_node_id = m_next_node_id;
 
-            {
+        {
+            if (DEBUG_NO_FILTER || testBit(*valid_ways, way.id()) > 0) {
                 osmium::builder::WayBuilder builder{*m_buffer};
                 builder.set_id(way.id());
                 copy_tags(builder, way.tags());
@@ -207,30 +220,39 @@ public:
                     for (int i = 1; i < way.nodes().size(); i++) {
                         auto to = way.nodes()[i];
                         auto toLocation = get_node_location(to.positive_ref());
-                        wnl_builder.add_node_ref(to);
+
+
+                        for (auto le: location_elevation.interpolate(fromLocation, toLocation)) {
+
+                            auto new_node_id = m_next_node_id++;
+                            newNode(new_node_id, le);
+                            m_new_node_buffer->commit();
+                            wnl_builder.add_node_ref(new_node_id);
+                        }
 
                         // from / to with locations
                         //  split(fromLocation, toLocation);
 
+                        wnl_builder.add_node_ref(to);
                         from = to;
                         fromLocation = toLocation;
                     }
                 }
             }
-//            for (const auto &node: nodes) {
-//                {
-//                    osmium::builder::NodeBuilder nodeBuilder(*m_new_node_buffer);
-//                    nodeBuilder.set_id(next_node_id++);
-//                    nodeBuilder.set_location(osmium::Location(node.x(), node.y()));
-//                    {
-//                        osmium::builder::TagListBuilder nodeTagsBuilder{nodeBuilder};
-//                        nodeTagsBuilder.add_tag("ele", to_string(node.elevation()));
-//                    }
-//                }
-//                m_new_node_buffer->commit();
-//            }
+            m_buffer->commit();
         }
-        m_buffer->commit();
+    }
+
+    void newNode(osmium::object_id_type id, LocationElevation le) {
+        osmium::builder::NodeBuilder nodeBuilder(*m_new_node_buffer);
+        nodeBuilder.set_id(id);
+        nodeBuilder.set_location(le.location);
+        {
+            osmium::builder::TagListBuilder nodeTagsBuilder{nodeBuilder};
+            nodeTagsBuilder.add_tag("ele", to_string(le.ele));
+//            nodeTagsBuilder.add_tag("barrier", "gate");
+        }
+
     }
 
     void relation(const osmium::Relation &relation) {
@@ -249,4 +271,4 @@ public:
 };
 
 
-#endif //REWRITEHANDLER_H
+#endif//REWRITEHANDLER_H

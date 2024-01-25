@@ -2,9 +2,18 @@
 #define GEOTIFF_H
 #include "utils.h"
 
+#include <boost/algorithm/string/predicate.hpp>
+#include <boost/geometry.hpp>
+#include <boost/geometry/geometries/box.hpp>
+#include <boost/geometry/geometries/point.hpp>
+#include <boost/geometry/index/rtree.hpp>
+
+
+#include <filesystem>
 #include <gdal_priv.h>
 #include <iostream>
-#include <filesystem>
+#include <osmium/util/file.hpp>
+#include <osmium/util/progress_bar.hpp>
 
 
 class GeoTiff {
@@ -51,6 +60,7 @@ public:
     auto GetRasterXSize() const { return dataSet->GetRasterXSize(); };
     auto GetRasterYSize() const { return dataSet->GetRasterYSize(); };
     auto GetRasterCount() const { return dataSet->GetRasterCount(); };
+
 };
 
 
