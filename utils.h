@@ -58,7 +58,7 @@ static OGRSpatialReference getWGS84Reference() {
 }
 
 static auto WGS84 = getWGS84Reference();
-static const int NO_DATA_VALUE = -32768;
+static constexpr double NO_DATA_VALUE = -32768.0;
 
 
 static OGRSpatialReference getSpatialReference(const char *crs) {

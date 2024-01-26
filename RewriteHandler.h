@@ -29,7 +29,7 @@ class RewriteHandler : public osmium::handler::Handler {
     std::unique_ptr<osmium::index::map::Map<osmium::unsigned_object_id_type, osmium::Location>> &m_location_index;
     LocationElevationService location_elevation;
 
-    void copy_tags(osmium::builder::Builder &parent, const osmium::TagList &tags, const int ele = NO_DATA_VALUE) {
+    void copy_tags(osmium::builder::Builder &parent, const osmium::TagList &tags, const double ele = NO_DATA_VALUE) {
         osmium::builder::TagListBuilder builder{parent};
         for (const auto &tag: tags) {
             total_tags++;
@@ -171,7 +171,7 @@ public:
                 osmium::builder::NodeBuilder builder{*m_buffer};
                 builder.set_id(node.id());
                 builder.set_location(node.location());
-                int ele = NO_DATA_VALUE;
+                double ele = NO_DATA_VALUE;
                 if (addElevation) {
                     if (!overrideValues && node.tags().has_key("ele")) {
                         nodes_with_elevation++;
