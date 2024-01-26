@@ -357,6 +357,9 @@ int main(int argc, char **argv) {
         if (config.addElevation) {
             printf("All Nodes: %19llu Nodes\n",
                    countBits(*first_pass.valid_nodes));
+            printf("Custom Elevation: %14.2f %% (%lld)\n",
+                   static_cast<double>(handler.nodes_with_elevation_high_precision) /
+                   static_cast<double>(countBits(*first_pass.valid_nodes)) * 100, handler.nodes_with_elevation_high_precision);
             printf("SRTM Elevation: %14.2f %% (%lld)\n",
                    static_cast<double>(handler.nodes_with_elevation_srtm_precision) /
                    static_cast<double>(countBits(*first_pass.valid_nodes)) * 100, handler.nodes_with_elevation_srtm_precision);

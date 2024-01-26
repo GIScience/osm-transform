@@ -128,6 +128,7 @@ public:
     bool addElevation = false;
     bool overrideValues = false;
     llu nodes_with_elevation_srtm_precision = 0;
+    llu nodes_with_elevation_high_precision = 0;
     llu nodes_with_elevation_gmted_precision = 0;
     llu nodes_with_elevation = 0;
     llu nodes_with_elevation_not_found = 0;
@@ -159,7 +160,7 @@ public:
         non_digit_regex = boost::regex("[^0-9.]");
 
         // load
-        location_elevation.load("dgm");
+        location_elevation.load("tiffs");
     }
 
     void node(const osmium::Node &node) {
@@ -176,20 +177,22 @@ public:
                         nodes_with_elevation++;
                     } else {
                           ele = location_elevation.elevation(node.location());
-                        if (ele == NO_DATA_VALUE) {
-                            ele = getElevationCGIAR(node.location().lat(), node.location().lon());
-                        }
                         if (ele != NO_DATA_VALUE) {
-                            nodes_with_elevation_srtm_precision++;
+                            nodes_with_elevation_high_precision++;
                         } else {
-                            ele = getElevationGMTED(node.location().lat(), node.location().lon());
+                            ele = getElevationCGIAR(node.location().lat(), node.location().lon());
                             if (ele != NO_DATA_VALUE) {
-                                nodes_with_elevation_gmted_precision++;
+                                nodes_with_elevation_srtm_precision++;
                             } else {
-                                nodes_with_elevation_not_found++;
-                                *log << getTimeStr() << " ele retrieval failed: " << node.location().lat() << " "
-                                     << node.location().lon() << endl;
-                                ele = 0.0;// GH elevation code defaults to 0
+                                ele = getElevationGMTED(node.location().lat(), node.location().lon());
+                                if (ele != NO_DATA_VALUE) {
+                                    nodes_with_elevation_gmted_precision++;
+                                } else {
+                                    nodes_with_elevation_not_found++;
+                                    *log << getTimeStr() << " ele retrieval failed: " << node.location().lat() << " "
+                                         << node.location().lon() << endl;
+                                    ele = 0.0;// GH elevation code defaults to 0
+                                }
                             }
                         }
                     }
