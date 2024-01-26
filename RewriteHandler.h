@@ -175,7 +175,10 @@ public:
                     if (!overrideValues && node.tags().has_key("ele")) {
                         nodes_with_elevation++;
                     } else {
-                        ele = getElevationCGIAR(node.location().lat(), node.location().lon());
+                          ele = location_elevation.elevation(node.location());
+                        if (ele == NO_DATA_VALUE) {
+                            ele = getElevationCGIAR(node.location().lat(), node.location().lon());
+                        }
                         if (ele != NO_DATA_VALUE) {
                             nodes_with_elevation_srtm_precision++;
                         } else {
