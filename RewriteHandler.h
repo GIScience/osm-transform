@@ -157,10 +157,9 @@ public:
     }
 
     void node(const osmium::Node &node) {
-        processed_elements++;
         if (node.id() < 0) return;
-
         if (m_valid_ids->nodes().get(node.id())) {
+            processed_elements++;
             osmium::builder::NodeBuilder builder{*m_buffer};
             builder.set_id(node.id());
             builder.set_location(node.location());
@@ -198,10 +197,9 @@ public:
     }
 
     void way(const osmium::Way &way) {
-        processed_elements++;
         if (way.id() < 0) return;
-
         if (m_valid_ids->ways().get(way.id())) {
+            processed_elements++;
             osmium::builder::WayBuilder builder{*m_buffer};
             builder.set_id(way.id());
             copy_tags(builder, way.tags());
@@ -244,10 +242,9 @@ public:
     }
 
     void relation(const osmium::Relation &relation) {
-        processed_elements++;
         if (relation.id() < 0) return;
-
         if (m_valid_ids->relations().get(relation.id())) {
+            processed_elements++;
             osmium::builder::RelationBuilder builder{*m_buffer};
             builder.set_id(relation.id());
             builder.add_item(relation.members());
