@@ -142,38 +142,25 @@ void second_pass(Config &config, std::ofstream &logFile, boost::regex &remove_ta
     handler.addElevation = config.addElevation;
     handler.overrideValues = config.overrideValues;;
 
-
     const auto new_node_output = remove_extension(fs::path(config.filename.c_str()).stem()) + ".ors.new_nodes.pbf";
-    osmium::io::Writer new_node_writer{new_node_output, header, osmium::io::overwrite::allow};
-
-    while (osmium::memory::Buffer input_buffer = reader.read()) {
-        auto step_start = chrono::steady_clock::now();
-
-        auto bytes_per_cycle = input_buffer.committed();
-        osmium::memory::Buffer output_buffer{bytes_per_cycle};
+    osmium::io::Writer nodeWriter{new_node_output, header, osmium::io::overwrite::allow};
+    osmium::ProgressBar progress{total_elements, osmium::isatty(2)};
+    while (auto input_buffer = reader.read()) {
+        osmium::memory::Buffer output_buffer{input_buffer.committed()};
         osmium::memory::Buffer new_node_output_buffer{input_buffer.committed()};
         handler.set_buffers(&output_buffer, &new_node_output_buffer);
 
         osmium::apply(input_buffer, handler);
         writer(std::move(output_buffer));
-        new_node_writer(std::move(new_node_output_buffer));
+        nodeWriter(std::move(new_node_output_buffer));
 
-        auto step_end = chrono::steady_clock::now();
         processed_elements += handler.processed_elements;
-        processed_nanos += chrono::duration_cast<chrono::nanoseconds>(step_end - step_start).count();
-        printf("\rProgress: %llu / %llu (%3.2f %%)", processed_elements, total_elements,
-               (static_cast<float>(processed_elements) / static_cast<float>(total_elements)) * 100.0);
-        if (config.debug_output) {
-            printf(" - Average element process time: %.3f ms - bytes / cycle: %ld, %llu elements / cycle",
-                   static_cast<float>(processed_nanos) / processed_elements / 1000.0, bytes_per_cycle,
-                   handler.processed_elements);
-        }
-        fflush(stdout);
+        progress.update(processed_elements);
     }
+    progress.done();
     reader.close();
     writer.close();
-
-    new_node_writer.close();
+    nodeWriter.close();
 
     const auto mem = location_index->used_memory() / (1024UL );
     std::cout << "\nAbout " << mem << " KBytes used for node location index (in main memory or on disk).\n";
@@ -184,7 +171,7 @@ void second_pass(Config &config, std::ofstream &logFile, boost::regex &remove_ta
     const auto insize = std::filesystem::file_size(config.filename);
     const auto outsize = std::filesystem::file_size(output);
     const auto reduction = insize - outsize;
-    printf("\nOriginal: %20llu b\nReduced: %21lu b\nReduction: %19llu b (= %3.2f %%)\n", insize, outsize,
+    printf("\nOriginal: %20ju b\nReduced: %21lu b\nReduction: %19ju b (= %3.2f %%)\n", insize, outsize,
            reduction, static_cast<float>(reduction) / static_cast<float>(insize) * 100);
     if (config.addElevation) {
         auto valid_nodes = valid_ids.nodes().size();
