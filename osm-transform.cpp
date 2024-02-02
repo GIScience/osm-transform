@@ -98,7 +98,7 @@ void first_pass(Config &config, boost::regex &remove_tag_regex, osmium::nwr_arra
     cout << "Processing first pass: validate ways & relations..." << endl;
     auto start = chrono::steady_clock::now();
 
-    osmium::io::Reader reader{config.filename};
+    osmium::io::Reader reader{config.filename, osmium::osm_entity_bits::way | osmium::osm_entity_bits::relation,  osmium::io::read_meta::no};
     osmium::ProgressBar progress{reader.file_size(), osmium::isatty(2)};
     FirstPassHandler handler(remove_tag_regex, valid_ids);
     while (osmium::memory::Buffer input_buffer = reader.read()) {
@@ -125,11 +125,10 @@ void second_pass(Config &config, std::ofstream &logFile, boost::regex &remove_ta
 
     const auto start = chrono::steady_clock::now();
     cout << "Processing second pass: rebuild data..." << endl;
-    osmium::io::Reader reader{config.filename};
+    osmium::io::Reader reader{config.filename, osmium::osm_entity_bits::node | osmium::osm_entity_bits::way | osmium::osm_entity_bits::relation, osmium::io::read_meta::no};
 
     // keep existing headers incluing osm data dates
-    osmium::io::Header header_in = reader.header();
-    osmium::io::Header header = header_in;
+    osmium::io::Header header(reader.header());
     header.set("generator", "osm-transform v0.1.0");
 
     osmium::io::Writer writer{output, header, osmium::io::overwrite::allow};
