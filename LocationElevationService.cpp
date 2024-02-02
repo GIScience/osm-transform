@@ -85,3 +85,6 @@ double LocationElevationService::elevation(osmium::Location l) {
 
     return geo_tiff->elevation(l.lon(), l.lat());
 }
+LocationElevationService::LocationElevationService() {
+    GDALAllRegister();
+}

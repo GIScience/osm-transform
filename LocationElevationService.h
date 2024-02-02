@@ -32,6 +32,7 @@ private:
 
     std::shared_ptr<GeoTiff> load_tiff(const char* filename);
 public:
+    explicit LocationElevationService();
 
     void load(const std::string &path);
 

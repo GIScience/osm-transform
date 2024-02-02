@@ -13,9 +13,6 @@
 #include <boost/geometry/index/rtree.hpp>
 #include <boost/program_options.hpp>
 
-#include "gdal.h"
-#include "gdal_priv.h"
-#include "gdal_utils.h"
 #include "cpl_conv.h"
 
 #include <osmium/io/any_input.hpp>
@@ -41,10 +38,7 @@
 #include <algorithm>
 
 #include "FirstPassHandler.h"
-#include "GeoTiff.h"
 #include "RewriteHandler.h"
-
-#include <boost/foreach.hpp>
 
 #include "utils.h"
 
@@ -184,9 +178,6 @@ int main(int argc, char **argv) {
     Config config;
     config.cmd(argc, argv);
 
-    GDALAllRegister();
-
-
     ofstream logFile;
     logFile.open("osm-transform.log");
     try {
@@ -314,36 +305,5 @@ int main(int argc, char **argv) {
         return (3);
     }
     logFile.close();
-    return 0;
-}
-
-// int main(int argc, char *argv[]) {
-int quickTest(int argc, char *argv[]) {
-    GDALAllRegister();
-
-    bgi::rtree<rTreeEntry, bgi::quadratic<16>> rtree;
-
-    const std::string path("tiffs");
-
-    const auto maxStepWidth = generate_geo_tiff_index(rtree, path);
-    // find values intersecting some area defined by a box
-    std::cout << "MaxStepWidth: " << maxStepWidth << endl;
-    // constexpr box query_box(point(8.852324,49.748482), point(8.852334,49.748492));
-    std::vector<rTreeEntry> result_s;
-    // auto location = point(15.85232,50.74848);
-    // auto location = point(15.85232,50.74848);
-    const auto location = point(8.85232, 49.74848);
-    rtree.query(bgi::contains(location), std::back_inserter(result_s));
-
-    std::cout << "Query output:" << std::endl;
-
-    std::sort(result_s.begin(), result_s.end(), sortRTreeEntryByPrio);
-
-    BOOST_FOREACH(rTreeEntry const& v, result_s) {
-        std::cout << bg::wkt<box>(v.first) << " - " << v.second.prio << " - " << v.second.fileName << std::endl;
-        GeoTiff geo_tiff(v.second.fileName.c_str());
-        std::cout << "Elevation in point " << bg::wkt<point>(location) << ": " << geo_tiff.elevation(location.get<0>(), location.get<1>()) << std::endl;
-    }
-
     return 0;
 }
