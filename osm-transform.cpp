@@ -1,48 +1,23 @@
-#include <string>
-#include <fstream>
-#include <iostream>
+#include "Config.h"
+#include "FirstPassHandler.h"
+#include "RewriteHandler.h"
+
 #include <chrono>
-#include <limits>
+#include <filesystem>
+#include <iostream>
+#include <string>
+#include <vector>
 
 #include <boost/regex.hpp>
-#include <boost/filesystem.hpp>
-
-#include <boost/geometry.hpp>
-#include <boost/geometry/geometries/point.hpp>
-#include <boost/geometry/geometries/box.hpp>
-#include <boost/geometry/index/rtree.hpp>
-
-
-#include "cpl_conv.h"
 
 #include <osmium/io/any_input.hpp>
 #include <osmium/io/any_output.hpp>
 #include <osmium/util/file.hpp>
 #include <osmium/util/progress_bar.hpp>
-#include <osmium/index/index.hpp>
-#include <osmium/index/map/flex_mem.hpp>
-#include <osmium/index/map/all.hpp>
 #include <osmium/util/memory.hpp>
-
-#include <osmium/index/id_set.hpp>
-#include <osmium/index/nwr_array.hpp>
-
-#include <osmium/handler.hpp>
-#include <osmium/handler/node_locations_for_ways.hpp>
-#include <osmium/util/progress_bar.hpp>
 #include <osmium/visitor.hpp>
-#include <osmium/osm/node_ref.hpp>
-
-
-#include <vector>
-#include <algorithm>
-
-#include "Config.h"
-#include "FirstPassHandler.h"
-#include "RewriteHandler.h"
 
 using namespace std;
-
 
 ostream &operator<<(ostream &out, const FirstPassHandler &handler) {
     return out << "valid nodes: " << handler.m_valid_ids.nodes().size() << " (" << handler.node_count << "), "
@@ -50,17 +25,11 @@ ostream &operator<<(ostream &out, const FirstPassHandler &handler) {
            << "valid relations: " << handler.m_valid_ids.relations().size() << " (" << handler.relation_count << ")";
 }
 
-ostream &operator<<(ostream &out, const RewriteHandler &handler) {
-    return out << "valid elements: " << handler.valid_elements << " (" << handler.processed_elements << "), "
-           << "valid tags: " << handler.valid_tags << " (" << handler.total_tags << ")";
-}
-
 auto remove_extension(const string &filename) {
-    const size_t lastdot = filename.find_first_of(".");
+    const size_t lastdot = filename.find_first_of('.');
     if (lastdot == string::npos) return filename;
     return filename.substr(0, lastdot);
 }
-
 
 auto show_memory_used() {
     const osmium::MemoryUsage mem;
@@ -69,32 +38,27 @@ auto show_memory_used() {
     }
 }
 
-
 void first_pass(Config &config, boost::regex &remove_tag_regex, osmium::nwr_array<osmium::index::IdSetDense<osmium::unsigned_object_id_type>> &valid_ids);
-void second_pass(Config &config, std::ofstream &logFile, boost::regex &remove_tag_regex, osmium::nwr_array<osmium::index::IdSetDense<osmium::unsigned_object_id_type>> &valid_ids);
+void second_pass(Config &config, boost::regex &remove_tag_regex, osmium::nwr_array<osmium::index::IdSetDense<osmium::unsigned_object_id_type>> &valid_ids);
 
 int main(int argc, char **argv) {
     Config config;
     config.cmd(argc, argv);
 
-    ofstream logFile;
-    logFile.open("osm-transform.log");
     try {
 
         boost::regex remove_tag_regex(config.remove_tag_regex_str, boost::regex::icase);
         osmium::nwr_array<osmium::index::IdSetDense<osmium::unsigned_object_id_type>> valid_ids;
 
         first_pass(config, remove_tag_regex, valid_ids);
-        second_pass(config, logFile, remove_tag_regex, valid_ids);
+        second_pass(config, remove_tag_regex, valid_ids);
 
         show_memory_used();
 
     } catch (const exception &e) {
-        logFile.close();
         cerr << e.what() << '\n';
         return (3);
     }
-    logFile.close();
     return 0;
 }
 
@@ -118,14 +82,14 @@ void first_pass(Config &config, boost::regex &remove_tag_regex, osmium::nwr_arra
     printf("Processed in %.3f s\n\n", chrono::duration_cast<chrono::milliseconds>(chrono::steady_clock::now() - start).count() / 1000.0);
 }
 
-void second_pass(Config &config, std::ofstream &logFile, boost::regex &remove_tag_regex, osmium::nwr_array<osmium::index::IdSetDense<osmium::unsigned_object_id_type>> &valid_ids) {
-    const auto& map_factory = osmium::index::MapFactory<osmium::unsigned_object_id_type, osmium::Location>::instance();
-    auto location_index = map_factory.create_map("flex_mem");
-
+void second_pass(Config &config, boost::regex &remove_tag_regex, osmium::nwr_array<osmium::index::IdSetDense<osmium::unsigned_object_id_type>> &valid_ids) {
     LocationElevationService locationElevationService;
     locationElevationService.load("tiffs");
 
-    string output = remove_extension(fs::path(config.filename.c_str()).stem()) + ".ors.pbf";
+    const auto& map_factory = osmium::index::MapFactory<osmium::unsigned_object_id_type, osmium::Location>::instance();
+    auto location_index = map_factory.create_map("flex_mem");
+
+    string output = remove_extension(std::filesystem::path(config.filename.c_str()).stem()) + ".ors.pbf";
     const auto total_elements = valid_ids.nodes().size() + valid_ids.ways().size() + valid_ids.relations().size();
     unsigned long long processed_elements = 0;
 
@@ -138,11 +102,11 @@ void second_pass(Config &config, std::ofstream &logFile, boost::regex &remove_ta
     header.set("generator", "osm-transform v0.1.0");
 
     osmium::io::Writer writer{output, header, osmium::io::overwrite::allow};
-    RewriteHandler handler(1000000000, location_index, locationElevationService, config.cache_size, &remove_tag_regex, &valid_ids, &logFile);
+    RewriteHandler handler(1000000000, location_index, locationElevationService, config.cache_size, remove_tag_regex, valid_ids);
     handler.addElevation = config.addElevation;
-    handler.overrideValues = config.overrideValues;;
+    handler.overrideValues = config.overrideValues;
 
-    const auto new_node_output = remove_extension(fs::path(config.filename.c_str()).stem()) + ".ors.new_nodes.pbf";
+    const auto new_node_output = remove_extension(std::filesystem::path(config.filename.c_str()).stem()) + ".ors.new_nodes.pbf";
     osmium::io::Writer nodeWriter{new_node_output, header, osmium::io::overwrite::allow};
     osmium::ProgressBar progress{total_elements, osmium::isatty(2)};
     while (auto input_buffer = reader.read()) {

@@ -3,12 +3,17 @@
 
 #include <ostream>
 #include <set>
+
 #include <boost/regex.hpp>
+
 #include <osmium/handler.hpp>
 #include <osmium/index/id_set.hpp>
 #include <osmium/index/nwr_array.hpp>
-
-using namespace std;
+#include <osmium/osm/tag.hpp>
+#include <osmium/osm/node.hpp>
+#include <osmium/osm/types.hpp>
+#include <osmium/osm/way.hpp>
+#include <osmium/osm/relation.hpp>
 
 class FirstPassHandler : public osmium::handler::Handler {
     friend std::ostream &operator<<(std::ostream &out, const FirstPassHandler &handler);
@@ -18,7 +23,7 @@ class FirstPassHandler : public osmium::handler::Handler {
     // const set<string> invalidating_tags{"building", "landuse"};
     boost::regex &remove_tags;
 
-    static bool validating_tags(const string &tag, const string &value) {
+    static bool validating_tags(const std::string &tag, const std::string &value) {
         if (tag == "highway") return true;
         if (tag == "route") return true;
         if (tag == "railway" && value == "platform") return true;

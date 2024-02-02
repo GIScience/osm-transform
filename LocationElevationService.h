@@ -1,12 +1,13 @@
 #ifndef OSM_TRANSFORM_LOCATIONELEVATIONSERVICE_H
 #define OSM_TRANSFORM_LOCATIONELEVATIONSERVICE_H
 
+#include <list>
 
 #include <boost/geometry.hpp>
 #include <boost/geometry/geometries/box.hpp>
 #include <boost/geometry/geometries/point.hpp>
 #include <boost/geometry/index/rtree.hpp>
-#include <list>
+
 #include <osmium/osm/location.hpp>
 
 
@@ -15,9 +16,12 @@ struct LocationElevation {
     double ele;
 };
 
-
 class GeoTiff;
-struct prioAndFileName;
+
+struct prioAndFileName {
+    double prio;
+    std::string fileName;
+};
 
 class LocationElevationService {
     typedef boost::geometry::model::point<double, 2,  boost::geometry::cs::geographic< boost::geometry::degree>> point;
@@ -31,6 +35,7 @@ private:
     uint m_cache_size = 10;
 
     std::shared_ptr<GeoTiff> load_tiff(const char* filename);
+
 public:
     explicit LocationElevationService();
 
