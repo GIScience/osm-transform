@@ -41,8 +41,6 @@
 #include "FirstPassHandler.h"
 #include "RewriteHandler.h"
 
-#include "utils.h"
-
 using namespace std;
 
 
@@ -55,6 +53,12 @@ ostream &operator<<(ostream &out, const FirstPassHandler &handler) {
 ostream &operator<<(ostream &out, const RewriteHandler &handler) {
     return out << "valid elements: " << handler.valid_elements << " (" << handler.processed_elements << "), "
            << "valid tags: " << handler.valid_tags << " (" << handler.total_tags << ")";
+}
+
+auto remove_extension(const string &filename) {
+    const size_t lastdot = filename.find_first_of(".");
+    if (lastdot == string::npos) return filename;
+    return filename.substr(0, lastdot);
 }
 
 
@@ -119,9 +123,8 @@ void second_pass(Config &config, std::ofstream &logFile, boost::regex &remove_ta
     auto location_index = map_factory.create_map("flex_mem");
 
     string output = remove_extension(fs::path(config.filename.c_str()).stem()) + ".ors.pbf";
-    llu total_elements = valid_ids.nodes().size() + valid_ids.ways().size() + valid_ids.relations().size();
-    llu processed_elements = 0;
-    llu processed_nanos = 0;
+    const auto total_elements = valid_ids.nodes().size() + valid_ids.ways().size() + valid_ids.relations().size();
+    unsigned long long processed_elements = 0;
 
     const auto start = chrono::steady_clock::now();
     cout << "Processing second pass: rebuild data..." << endl;

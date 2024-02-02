@@ -1,6 +1,5 @@
 #ifndef GEOTIFF_H
 #define GEOTIFF_H
-#include "utils.h"
 
 #include <boost/algorithm/string/predicate.hpp>
 #include <boost/geometry.hpp>
@@ -15,6 +14,16 @@
 #include <osmium/util/file.hpp>
 #include <osmium/util/progress_bar.hpp>
 
+static constexpr double NO_DATA_VALUE = -32768.0;
+
+static const OGRSpatialReference getWGS84Reference() {
+    OGRSpatialReference reference;
+    reference.SetWellKnownGeogCS("WGS84");
+    reference.SetAxisMappingStrategy(OAMS_TRADITIONAL_GIS_ORDER);
+    return reference;
+}
+
+static auto WGS84 = getWGS84Reference();
 
 class GeoTiff {
     GDALDatasetUniquePtr dataSet;
@@ -24,6 +33,15 @@ class GeoTiff {
     double rasterNoDataValue = 0.0;
 
 public:
+
+
+    static auto getSpatialReference(const char *crs) {
+        OGRSpatialReference reference;
+        reference.importFromWkt(crs);
+        reference.SetAxisMappingStrategy(OAMS_TRADITIONAL_GIS_ORDER);
+        return reference;
+    }
+
     explicit GeoTiff(const char *filename) {
         dataSet = GDALDatasetUniquePtr(GDALDataset::FromHandle(GDALOpenShared(filename, GA_ReadOnly)));
         if (dataSet == nullptr) return;
@@ -47,8 +65,8 @@ public:
 
         // for some coordinates close to the borders of the tile space the transformation returns invalid coordinates,
         // because the tiles of the dataset are not cut along full degree lines.
-        x = max(min(x, dataSet->GetRasterXSize() - 1), 0);
-        y = max(min(y, dataSet->GetRasterYSize() - 1), 0);
+        x = std::max(std::min(x, dataSet->GetRasterXSize() - 1), 0);
+        y = std::max(std::min(y, dataSet->GetRasterYSize() - 1), 0);
         double pixel[2];
         if (dataSet->GetRasterBand(1)->RasterIO(GF_Read, x, y, 1, 1, pixel, 1, 1, GDT_CFloat64, 0, 0) != CE_None ||
             (rasterHasNoData && pixel[0] <= rasterNoDataValue)) { return NO_DATA_VALUE; }
@@ -66,7 +84,7 @@ public:
 
 struct prioAndFileName {
     double prio;
-    string fileName;
+    std::string fileName;
 };
 
 namespace fs = std::filesystem;
@@ -83,7 +101,7 @@ typedef std::pair<box, prioAndFileName> rTreeEntry;
 inline auto sortRTreeEntryByPrio(const rTreeEntry &a, const rTreeEntry &b) { return a.second.prio < b.second.prio; };
 
 inline auto generate_geo_tiff_index(bgi::rtree<rTreeEntry, bgi::quadratic<16>> &rtree, const std::string &path) {
-    std::vector<string> geotiffs;
+    std::vector<std::string> geotiffs;
     for (auto &p: fs::recursive_directory_iterator(path)) {
         auto ext = p.path().extension().string();
         if (!boost::iequals(ext, ".tif") && !boost::iequals(ext, ".tiff") && !boost::iequals(ext, ".gtiff")) { continue; }
@@ -95,7 +113,7 @@ inline auto generate_geo_tiff_index(bgi::rtree<rTreeEntry, bgi::quadratic<16>> &
     for (const auto& geotiff: geotiffs) {
         const auto tif = GDALDatasetUniquePtr(GDALDataset::FromHandle(GDALOpen(geotiff.c_str(), GA_ReadOnly)));
 
-        auto reference = getSpatialReference(tif->GetProjectionRef());
+        auto reference = GeoTiff::getSpatialReference(tif->GetProjectionRef());
         const auto transformation = OGRCreateCoordinateTransformation(&reference, &WGS84);
 
         double transform[6] = {};

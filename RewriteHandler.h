@@ -121,18 +121,26 @@ class RewriteHandler : public osmium::handler::Handler {
         return m_location_index->get_noexcept(static_cast<osmium::unsigned_object_id_type>(id));
     }
 
+    auto getTimeStr() {
+        const std::time_t now = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
+        std::string s(30, '\0');
+        std::strftime(&s[0], s.size(), "%Y-%m-%d %H:%M:%S", std::localtime(&now));
+        return s;
+    }
+
+
 public:
-    llu valid_elements = 0;
-    llu processed_elements = 0;
-    llu total_tags = 0;
-    llu valid_tags = 0;
+    unsigned long long valid_elements = 0;
+    unsigned long long processed_elements = 0;
+    unsigned long long total_tags = 0;
+    unsigned long long valid_tags = 0;
     bool addElevation = false;
     bool overrideValues = false;
-    llu nodes_with_elevation_srtm_precision = 0;
-    llu nodes_with_elevation_high_precision = 0;
-    llu nodes_with_elevation_gmted_precision = 0;
-    llu nodes_with_elevation = 0;
-    llu nodes_with_elevation_not_found = 0;
+    unsigned long long nodes_with_elevation_srtm_precision = 0;
+    unsigned long long nodes_with_elevation_high_precision = 0;
+    unsigned long long nodes_with_elevation_gmted_precision = 0;
+    unsigned long long nodes_with_elevation = 0;
+    unsigned long long nodes_with_elevation_not_found = 0;
 
     explicit RewriteHandler(const osmium::object_id_type next_node_id, std::unique_ptr<osmium::index::map::Map<osmium::unsigned_object_id_type, osmium::Location>> &location_index,
                             const int i_cache_size, boost::regex *re, osmium::nwr_array<osmium::index::IdSetDense<osmium::unsigned_object_id_type>> *valid_ids, ofstream *logref) :

@@ -7,7 +7,6 @@
 #include <osmium/handler.hpp>
 #include <osmium/index/id_set.hpp>
 #include <osmium/index/nwr_array.hpp>
-#include "utils.h"
 
 using namespace std;
 
@@ -41,9 +40,9 @@ class FirstPassHandler : public osmium::handler::Handler {
     }
 
 public:
-    llu node_count = 0;
-    llu relation_count = 0;
-    llu way_count = 0;
+    unsigned long long node_count = 0;
+    unsigned long long relation_count = 0;
+    unsigned long long way_count = 0;
 
     osmium::nwr_array<osmium::index::IdSetDense<osmium::unsigned_object_id_type>> &m_valid_ids;
 
