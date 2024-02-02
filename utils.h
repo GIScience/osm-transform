@@ -8,16 +8,6 @@
 using namespace std;
 typedef unsigned long long llu;
 
-static bool file_exists(const string &filename) {
-    const ifstream ifile(filename.c_str());
-    return static_cast<bool>(ifile);
-}
-
-static llu filesize(const string &filename) {
-    ifstream in(filename.c_str(), std::ifstream::ate | std::ifstream::binary);
-    return (llu) in.tellg();
-}
-
 static string remove_extension(const string &filename) {
     const size_t lastdot = filename.find_first_of(".");
     if (lastdot == string::npos) return filename;

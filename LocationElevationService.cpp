@@ -1,5 +1,7 @@
 #include "LocationElevationService.h"
 
+#include <filesystem>
+
 #include "GeoTiff.h"
 
 std::vector<LocationElevation> LocationElevationService::interpolate(osmium::Location from, osmium::Location to) {
@@ -52,7 +54,7 @@ std::shared_ptr<GeoTiff> LocationElevationService::load_tiff(const char * filena
         return geoTiff;
     }
 
-    if (!file_exists(filename)) {
+    if (!std::filesystem::exists(filename)) {
         return nullptr;
     }
     auto geoTiff = std::make_shared<GeoTiff>(filename);

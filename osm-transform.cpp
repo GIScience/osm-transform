@@ -160,13 +160,13 @@ int main(int argc, char **argv) {
         end = chrono::steady_clock::now();
         printf("\nProcessed in %.3f s\n", chrono::duration_cast<chrono::milliseconds>(end - start).count() / 1000.0);
 
-        llu outsize = filesize(output);
-        llu reduction = insize - outsize;
-        printf("\nOriginal: %20llu b\nReduced: %21llu b\nReduction: %19llu b (= %3.2f %%)\n", insize, outsize,
+        const auto outsize = std::filesystem::file_size(output);
+        const auto reduction = insize - outsize;
+        printf("\nOriginal: %20llu b\nReduced: %21lu b\nReduction: %19llu b (= %3.2f %%)\n", insize, outsize,
                reduction, static_cast<float>(reduction) / static_cast<float>(insize) * 100);
         if (config.addElevation) {
             auto valid_nodes = valid_ids.nodes().size();
-            printf("All Nodes: %19llu Nodes\n",
+            printf("All Nodes: %19lu Nodes\n",
                    valid_nodes);
             printf("Custom Elevation: %14.2f %% (%lld)\n",
                    static_cast<double>(handler.nodes_with_elevation_high_precision) /

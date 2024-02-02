@@ -1,14 +1,16 @@
 #ifndef REWRITEHANDLER_H
 #define REWRITEHANDLER_H
+
+#include <filesystem>
+#include <iostream>
+
 #include "GeoTiff.h"
 #include "LocationElevationService.h"
-#include "utils.h"
 #include <boost/regex.hpp>
 #include <osmium/handler.hpp>
 #include <osmium/index/id_set.hpp>
-#include <osmium/index/nwr_array.hpp>
 
-#include <iostream>
+#include <osmium/index/nwr_array.hpp>
 
 class RewriteHandler : public osmium::handler::Handler {
 
@@ -82,7 +84,7 @@ class RewriteHandler : public osmium::handler::Handler {
             return geoTiff;
         }
 
-        if (!file_exists(pszFilename)) {
+        if (!std::filesystem::exists(pszFilename)) {
             return nullptr;
             // if (debug) cout << "File does not exist: " << pszFilename << endl;
             // value = NO_DATA_VALUE;
