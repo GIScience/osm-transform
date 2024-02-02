@@ -146,15 +146,14 @@ public:
         location_elevation.load("tiffs");
     }
 
-    void set_buffer(osmium::memory::Buffer *buffer) {
-        m_buffer = buffer;
+    void set_buffers(osmium::memory::Buffer *output_buffer, osmium::memory::Buffer *output_node_buffer) {
+        m_buffer = output_buffer;
+        m_new_node_buffer = output_node_buffer;
         valid_elements = 0;
         processed_elements = 0;
         total_tags = 0;
         valid_tags = 0;
     }
-
-    void set_new_node_buffer(osmium::memory::Buffer *buffer) { m_new_node_buffer = buffer; }
 
     void node(const osmium::Node &node) {
         processed_elements++;

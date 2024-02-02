@@ -299,16 +299,13 @@ int main(int argc, char **argv) {
         while (osmium::memory::Buffer input_buffer = second_reader.read()) {
             auto step_start = chrono::steady_clock::now();
 
-            int bytes_per_cycle = input_buffer.committed();
-            osmium::memory::Buffer output_buffer{input_buffer.committed()};
-            handler.set_buffer(&output_buffer);
-
+            auto bytes_per_cycle = input_buffer.committed();
+            osmium::memory::Buffer output_buffer{bytes_per_cycle};
             osmium::memory::Buffer new_node_output_buffer{input_buffer.committed()};
-            handler.set_new_node_buffer(&new_node_output_buffer);
+            handler.set_buffers(&output_buffer, &new_node_output_buffer);
 
             osmium::apply(input_buffer, handler);
             writer(std::move(output_buffer));
-
             new_node_writer(std::move(new_node_output_buffer));
 
             auto step_end = chrono::steady_clock::now();
@@ -317,7 +314,7 @@ int main(int argc, char **argv) {
             printf("\rProgress: %llu / %llu (%3.2f %%)", processed_elements, total_elements,
                    (static_cast<float>(processed_elements) / static_cast<float>(total_elements)) * 100.0);
             if (config.debug_output) {
-                printf(" - Average element process time: %.3f ms - bytes / cycle: %d, %llu elements / cycle",
+                printf(" - Average element process time: %.3f ms - bytes / cycle: %ld, %llu elements / cycle",
                        static_cast<float>(processed_nanos) / processed_elements / 1000.0, bytes_per_cycle,
                        handler.processed_elements);
             }
