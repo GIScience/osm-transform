@@ -16,7 +16,6 @@ class RewriteHandler : public osmium::handler::Handler {
     vi *valid_relations;
     boost::regex *remove_tags;
     boost::regex non_digit_regex;
-    bool DEBUG_NO_TAG_FILTER = false;
 
     unordered_map<string, GeoTiff *> elevationData;
     int cache_size = -1;
@@ -32,7 +31,7 @@ class RewriteHandler : public osmium::handler::Handler {
         osmium::builder::TagListBuilder builder{parent};
         for (const auto &tag: tags) {
             total_tags++;
-            if (DEBUG_NO_TAG_FILTER || !boost::regex_match(tag.key(), *remove_tags)) {
+            if (!boost::regex_match(tag.key(), *remove_tags)) {
                 string key = tag.key();
                 if (key == "ele") {
                     // keep ele tags only if no ele value passed
@@ -146,7 +145,7 @@ public:
     void set_new_node_buffer(osmium::memory::Buffer *buffer) { m_new_node_buffer = buffer; }
 
     void init(const int i_cache_size, boost::regex *re, vi *i_valid_nodes, vi *i_valid_ways, vi *i_valid_relations,
-              ofstream *logref, const bool debug_no_tag_filter) {
+              ofstream *logref) {
         cache_size = i_cache_size;
         remove_tags = re;
         valid_nodes = i_valid_nodes;
@@ -154,7 +153,6 @@ public:
         valid_relations = i_valid_relations;
         valid_elements = valid_nodes->size() + valid_ways->size() + valid_relations->size();
         log = logref;
-        DEBUG_NO_TAG_FILTER = debug_no_tag_filter;
         non_digit_regex = boost::regex("[^0-9.]");
 
         // load

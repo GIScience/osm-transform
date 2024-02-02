@@ -71,7 +71,6 @@ struct Config {
     bool overrideValues = true;
 
     bool debug_output = false;
-    bool debug_no_tag_filter = false;
 
     llu nodes_max_id;
     llu ways_max_id;
@@ -108,8 +107,7 @@ struct Config {
                 ("nodes_max_id,N", po::value<llu>(&nodes_max_id)->default_value(13000000000L), "Max Node Id")
                 ("ways_max_id,W", po::value<llu>(&ways_max_id)->default_value(1300000000L), "Max Ways Id")
                 ("rels_max_id,R", po::value<llu>(&rels_max_id)->default_value(20000000L), "Max Rels Id")
-                ("debug_output", "debug_output")
-                ("debug_no_tag_filter", "debug_no_tag_filter");
+                ("debug_output", "debug_output");
 
 
 
@@ -189,11 +187,6 @@ struct Config {
         }
 
         debug_output = vm.contains("debug_output");
-        debug_no_tag_filter = vm.contains("debug_no_tag_filter");
-
-        if (debug_no_tag_filter) {
-            cout << "DEBUG MODE: Tag filtering disabled" << endl << endl;
-        }
     }
 };
 
@@ -297,7 +290,7 @@ int main(int argc, char **argv) {
         osmium::io::Writer writer{output, header, osmium::io::overwrite::allow};
         RewriteHandler handler(config.nodes_max_id + 1000000000, location_index);
         handler.init(config.cache_size, &remove_tag_regex, first_pass.valid_nodes, first_pass.valid_ways,
-                     first_pass.valid_relations, &logFile, config.debug_no_tag_filter);
+                     first_pass.valid_relations, &logFile);
         handler.addElevation = config.addElevation;
         handler.overrideValues = config.overrideValues;;
 
