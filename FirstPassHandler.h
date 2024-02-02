@@ -56,17 +56,15 @@ public:
     vi *valid_ways;
     vi *valid_relations;
 
-
-    void init(boost::regex *re, vi *i_valid_nodes, vi *i_valid_ways, vi *i_valid_relations,
-              const llu i_node_max_id, const llu i_way_max_id, const llu i_relation_max_id) {
-        remove_tags = re;
-        valid_nodes = i_valid_nodes;
-        valid_ways = i_valid_ways;
-        valid_relations = i_valid_relations;
-        node_max_id = i_node_max_id;
-        way_max_id = i_way_max_id;
-        relation_max_id = i_relation_max_id;
-    }
+    explicit FirstPassHandler(boost::regex *re, vi *i_valid_nodes, vi *i_valid_ways, vi *i_valid_relations,
+                              const llu i_node_max_id, const llu i_way_max_id, const llu i_relation_max_id) :
+            remove_tags(re),
+            valid_nodes(i_valid_nodes),
+            valid_ways(i_valid_ways),
+            valid_relations(i_valid_relations),
+            node_max_id(i_node_max_id),
+            way_max_id(i_way_max_id),
+            relation_max_id(i_relation_max_id) {}
 
     void node(const osmium::Node &node) {
         if (node.id() < 0) return;

@@ -252,8 +252,7 @@ int main(int argc, char **argv) {
         osmium::io::Reader first_pass_reader{config.filename};
         llu insize = first_pass_reader.file_size();
         osmium::ProgressBar progress{insize, osmium::isatty(2)};
-        FirstPassHandler first_pass;
-        first_pass.init(&remove_tag_regex, &valid_nodes, &valid_ways, &valid_relations, config.nodes_max_id,
+        FirstPassHandler first_pass(&remove_tag_regex, &valid_nodes, &valid_ways, &valid_relations, config.nodes_max_id,
                         config.ways_max_id, config.rels_max_id);
         while (osmium::memory::Buffer input_buffer = first_pass_reader.read()) {
             osmium::apply(input_buffer, first_pass);
@@ -288,8 +287,7 @@ int main(int argc, char **argv) {
         header.set("generator", "osm-transform v0.1.0");
 
         osmium::io::Writer writer{output, header, osmium::io::overwrite::allow};
-        RewriteHandler handler(config.nodes_max_id + 1000000000, location_index);
-        handler.init(config.cache_size, &remove_tag_regex, first_pass.valid_nodes, first_pass.valid_ways,
+        RewriteHandler handler(config.nodes_max_id + 1000000000, location_index, config.cache_size, &remove_tag_regex, first_pass.valid_nodes, first_pass.valid_ways,
                      first_pass.valid_relations, &logFile);
         handler.addElevation = config.addElevation;
         handler.overrideValues = config.overrideValues;;

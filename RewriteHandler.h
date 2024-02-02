@@ -15,7 +15,7 @@ class RewriteHandler : public osmium::handler::Handler {
     vi *valid_ways;
     vi *valid_relations;
     boost::regex *remove_tags;
-    boost::regex non_digit_regex;
+    boost::regex non_digit_regex = boost::regex("[^0-9.]");
 
     unordered_map<string, GeoTiff *> elevationData;
     int cache_size = -1;
@@ -131,8 +131,20 @@ public:
     llu nodes_with_elevation = 0;
     llu nodes_with_elevation_not_found = 0;
 
-    explicit RewriteHandler(const osmium::object_id_type next_node_id, std::unique_ptr<osmium::index::map::Map<osmium::unsigned_object_id_type, osmium::Location>> &location_index)
-        : m_next_node_id(next_node_id), m_location_index(location_index) {}
+    explicit RewriteHandler(const osmium::object_id_type next_node_id, std::unique_ptr<osmium::index::map::Map<osmium::unsigned_object_id_type, osmium::Location>> &location_index,
+                            const int i_cache_size, boost::regex *re, vi *i_valid_nodes, vi *i_valid_ways, vi *i_valid_relations, ofstream *logref) :
+            m_next_node_id(next_node_id),
+            m_location_index(location_index),
+            cache_size(i_cache_size),
+            remove_tags(re),
+            valid_nodes(i_valid_nodes),
+            valid_ways(i_valid_ways),
+            valid_relations(i_valid_relations),
+            valid_elements(valid_nodes->size() + valid_ways->size() + valid_relations->size()),
+            log(logref) {
+        // load
+        location_elevation.load("tiffs");
+    }
 
     void set_buffer(osmium::memory::Buffer *buffer) {
         m_buffer = buffer;
@@ -143,21 +155,6 @@ public:
     }
 
     void set_new_node_buffer(osmium::memory::Buffer *buffer) { m_new_node_buffer = buffer; }
-
-    void init(const int i_cache_size, boost::regex *re, vi *i_valid_nodes, vi *i_valid_ways, vi *i_valid_relations,
-              ofstream *logref) {
-        cache_size = i_cache_size;
-        remove_tags = re;
-        valid_nodes = i_valid_nodes;
-        valid_ways = i_valid_ways;
-        valid_relations = i_valid_relations;
-        valid_elements = valid_nodes->size() + valid_ways->size() + valid_relations->size();
-        log = logref;
-        non_digit_regex = boost::regex("[^0-9.]");
-
-        // load
-        location_elevation.load("tiffs");
-    }
 
     void node(const osmium::Node &node) {
         processed_elements++;
