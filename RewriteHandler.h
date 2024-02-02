@@ -17,7 +17,7 @@ class RewriteHandler : public osmium::handler::Handler {
     boost::regex *remove_tags;
     boost::regex non_digit_regex = boost::regex("[^0-9.]");
 
-    unordered_map<string, GeoTiff *> elevationData;
+    unordered_map<string, std::shared_ptr<GeoTiff>> elevationData;
     int cache_size = -1;
     list<string> cache_queue;
     ofstream *log;
@@ -71,11 +71,11 @@ class RewriteHandler : public osmium::handler::Handler {
         return getElevationFromFile(lat, lng, pszFilename, debug);
     }
 
-    GeoTiff *get_geotiff_from_cache(char *pszFilename, const bool debug) {
+    std::shared_ptr<GeoTiff> get_geotiff_from_cache(char *pszFilename, const bool debug) {
 
         const auto search = elevationData.find(pszFilename);
         if (search != elevationData.end()) {
-            const auto geoTiff = static_cast<GeoTiff *>(elevationData.at(pszFilename));
+            const auto geoTiff = elevationData.at(pszFilename);
             cache_queue.remove(pszFilename);
             cache_queue.emplace_front(pszFilename);
             return geoTiff;
@@ -87,7 +87,7 @@ class RewriteHandler : public osmium::handler::Handler {
             // value = NO_DATA_VALUE;
             // return true;
         }
-        auto geoTiff = new GeoTiff(pszFilename);
+        auto geoTiff = std::make_shared<GeoTiff>(pszFilename);
         if (geoTiff == nullptr) {
             return nullptr;
             // if (debug) cout << "Failed to read input data from file " << pszFilename << endl;
