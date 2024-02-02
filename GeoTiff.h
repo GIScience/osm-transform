@@ -47,8 +47,8 @@ public:
 
         // for some coordinates close to the borders of the tile space the transformation returns invalid coordinates,
         // because the tiles of the dataset are not cut along full degree lines.
-        x = max(min(x, dataSet->GetRasterXSize()), 0);
-        y = max(min(y, dataSet->GetRasterYSize()), 0);
+        x = max(min(x, dataSet->GetRasterXSize() - 1), 0);
+        y = max(min(y, dataSet->GetRasterYSize() - 1), 0);
         double pixel[2];
         if (dataSet->GetRasterBand(1)->RasterIO(GF_Read, x, y, 1, 1, pixel, 1, 1, GDT_CFloat64, 0, 0) != CE_None ||
             (rasterHasNoData && pixel[0] <= rasterNoDataValue)) { return NO_DATA_VALUE; }
