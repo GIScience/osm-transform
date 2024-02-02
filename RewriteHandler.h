@@ -158,87 +158,77 @@ public:
     void node(const osmium::Node &node) {
         processed_elements++;
         if (node.id() < 0) return;
-        {
-            if (testBit(*valid_nodes, node.id()) > 0) {
-                osmium::builder::NodeBuilder builder{*m_buffer};
-                builder.set_id(node.id());
-                builder.set_location(node.location());
-                double ele = NO_DATA_VALUE;
-                if (addElevation) {
-                    if (!overrideValues && node.tags().has_key("ele")) {
-                        nodes_with_elevation++;
+
+        if (testBit(*valid_nodes, node.id()) > 0) {
+            osmium::builder::NodeBuilder builder{*m_buffer};
+            builder.set_id(node.id());
+            builder.set_location(node.location());
+            double ele = NO_DATA_VALUE;
+            if (addElevation) {
+                if (!overrideValues && node.tags().has_key("ele")) {
+                    nodes_with_elevation++;
+                } else {
+                      ele = location_elevation.elevation(node.location());
+                    if (ele != NO_DATA_VALUE) {
+                        nodes_with_elevation_high_precision++;
                     } else {
-                          ele = location_elevation.elevation(node.location());
+                        ele = getElevationCGIAR(node.location().lat(), node.location().lon());
                         if (ele != NO_DATA_VALUE) {
-                            nodes_with_elevation_high_precision++;
+                            nodes_with_elevation_srtm_precision++;
                         } else {
-                            ele = getElevationCGIAR(node.location().lat(), node.location().lon());
+                            ele = getElevationGMTED(node.location().lat(), node.location().lon());
                             if (ele != NO_DATA_VALUE) {
-                                nodes_with_elevation_srtm_precision++;
+                                nodes_with_elevation_gmted_precision++;
                             } else {
-                                ele = getElevationGMTED(node.location().lat(), node.location().lon());
-                                if (ele != NO_DATA_VALUE) {
-                                    nodes_with_elevation_gmted_precision++;
-                                } else {
-                                    nodes_with_elevation_not_found++;
-                                    *log << getTimeStr() << " ele retrieval failed: " << node.location().lat() << " "
-                                         << node.location().lon() << endl;
-                                    ele = 0.0;// GH elevation code defaults to 0
-                                }
+                                nodes_with_elevation_not_found++;
+                                *log << getTimeStr() << " ele retrieval failed: " << node.location().lat() << " "
+                                     << node.location().lon() << endl;
+                                ele = 0.0;// GH elevation code defaults to 0
                             }
                         }
                     }
                 }
-                copy_tags(builder, node.tags(), ele);
-                m_location_index->set(static_cast<osmium::unsigned_object_id_type>(node.id()), node.location());
             }
+            copy_tags(builder, node.tags(), ele);
+            m_location_index->set(static_cast<osmium::unsigned_object_id_type>(node.id()), node.location());
         }
+
         m_buffer->commit();
     }
-
-    struct NewNode {
-        osmium::object_id_type id;
-        LocationElevation le;
-    };
 
     void way(const osmium::Way &way) {
         processed_elements++;
         if (way.id() < 0) return;
 
-        {
-            if (testBit(*valid_ways, way.id()) > 0) {
-                osmium::builder::WayBuilder builder{*m_buffer};
-                builder.set_id(way.id());
-                copy_tags(builder, way.tags());
-                {
-                    osmium::builder::WayNodeListBuilder wnl_builder{builder};
-                    auto from = way.nodes()[0];
-                    auto fromLocation = get_node_location(from.positive_ref());
-                    wnl_builder.add_node_ref(from);
-                    for (int i = 1; i < way.nodes().size(); i++) {
-                        auto to = way.nodes()[i];
-                        auto toLocation = get_node_location(to.positive_ref());
+        if (testBit(*valid_ways, way.id()) > 0) {
+            osmium::builder::WayBuilder builder{*m_buffer};
+            builder.set_id(way.id());
+            copy_tags(builder, way.tags());
+            {
+                osmium::builder::WayNodeListBuilder wnl_builder{builder};
+                auto from = way.nodes()[0];
+                auto fromLocation = get_node_location(from.positive_ref());
+                wnl_builder.add_node_ref(from);
+                for (int i = 1; i < way.nodes().size(); i++) {
+                    auto to = way.nodes()[i];
+                    auto toLocation = get_node_location(to.positive_ref());
 
+                    for (auto le: location_elevation.interpolate(fromLocation, toLocation)) {
 
-                        for (auto le: location_elevation.interpolate(fromLocation, toLocation)) {
-
-                            auto new_node_id = m_next_node_id++;
-                            newNode(new_node_id, le);
-                            m_new_node_buffer->commit();
-                            wnl_builder.add_node_ref(new_node_id);
-                        }
-
-                        // from / to with locations
-                        //  split(fromLocation, toLocation);
-
-                        wnl_builder.add_node_ref(to);
-                        from = to;
-                        fromLocation = toLocation;
+                        auto new_node_id = m_next_node_id++;
+                        newNode(new_node_id, le);
+                        m_new_node_buffer->commit();
+                        wnl_builder.add_node_ref(new_node_id);
                     }
+
+
+                    wnl_builder.add_node_ref(to);
+                    from = to;
+                    fromLocation = toLocation;
                 }
             }
-            m_buffer->commit();
         }
+        m_buffer->commit();
     }
 
     void newNode(osmium::object_id_type id, LocationElevation le) {
@@ -250,19 +240,17 @@ public:
             nodeTagsBuilder.add_tag("ele", to_string(le.ele));
             nodeTagsBuilder.add_tag("highway", "traffic_signal");
         }
-
     }
 
     void relation(const osmium::Relation &relation) {
         processed_elements++;
         if (relation.id() < 0) return;
-        {
-            if (testBit(*valid_relations, relation.id()) > 0) {
-                osmium::builder::RelationBuilder builder{*m_buffer};
-                builder.set_id(relation.id());
-                builder.add_item(relation.members());
-                copy_tags(builder, relation.tags());
-            }
+
+        if (testBit(*valid_relations, relation.id()) > 0) {
+            osmium::builder::RelationBuilder builder{*m_buffer};
+            builder.set_id(relation.id());
+            builder.add_item(relation.members());
+            copy_tags(builder, relation.tags());
         }
         m_buffer->commit();
     }
