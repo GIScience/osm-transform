@@ -17,7 +17,6 @@
 #include "gdal_priv.h"
 #include "gdal_utils.h"
 #include "cpl_conv.h"
-#include "node-locations.hpp"
 
 #include <osmium/io/any_input.hpp>
 #include <osmium/io/any_output.hpp>

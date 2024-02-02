@@ -1,6 +1,5 @@
 #ifndef FIRSTPASSHANDLER_H
 #define FIRSTPASSHANDLER_H
-#include "NodeWithElevation.h"
 
 #include <ostream>
 #include <set>

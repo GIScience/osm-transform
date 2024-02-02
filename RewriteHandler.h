@@ -25,7 +25,7 @@ class RewriteHandler : public osmium::handler::Handler {
     ofstream *log;
 
     osmium::memory::Buffer *m_new_node_buffer;
-    osmid_t m_next_node_id;
+    osmium::object_id_type m_next_node_id;
     std::unique_ptr<osmium::index::map::Map<osmium::unsigned_object_id_type, osmium::Location>> &m_location_index;
     LocationElevationService location_elevation;
 
@@ -133,7 +133,7 @@ public:
     llu nodes_with_elevation = 0;
     llu nodes_with_elevation_not_found = 0;
 
-    explicit RewriteHandler(const osmid_t next_node_id, std::unique_ptr<osmium::index::map::Map<osmium::unsigned_object_id_type, osmium::Location>> &location_index)
+    explicit RewriteHandler(const osmium::object_id_type next_node_id, std::unique_ptr<osmium::index::map::Map<osmium::unsigned_object_id_type, osmium::Location>> &location_index)
         : m_next_node_id(next_node_id), m_location_index(location_index) {}
 
     void set_buffer(osmium::memory::Buffer *buffer) {
