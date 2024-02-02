@@ -5,6 +5,8 @@
 #include <set>
 #include <boost/regex.hpp>
 #include <osmium/handler.hpp>
+#include <osmium/index/id_set.hpp>
+#include <osmium/index/nwr_array.hpp>
 #include "utils.h"
 
 using namespace std;
@@ -16,15 +18,6 @@ class FirstPassHandler : public osmium::handler::Handler {
                                                   "aviation", "military", "power", "communication", "man_made"};
     // const set<string> invalidating_tags{"building", "landuse"};
     boost::regex *remove_tags;
-    llu node_max_id = 0;
-    llu way_max_id = 0;
-    llu relation_max_id = 0;
-
-    static void exitSegfault(const string &type, const llu id) {
-        printf("%s ID %lld exceeds the allocated flag memory. Please increase the value in the config file. \nTo determine the exact value required, run this tool with the -c option.\n",
-               type.c_str(), id);
-        exit(4);
-    }
 
     static bool validating_tags(const string &tag, const string &value) {
         if (tag == "highway") return true;
@@ -52,42 +45,37 @@ public:
     llu relation_count = 0;
     llu way_count = 0;
 
-    vi *valid_nodes;
-    vi *valid_ways;
-    vi *valid_relations;
+    osmium::nwr_array<osmium::index::IdSetDense<osmium::unsigned_object_id_type>> *m_valid_ids;
 
-    explicit FirstPassHandler(boost::regex *re, vi *i_valid_nodes, vi *i_valid_ways, vi *i_valid_relations,
-                              const llu i_node_max_id, const llu i_way_max_id, const llu i_relation_max_id) :
+    explicit FirstPassHandler(boost::regex *re, osmium::nwr_array<osmium::index::IdSetDense<osmium::unsigned_object_id_type>> *valid_ids) :
             remove_tags(re),
-            valid_nodes(i_valid_nodes),
-            valid_ways(i_valid_ways),
-            valid_relations(i_valid_relations),
-            node_max_id(i_node_max_id),
-            way_max_id(i_way_max_id),
-            relation_max_id(i_relation_max_id) {}
+            m_valid_ids(valid_ids) {}
 
     void node(const osmium::Node &node) {
         if (node.id() < 0) return;
-        if (node.id() > node_max_id) { exitSegfault("Node", node.id()); }
         node_count++;
     }
 
     void way(const osmium::Way &way) {
         if (way.id() < 0) return;
-        if (way.id() > way_max_id) { exitSegfault("Way", way.id()); }
         way_count++;
         if (way.nodes().size() < 2 || check_tags(way.tags())) { return; }
-        for (const osmium::NodeRef &n: way.nodes()) { setBit(*valid_nodes, n.ref()); }
-        setBit(*valid_ways, way.id());
+        for (const osmium::NodeRef &n: way.nodes()) {
+            m_valid_ids->nodes().set(n.ref());
+        }
+        m_valid_ids->ways().set(way.id());
     }
 
     void relation(const osmium::Relation &rel) {
         if (rel.id() < 0) return;
-        if (rel.id() > relation_max_id) { exitSegfault("Relation", rel.id()); }
         relation_count++;
         if (check_tags(rel.tags())) { return; }
-        for (const auto &member: rel.members()) { if (member.type() == osmium::item_type::node) { setBit(*valid_nodes, member.ref()); } }
-        setBit(*valid_relations, rel.id());
+        for (const auto &member: rel.members()) {
+            if (member.type() == osmium::item_type::node) {
+                m_valid_ids->nodes().set(member.ref());
+            }
+        }
+        m_valid_ids->relations().set(rel.id());
     }
 };
 

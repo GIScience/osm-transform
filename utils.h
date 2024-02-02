@@ -7,25 +7,6 @@
 
 using namespace std;
 typedef unsigned long long llu;
-typedef vector<unsigned int> vi;
-constexpr int BITWIDTH_INT = std::numeric_limits<unsigned int>::digits;
-
-
-static void setBit(vi &A, const llu k) {
-    if (k < 0) return;
-    A[k / BITWIDTH_INT] |= 1 << (k % BITWIDTH_INT);// Set the bit at the k-th position in A
-}
-
-static bool testBit(vi &A, const llu k) {
-    if (k < 0) return 0;
-    return (A[k / BITWIDTH_INT] & (1 << (k % BITWIDTH_INT))) != 0;
-}
-
-static llu countBits(vi &A) {
-    llu count = 0;
-    for (const auto &intval: A) { count += __builtin_popcount(intval); }
-    return count;
-}
 
 static bool file_exists(const string &filename) {
     const ifstream ifile(filename.c_str());

@@ -27,6 +27,9 @@
 #include <osmium/index/map/all.hpp>
 #include <osmium/util/memory.hpp>
 
+#include <osmium/index/id_set.hpp>
+#include <osmium/index/nwr_array.hpp>
+
 #include <osmium/handler.hpp>
 #include <osmium/handler/node_locations_for_ways.hpp>
 #include <osmium/util/progress_bar.hpp>
@@ -39,7 +42,6 @@
 
 #include "FirstPassHandler.h"
 #include "GeoTiff.h"
-#include "MaxIdHandler.h"
 #include "RewriteHandler.h"
 
 #include <boost/foreach.hpp>
@@ -50,9 +52,9 @@ using namespace std;
 
 
 ostream &operator<<(ostream &out, const FirstPassHandler &handler) {
-    return out << "valid nodes: " << countBits(*handler.valid_nodes) << " (" << handler.node_count << "), "
-           << "valid ways: " << countBits(*handler.valid_ways) << " (" << handler.way_count << "), "
-           << "valid relations: " << countBits(*handler.valid_relations) << " (" << handler.relation_count << ")";
+    return out << "valid nodes: " << handler.m_valid_ids->nodes().size() << " (" << handler.node_count << "), "
+           << "valid ways: " << handler.m_valid_ids->ways().size() << " (" << handler.way_count << "), "
+           << "valid relations: " << handler.m_valid_ids->relations().size() << " (" << handler.relation_count << ")";
 }
 
 ostream &operator<<(ostream &out, const RewriteHandler &handler) {
@@ -65,16 +67,10 @@ struct Config {
     std::string filename;
     std::string remove_tag_regex_str;
 
-    bool doMemoryCheck = false;
-    bool stopAfterMemoryCheck = false;
     bool addElevation = true;
     bool overrideValues = true;
 
     bool debug_output = false;
-
-    llu nodes_max_id;
-    llu ways_max_id;
-    llu rels_max_id;
 
     int cache_size = -1;
 
@@ -89,8 +85,6 @@ struct Config {
         generic.add_options()
                 ("version,v", "print version string") //
                 ("help", "produce help message") //
-                (",m", "perform memory requirement check") //
-                (",c", "only perform memory requirement check") //
                 (",e", "skip elevation data merge") //
                 (",o", "keep original elevation tags where present") //
                 ("osm-pbf,p", po::value<vector<string>>(), "Absolute file path to osm pbf file to process.") //
@@ -104,11 +98,7 @@ struct Config {
                 ("remove_tag,T", po::value<string>(&remove_tag_regex_str)->default_value("(.*:)?source(:.*)?|(.*:)?note(:.*)?|url|created_by|fixme|wikipedia"), "Regex to match removable tags")
                 ("geo_tiff_folders,F", po::value<vector<string>>(&geo_tiff_folder)->composing(), "Absolute paths to GeoTiff folders. Default: srtmdata")
                 ("cache_tile_size,S", po::value<int>(&cache_size)->default_value(10), "Maximum amount of tiles stored in cache")
-                ("nodes_max_id,N", po::value<llu>(&nodes_max_id)->default_value(13000000000L), "Max Node Id")
-                ("ways_max_id,W", po::value<llu>(&ways_max_id)->default_value(1300000000L), "Max Ways Id")
-                ("rels_max_id,R", po::value<llu>(&rels_max_id)->default_value(20000000L), "Max Rels Id")
                 ("debug_output", "debug_output");
-
 
 
         // Hidden options, will be allowed both on command line and
@@ -169,15 +159,6 @@ struct Config {
             exit(1);
         }
 
-        if (vm.contains("m")) {
-            doMemoryCheck = true;
-        }
-
-        if (vm.contains("c")) {
-            doMemoryCheck = true;
-            stopAfterMemoryCheck = true;
-        }
-
         if (vm.contains("e")) {
             addElevation = false;
         }
@@ -212,48 +193,14 @@ int main(int argc, char **argv) {
 
         boost::regex remove_tag_regex(config.remove_tag_regex_str, boost::regex::icase);
 
-
-        if (config.doMemoryCheck) {
-            cout << "Calculating required memory..." << endl;
-            osmium::io::Reader check_reader{config.filename};
-            llu insize = check_reader.file_size();
-            osmium::ProgressBar check_progress{insize, osmium::isatty(2)};
-            MaxIDHandler maxIDHandler;
-            while (osmium::memory::Buffer input_buffer = check_reader.read()) {
-                osmium::apply(input_buffer, maxIDHandler);
-                check_progress.update(check_reader.offset());
-            }
-            check_progress.done();
-            check_progress.remove();
-            check_reader.close();
-            config.nodes_max_id = maxIDHandler.node_max_id;
-            config.ways_max_id = maxIDHandler.way_max_id;
-            config.rels_max_id = maxIDHandler.relation_max_id;
-            cout << "Max IDs: Node " << maxIDHandler.node_max_id << " Way " << maxIDHandler.way_max_id << " Relation "
-                 << maxIDHandler.relation_max_id << endl;
-            if (config.stopAfterMemoryCheck) {
-                return 0;
-            }
-        } else {
-            cout << "Max IDs from config: Node " << config.nodes_max_id << " Way " << config.ways_max_id << " Relation "
-                 << config.rels_max_id << endl;
-        }
-
-
-        printf("Allocating memory: %.2f Mb nodes, %.2f Mb ways, %.2f Mb relations\n\n",
-               config.nodes_max_id / (1024 * 1024 * 8.0), config.ways_max_id / (1024 * 1024 * 8.0),
-               config.rels_max_id / (1024 * 1024 * 8.0));
-        vi valid_nodes((config.nodes_max_id / BITWIDTH_INT) + 1, 0);
-        vi valid_ways((config.ways_max_id / BITWIDTH_INT) + 1, 0);
-        vi valid_relations((config.rels_max_id / BITWIDTH_INT) + 1, 0);
+        osmium::nwr_array<osmium::index::IdSetDense<osmium::unsigned_object_id_type>> valid_ids;
 
         cout << "Processing first pass: validate ways & relations..." << endl;
         auto start = chrono::steady_clock::now();
         osmium::io::Reader first_pass_reader{config.filename};
         llu insize = first_pass_reader.file_size();
         osmium::ProgressBar progress{insize, osmium::isatty(2)};
-        FirstPassHandler first_pass(&remove_tag_regex, &valid_nodes, &valid_ways, &valid_relations, config.nodes_max_id,
-                        config.ways_max_id, config.rels_max_id);
+        FirstPassHandler first_pass(&remove_tag_regex, &valid_ids);
         while (osmium::memory::Buffer input_buffer = first_pass_reader.read()) {
             osmium::apply(input_buffer, first_pass);
             progress.update(first_pass_reader.offset());
@@ -287,8 +234,7 @@ int main(int argc, char **argv) {
         header.set("generator", "osm-transform v0.1.0");
 
         osmium::io::Writer writer{output, header, osmium::io::overwrite::allow};
-        RewriteHandler handler(config.nodes_max_id + 1000000000, location_index, config.cache_size, &remove_tag_regex, first_pass.valid_nodes, first_pass.valid_ways,
-                     first_pass.valid_relations, &logFile);
+        RewriteHandler handler(1000000000, location_index, config.cache_size, &remove_tag_regex, &valid_ids, &logFile);
         handler.addElevation = config.addElevation;
         handler.overrideValues = config.overrideValues;;
 
@@ -336,24 +282,25 @@ int main(int argc, char **argv) {
         printf("\nOriginal: %20llu b\nReduced: %21llu b\nReduction: %19llu b (= %3.2f %%)\n", insize, outsize,
                reduction, static_cast<float>(reduction) / static_cast<float>(insize) * 100);
         if (config.addElevation) {
+            auto valid_nodes = valid_ids.nodes().size();
             printf("All Nodes: %19llu Nodes\n",
-                   countBits(*first_pass.valid_nodes));
+                   valid_nodes);
             printf("Custom Elevation: %14.2f %% (%lld)\n",
                    static_cast<double>(handler.nodes_with_elevation_high_precision) /
-                   static_cast<double>(countBits(*first_pass.valid_nodes)) * 100, handler.nodes_with_elevation_high_precision);
+                   static_cast<double>(valid_nodes) * 100, handler.nodes_with_elevation_high_precision);
             printf("SRTM Elevation: %14.2f %% (%lld)\n",
                    static_cast<double>(handler.nodes_with_elevation_srtm_precision) /
-                   static_cast<double>(countBits(*first_pass.valid_nodes)) * 100, handler.nodes_with_elevation_srtm_precision);
+                   static_cast<double>(valid_nodes) * 100, handler.nodes_with_elevation_srtm_precision);
             printf("GMTED Elevation: %13.2f %% (%lld)\n",
                    static_cast<double>(handler.nodes_with_elevation_gmted_precision) /
-                   static_cast<double>(countBits(*first_pass.valid_nodes)) * 100, handler.nodes_with_elevation_gmted_precision);
+                   static_cast<double>(valid_nodes) * 100, handler.nodes_with_elevation_gmted_precision);
             printf("Failed Elevation: %12.2f %% (%lld)\n",
-                   (static_cast<double>(handler.nodes_with_elevation_not_found) /
-                    static_cast<double>(countBits(*first_pass.valid_nodes))) * 100,
+                   static_cast<double>(handler.nodes_with_elevation_not_found) /
+                   static_cast<double>(valid_nodes) * 100,
                    handler.nodes_with_elevation_not_found);
             if (!config.overrideValues)
                 printf("%30.2f %% already present (%lld)\n",
-                       (static_cast<float>(handler.nodes_with_elevation) / static_cast<float>(countBits(*first_pass.valid_nodes))) *
+                       (static_cast<float>(handler.nodes_with_elevation) / static_cast<float>(valid_nodes)) *
                        100.0,
                        handler.nodes_with_elevation);
         }

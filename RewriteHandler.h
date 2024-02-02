@@ -5,15 +5,16 @@
 #include "utils.h"
 #include <boost/regex.hpp>
 #include <osmium/handler.hpp>
+#include <osmium/index/id_set.hpp>
+#include <osmium/index/nwr_array.hpp>
 
 #include <iostream>
 
 class RewriteHandler : public osmium::handler::Handler {
 
     osmium::memory::Buffer *m_buffer;
-    vi *valid_nodes;
-    vi *valid_ways;
-    vi *valid_relations;
+    osmium::nwr_array<osmium::index::IdSetDense<osmium::unsigned_object_id_type>> *m_valid_ids;
+
     boost::regex *remove_tags;
     boost::regex non_digit_regex = boost::regex("[^0-9.]");
 
@@ -132,15 +133,13 @@ public:
     llu nodes_with_elevation_not_found = 0;
 
     explicit RewriteHandler(const osmium::object_id_type next_node_id, std::unique_ptr<osmium::index::map::Map<osmium::unsigned_object_id_type, osmium::Location>> &location_index,
-                            const int i_cache_size, boost::regex *re, vi *i_valid_nodes, vi *i_valid_ways, vi *i_valid_relations, ofstream *logref) :
+                            const int i_cache_size, boost::regex *re, osmium::nwr_array<osmium::index::IdSetDense<osmium::unsigned_object_id_type>> *valid_ids, ofstream *logref) :
             m_next_node_id(next_node_id),
             m_location_index(location_index),
             cache_size(i_cache_size),
             remove_tags(re),
-            valid_nodes(i_valid_nodes),
-            valid_ways(i_valid_ways),
-            valid_relations(i_valid_relations),
-            valid_elements(valid_nodes->size() + valid_ways->size() + valid_relations->size()),
+            m_valid_ids(valid_ids),
+            valid_elements(m_valid_ids->nodes().size() + m_valid_ids->ways().size() + m_valid_ids->relations().size()),
             log(logref) {
         // load
         location_elevation.load("tiffs");
@@ -159,7 +158,7 @@ public:
         processed_elements++;
         if (node.id() < 0) return;
 
-        if (testBit(*valid_nodes, node.id()) > 0) {
+        if (m_valid_ids->nodes().get(node.id())) {
             osmium::builder::NodeBuilder builder{*m_buffer};
             builder.set_id(node.id());
             builder.set_location(node.location());
@@ -200,7 +199,7 @@ public:
         processed_elements++;
         if (way.id() < 0) return;
 
-        if (testBit(*valid_ways, way.id()) > 0) {
+        if (m_valid_ids->ways().get(way.id())) {
             osmium::builder::WayBuilder builder{*m_buffer};
             builder.set_id(way.id());
             copy_tags(builder, way.tags());
@@ -246,7 +245,7 @@ public:
         processed_elements++;
         if (relation.id() < 0) return;
 
-        if (testBit(*valid_relations, relation.id()) > 0) {
+        if (m_valid_ids->relations().get(relation.id())) {
             osmium::builder::RelationBuilder builder{*m_buffer};
             builder.set_id(relation.id());
             builder.add_item(relation.members());
