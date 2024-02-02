@@ -16,7 +16,6 @@ class RewriteHandler : public osmium::handler::Handler {
     vi *valid_relations;
     boost::regex *remove_tags;
     boost::regex non_digit_regex;
-    bool DEBUG_NO_FILTER = false;
     bool DEBUG_NO_TAG_FILTER = false;
 
     unordered_map<string, GeoTiff *> elevationData;
@@ -147,7 +146,7 @@ public:
     void set_new_node_buffer(osmium::memory::Buffer *buffer) { m_new_node_buffer = buffer; }
 
     void init(const int i_cache_size, boost::regex *re, vi *i_valid_nodes, vi *i_valid_ways, vi *i_valid_relations,
-              ofstream *logref, const bool debug_no_filter, const bool debug_no_tag_filter) {
+              ofstream *logref, const bool debug_no_tag_filter) {
         cache_size = i_cache_size;
         remove_tags = re;
         valid_nodes = i_valid_nodes;
@@ -155,7 +154,6 @@ public:
         valid_relations = i_valid_relations;
         valid_elements = valid_nodes->size() + valid_ways->size() + valid_relations->size();
         log = logref;
-        DEBUG_NO_FILTER = debug_no_filter;
         DEBUG_NO_TAG_FILTER = debug_no_tag_filter;
         non_digit_regex = boost::regex("[^0-9.]");
 
@@ -167,7 +165,7 @@ public:
         processed_elements++;
         if (node.id() < 0) return;
         {
-            if (DEBUG_NO_FILTER || testBit(*valid_nodes, node.id()) > 0) {
+            if (testBit(*valid_nodes, node.id()) > 0) {
                 osmium::builder::NodeBuilder builder{*m_buffer};
                 builder.set_id(node.id());
                 builder.set_location(node.location());
@@ -214,7 +212,7 @@ public:
         if (way.id() < 0) return;
 
         {
-            if (DEBUG_NO_FILTER || testBit(*valid_ways, way.id()) > 0) {
+            if (testBit(*valid_ways, way.id()) > 0) {
                 osmium::builder::WayBuilder builder{*m_buffer};
                 builder.set_id(way.id());
                 copy_tags(builder, way.tags());
@@ -265,7 +263,7 @@ public:
         processed_elements++;
         if (relation.id() < 0) return;
         {
-            if (DEBUG_NO_FILTER || testBit(*valid_relations, relation.id()) > 0) {
+            if (testBit(*valid_relations, relation.id()) > 0) {
                 osmium::builder::RelationBuilder builder{*m_buffer};
                 builder.set_id(relation.id());
                 builder.add_item(relation.members());

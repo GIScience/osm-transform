@@ -71,7 +71,6 @@ struct Config {
     bool overrideValues = true;
 
     bool debug_output = false;
-    bool debug_no_filter = false;
     bool debug_no_tag_filter = false;
 
     llu nodes_max_id;
@@ -110,7 +109,6 @@ struct Config {
                 ("ways_max_id,W", po::value<llu>(&ways_max_id)->default_value(1300000000L), "Max Ways Id")
                 ("rels_max_id,R", po::value<llu>(&rels_max_id)->default_value(20000000L), "Max Rels Id")
                 ("debug_output", "debug_output")
-                ("debug_no_filter", "debug_no_filter")
                 ("debug_no_tag_filter", "debug_no_tag_filter");
 
 
@@ -191,12 +189,8 @@ struct Config {
         }
 
         debug_output = vm.contains("debug_output");
-        debug_no_filter = vm.contains("debug_no_filter");
         debug_no_tag_filter = vm.contains("debug_no_tag_filter");
 
-        if (debug_no_filter) {
-            cout << "DEBUG MODE: Filtering disabled" << endl << endl;
-        }
         if (debug_no_tag_filter) {
             cout << "DEBUG MODE: Tag filtering disabled" << endl << endl;
         }
@@ -266,7 +260,7 @@ int main(int argc, char **argv) {
         llu insize = first_pass_reader.file_size();
         osmium::ProgressBar progress{insize, osmium::isatty(2)};
         FirstPassHandler first_pass;
-        first_pass.init(&remove_tag_regex, &valid_nodes, &valid_ways, &valid_relations, config.debug_no_filter, config.nodes_max_id,
+        first_pass.init(&remove_tag_regex, &valid_nodes, &valid_ways, &valid_relations, config.nodes_max_id,
                         config.ways_max_id, config.rels_max_id);
         while (osmium::memory::Buffer input_buffer = first_pass_reader.read()) {
             osmium::apply(input_buffer, first_pass);
@@ -303,7 +297,7 @@ int main(int argc, char **argv) {
         osmium::io::Writer writer{output, header, osmium::io::overwrite::allow};
         RewriteHandler handler(config.nodes_max_id + 1000000000, location_index);
         handler.init(config.cache_size, &remove_tag_regex, first_pass.valid_nodes, first_pass.valid_ways,
-                     first_pass.valid_relations, &logFile, config.debug_no_filter, config.debug_no_tag_filter);
+                     first_pass.valid_relations, &logFile, config.debug_no_tag_filter);
         handler.addElevation = config.addElevation;
         handler.overrideValues = config.overrideValues;;
 
