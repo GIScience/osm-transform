@@ -97,6 +97,7 @@ void LocationElevationService::load(const std::string &path) {
             pTiffs.update(loaded);
         }
 }
+
 std::shared_ptr<GeoTiff> LocationElevationService::load_tiff(const char * filename) {
     const auto search = m_cache.find(filename);
     if (search != m_cache.end()) {
@@ -140,6 +141,6 @@ double LocationElevationService::elevation(osmium::Location l) {
 
     return geo_tiff->elevation(l.lon(), l.lat());
 }
-LocationElevationService::LocationElevationService() {
+LocationElevationService::LocationElevationService(uint cache_size) : m_cache_size(cache_size) {
     GDALAllRegister();
 }

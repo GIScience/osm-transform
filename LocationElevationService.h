@@ -34,15 +34,16 @@ private:
     std::list<std::string> m_lru;
     uint m_cache_size = 10;
 
-    std::shared_ptr<GeoTiff> load_tiff(const char* filename);
-
 public:
-    explicit LocationElevationService();
+
+    explicit LocationElevationService(uint cache_size);
 
     void load(const std::string &path);
 
+    std::shared_ptr<GeoTiff> load_tiff(const char* filename);
 
     double elevation(osmium::Location l);
+
     std::vector<LocationElevation> interpolate(osmium::Location from, osmium::Location to);
 };
 
