@@ -122,6 +122,9 @@ void second_pass(Config &config, std::ofstream &logFile, boost::regex &remove_ta
     const auto& map_factory = osmium::index::MapFactory<osmium::unsigned_object_id_type, osmium::Location>::instance();
     auto location_index = map_factory.create_map("flex_mem");
 
+    LocationElevationService locationElevationService;
+    locationElevationService.load("tiffs");
+
     string output = remove_extension(fs::path(config.filename.c_str()).stem()) + ".ors.pbf";
     const auto total_elements = valid_ids.nodes().size() + valid_ids.ways().size() + valid_ids.relations().size();
     unsigned long long processed_elements = 0;
@@ -135,7 +138,7 @@ void second_pass(Config &config, std::ofstream &logFile, boost::regex &remove_ta
     header.set("generator", "osm-transform v0.1.0");
 
     osmium::io::Writer writer{output, header, osmium::io::overwrite::allow};
-    RewriteHandler handler(1000000000, location_index, config.cache_size, &remove_tag_regex, &valid_ids, &logFile);
+    RewriteHandler handler(1000000000, location_index, locationElevationService, config.cache_size, &remove_tag_regex, &valid_ids, &logFile);
     handler.addElevation = config.addElevation;
     handler.overrideValues = config.overrideValues;;
 

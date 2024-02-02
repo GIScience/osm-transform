@@ -109,7 +109,9 @@ inline auto generate_geo_tiff_index(bgi::rtree<rTreeEntry, bgi::quadratic<16>> &
         geotiffs.push_back(filename);
     }
     auto maxStepWidth = 0.0;
+    std::cout << "Load geotiff index...\n";
     osmium::ProgressBar pTiffs{geotiffs.size(), osmium::isatty(2)};
+    auto loaded = 0;
     for (const auto& geotiff: geotiffs) {
         const auto tif = GDALDatasetUniquePtr(GDALDataset::FromHandle(GDALOpen(geotiff.c_str(), GA_ReadOnly)));
 
@@ -137,7 +139,8 @@ inline auto generate_geo_tiff_index(bgi::rtree<rTreeEntry, bgi::quadratic<16>> &
         auto v = std::make_pair(b, prioAndFileName{prio, geotiff});
         //        std::cout << std::fixed << " insert = " << bg::wkt<box>(v.first) << " - " << v.second.prio << " - " << v.second.fileName << std::endl;
         rtree.insert(v);
-        pTiffs.update(1);
+        loaded += 1;
+        pTiffs.update(loaded);
     }
     return maxStepWidth;
 }

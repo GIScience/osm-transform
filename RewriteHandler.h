@@ -28,7 +28,7 @@ class RewriteHandler : public osmium::handler::Handler {
     osmium::memory::Buffer *m_new_node_buffer;
     osmium::object_id_type m_next_node_id;
     std::unique_ptr<osmium::index::map::Map<osmium::unsigned_object_id_type, osmium::Location>> &m_location_index;
-    LocationElevationService location_elevation;
+    LocationElevationService &location_elevation;
 
     void copy_tags(osmium::builder::Builder &parent, const osmium::TagList &tags, const double ele = NO_DATA_VALUE) {
         osmium::builder::TagListBuilder builder{parent};
@@ -143,16 +143,16 @@ public:
     unsigned long long nodes_with_elevation_not_found = 0;
 
     explicit RewriteHandler(const osmium::object_id_type next_node_id, std::unique_ptr<osmium::index::map::Map<osmium::unsigned_object_id_type, osmium::Location>> &location_index,
+                            LocationElevationService &elevation_service,
                             const int i_cache_size, boost::regex *re, osmium::nwr_array<osmium::index::IdSetDense<osmium::unsigned_object_id_type>> *valid_ids, ofstream *logref) :
             m_next_node_id(next_node_id),
             m_location_index(location_index),
+            location_elevation(elevation_service),
             cache_size(i_cache_size),
             remove_tags(re),
             m_valid_ids(valid_ids),
             valid_elements(m_valid_ids->nodes().size() + m_valid_ids->ways().size() + m_valid_ids->relations().size()),
             log(logref) {
-        // load
-        location_elevation.load("tiffs");
     }
 
     void set_buffers(osmium::memory::Buffer *output_buffer, osmium::memory::Buffer *output_node_buffer) {
