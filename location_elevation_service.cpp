@@ -68,7 +68,7 @@ void LocationElevationService::load(const std::string &path) {
         for (const auto& geotiff: geotiffs) {
             const auto tif = GDALDatasetUniquePtr(GDALDataset::FromHandle(GDALOpen(geotiff.c_str(), GA_ReadOnly)));
 
-            auto reference = Geotiff::Geotiff(tif->GetProjectionRef());
+            auto reference = Geotiff::getSpatialReference(tif->GetProjectionRef());
             const auto transformation = OGRCreateCoordinateTransformation(&reference, &WGS84);
 
             double transform[6] = {};
