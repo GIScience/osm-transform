@@ -1,13 +1,6 @@
 #ifndef GEOTIFF_H
 #define GEOTIFF_H
 
-#include <boost/algorithm/string/predicate.hpp>
-#include <boost/geometry.hpp>
-#include <boost/geometry/geometries/box.hpp>
-#include <boost/geometry/geometries/point.hpp>
-#include <boost/geometry/index/rtree.hpp>
-
-#include <filesystem>
 #include <gdal_priv.h>
 #include <iostream>
 #include <osmium/util/file.hpp>
