@@ -9,8 +9,8 @@ struct Config {
     std::string filename;
     std::string remove_tag_regex_str;
 
-    bool addElevation = true;
-    bool overrideValues = true;
+    bool add_elevation = true;
+    bool override_values = true;
 
     bool debug_output = false;
 
@@ -102,11 +102,11 @@ struct Config {
         }
 
         if (vm.contains("e")) {
-            addElevation = false;
+            add_elevation = false;
         }
 
         if (vm.contains("o")) {
-            overrideValues = false;
+            override_values = false;
         }
 
         debug_output = vm.contains("debug_output");

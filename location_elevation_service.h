@@ -20,19 +20,19 @@ class Geotiff;
 
 struct PrioAndFilename {
     double prio;
-    std::string fileName;
+    std::string filename;
 };
 
 class LocationElevationService {
     typedef boost::geometry::model::point<double, 2,  boost::geometry::cs::geographic< boost::geometry::degree>> point;
     typedef boost::geometry::model::box<point> box;
-    typedef std::pair<box, PrioAndFilename> rTreeEntry;
+    typedef std::pair<box, PrioAndFilename> rtree_entry;
 
 private:
-    boost::geometry::index::rtree<rTreeEntry,  boost::geometry::index::quadratic<16>> rtree;
-    std::unordered_map<std::string, std::shared_ptr<Geotiff>> m_cache;
-    std::list<std::string> m_lru;
-    uint m_cache_size = 10;
+    boost::geometry::index::rtree<rtree_entry,  boost::geometry::index::quadratic<16>> rtree_;
+    std::unordered_map<std::string, std::shared_ptr<Geotiff>> cache_;
+    std::list<std::string> lru_;
+    uint cache_size_ = 10;
 
 public:
 

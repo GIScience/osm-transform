@@ -12,40 +12,40 @@ namespace bgi = bg::index;
 
 typedef bgm::point<double, 2, bg::cs::geographic<bg::degree>> point;
 typedef bgm::box<point> box;
-typedef std::pair<box, PrioAndFilename> rTreeEntry;
+typedef std::pair<box, PrioAndFilename> rtree_entry;
 
-inline auto sortRTreeEntryByPrio(const rTreeEntry &a, const rTreeEntry &b) { return a.second.prio < b.second.prio; }
+inline auto sortRTreeEntryByPrio(const rtree_entry &a, const rtree_entry &b) { return a.second.prio < b.second.prio; }
 
 std::vector<LocationElevation> LocationElevationService::interpolate(osmium::Location from, osmium::Location to) {
     std::vector<LocationElevation> data;
 
-    std::vector<rTreeEntry> result_s;
-    rtree.query(bgi::contains(point(from.lon(),from.lat())), std::back_inserter(result_s));
-    std::sort(result_s.begin(), result_s.end(), sortRTreeEntryByPrio);
-    if (result_s.empty()) {
+    std::vector<rtree_entry> query_result;
+    rtree_.query(bgi::contains(point(from.lon(),from.lat())), std::back_inserter(query_result));
+    std::sort(query_result.begin(), query_result.end(), sortRTreeEntryByPrio);
+    if (query_result.empty()) {
         return data;
     }
 
-    auto entry = result_s.front();
-    auto stepWidth = entry.second.prio;
-    auto filename = entry.second.fileName;
+    auto entry = query_result.front();
+    auto step_width = entry.second.prio;
+    auto filename = entry.second.filename;
 
 
     auto geo_tiff = load_tiff(filename.c_str());
 
-    auto deltaX = to.lon() - from.lon();
-    auto deltaY = to.lat() - from.lat();
-    auto length = std::sqrt(deltaX * deltaX + deltaY * deltaY);
+    auto delta_x = to.lon() - from.lon();
+    auto delta_y = to.lat() - from.lat();
+    auto length = std::sqrt(delta_x * delta_x + delta_y * delta_y);
 
-    const auto nX = deltaX / length;
-    const auto nY = deltaY / length;
-    const auto sX = nX * stepWidth;
-    const auto sY = nY * stepWidth;
+    const auto nx = delta_x / length;
+    const auto ny = delta_y / length;
+    const auto sx = nx * step_width;
+    const auto sy = ny * step_width;
 
-    auto steps = static_cast<int>(deltaX / sX);
+    auto steps = static_cast<int>(delta_x / sx);
     for (auto s = 1; s <= steps; s++) {
-        double lng = from.lon() + sX * s;
-        double lat = from.lat() + sY * s;
+        double lng = from.lon() + sx * s;
+        double lat = from.lat() + sy * s;
         double ele = geo_tiff->elevation(lng, lat);
         auto loc = osmium::Location(lng, lat);
         data.push_back(LocationElevation {loc, ele});
@@ -62,7 +62,6 @@ void LocationElevationService::load(const std::string &path) {
             const std::string filename{p.path().string()};
             geotiffs.push_back(filename);
         }
-        auto maxStepWidth = 0.0;
         std::cout << "Load geotiff index...\n";
         osmium::ProgressBar pTiffs{geotiffs.size(), osmium::isatty(2)};
         auto loaded = 0;
@@ -75,72 +74,71 @@ void LocationElevationService::load(const std::string &path) {
             double transform[6] = {};
             tif->GetGeoTransform(transform);
 
-            const double lngMin = transform[0] + 0 * transform[1] + 0 * transform[2];
-            const double latMax = transform[3] + 0 * transform[4] + 0 * transform[5];
-            const double lngMax = lngMin + tif->GetRasterXSize() * transform[1] + tif->GetRasterXSize() * transform[2];
-            const double latMin = latMax + tif->GetRasterYSize() * transform[4] + tif->GetRasterYSize() * transform[5];
+            const double lng_min = transform[0] + 0 * transform[1] + 0 * transform[2];
+            const double lat_max = transform[3] + 0 * transform[4] + 0 * transform[5];
+            const double lng_max = lng_min + tif->GetRasterXSize() * transform[1] + tif->GetRasterXSize() * transform[2];
+            const double lat_min = lat_max + tif->GetRasterYSize() * transform[4] + tif->GetRasterYSize() * transform[5];
 
-            double lng[2] = {lngMin, lngMax};
-            double lat[2] = {latMin, latMax};
+            double lng[2] = {lng_min, lng_max};
+            double lat[2] = {lat_min, lat_max};
             transformation->Transform(2, lng, lat);
 
             box b(point(lng[0], lat[0]), point(lng[1], lat[1]));
             double lngStep = (lng[1] - lng[0]) / static_cast<double>(tif->GetRasterXSize());
             double latStep = (lat[1] - lat[0]) / static_cast<double>(tif->GetRasterYSize());
             auto prio = std::min(lngStep, latStep);
-            maxStepWidth = std::max(prio, maxStepWidth);
 
             auto v = std::make_pair(b, PrioAndFilename{prio, geotiff});
-            //        std::cout << std::fixed << " insert = " << bg::wkt<box>(v.first) << " - " << v.second.prio << " - " << v.second.fileName << std::endl;
-            rtree.insert(v);
+            //        std::cout << std::fixed << " insert = " << bg::wkt<box>(v.first) << " - " << v.second.prio << " - " << v.second.filename << std::endl;
+            rtree_.insert(v);
             loaded += 1;
             pTiffs.update(loaded);
         }
 }
 
 std::shared_ptr<Geotiff> LocationElevationService::load_tiff(const char * filename) {
-    const auto search = m_cache.find(filename);
-    if (search != m_cache.end()) {
-        const auto geoTiff = m_cache.at(filename);
-        m_lru.remove(filename);
-        m_lru.emplace_front(filename);
+    const auto search = cache_.find(filename);
+    if (search != cache_.end()) {
+        const auto geoTiff = cache_.at(filename);
+        lru_.remove(filename);
+        lru_.emplace_front(filename);
         return geoTiff;
     }
 
     if (!std::filesystem::exists(filename)) {
         return nullptr;
     }
-    auto geoTiff = std::make_shared<Geotiff>(filename);
-    if (geoTiff == nullptr) {
+    auto geotiff = std::make_shared<Geotiff>(filename);
+    if (geotiff == nullptr) {
         return nullptr;
     }
-    m_cache.insert(make_pair(filename, geoTiff));
-    if (m_lru.size() == m_cache_size) {
-        m_cache.erase(m_lru.back());
-        m_lru.pop_back();
+    cache_.insert(make_pair(filename, geotiff));
+    if (lru_.size() == cache_size_) {
+        cache_.erase(lru_.back());
+        lru_.pop_back();
     }
 
-        printf("Dataset opened. (format: %s; size: %d x %d x %d)\n", geoTiff->GetDescription(),
-               geoTiff->GetRasterXSize(), geoTiff->GetRasterYSize(), geoTiff->GetRasterCount());
-    m_lru.emplace_front(filename);
+        printf("Dataset opened. (format: %s; size: %d x %d x %d)\n", geotiff->GetDescription(),
+           geotiff->GetRasterXSize(), geotiff->GetRasterYSize(), geotiff->GetRasterCount());
+        lru_.emplace_front(filename);
 
-    return geoTiff;
+    return geotiff;
 }
 
 double LocationElevationService::elevation(osmium::Location l) {
-    std::vector<rTreeEntry> result_s;
-    rtree.query(bgi::contains(point(l.lon(),l.lat())), std::back_inserter(result_s));
-    std::sort(result_s.begin(), result_s.end(), sortRTreeEntryByPrio);
-    if (result_s.empty()) {
-        return NO_DATA_VALUE;
+    std::vector<rtree_entry> query_result;
+    rtree_.query(bgi::contains(point(l.lon(),l.lat())), std::back_inserter(query_result));
+    std::sort(query_result.begin(), query_result.end(), sortRTreeEntryByPrio);
+    if (query_result.empty()) {
+        return kNoDataValue;
     }
 
-    auto entry = result_s.front();
-    auto filename = entry.second.fileName;
-    auto geo_tiff = load_tiff(filename.c_str());
+    auto entry = query_result.front();
+    auto filename = entry.second.filename;
+    auto geotiff = load_tiff(filename.c_str());
 
-    return geo_tiff->elevation(l.lon(), l.lat());
+    return geotiff->elevation(l.lon(), l.lat());
 }
-LocationElevationService::LocationElevationService(uint cache_size) : m_cache_size(cache_size) {
+LocationElevationService::LocationElevationService(uint cache_size) : cache_size_(cache_size) {
     GDALAllRegister();
 }
