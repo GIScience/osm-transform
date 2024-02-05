@@ -16,9 +16,9 @@ struct LocationElevation {
     double ele;
 };
 
-class GeoTiff;
+class Geotiff;
 
-struct prioAndFileName {
+struct PrioAndFilename {
     double prio;
     std::string fileName;
 };
@@ -26,11 +26,11 @@ struct prioAndFileName {
 class LocationElevationService {
     typedef boost::geometry::model::point<double, 2,  boost::geometry::cs::geographic< boost::geometry::degree>> point;
     typedef boost::geometry::model::box<point> box;
-    typedef std::pair<box, prioAndFileName> rTreeEntry;
+    typedef std::pair<box, PrioAndFilename> rTreeEntry;
 
 private:
     boost::geometry::index::rtree<rTreeEntry,  boost::geometry::index::quadratic<16>> rtree;
-    std::unordered_map<std::string, std::shared_ptr<GeoTiff>> m_cache;
+    std::unordered_map<std::string, std::shared_ptr<Geotiff>> m_cache;
     std::list<std::string> m_lru;
     uint m_cache_size = 10;
 
@@ -40,7 +40,7 @@ public:
 
     void load(const std::string &path);
 
-    std::shared_ptr<GeoTiff> load_tiff(const char* filename);
+    std::shared_ptr<Geotiff> load_tiff(const char* filename);
 
     double elevation(osmium::Location l);
 

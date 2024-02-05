@@ -12,7 +12,7 @@ namespace bgi = bg::index;
 
 typedef bgm::point<double, 2, bg::cs::geographic<bg::degree>> point;
 typedef bgm::box<point> box;
-typedef std::pair<box, prioAndFileName> rTreeEntry;
+typedef std::pair<box, PrioAndFilename> rTreeEntry;
 
 inline auto sortRTreeEntryByPrio(const rTreeEntry &a, const rTreeEntry &b) { return a.second.prio < b.second.prio; }
 
@@ -69,7 +69,7 @@ void LocationElevationService::load(const std::string &path) {
         for (const auto& geotiff: geotiffs) {
             const auto tif = GDALDatasetUniquePtr(GDALDataset::FromHandle(GDALOpen(geotiff.c_str(), GA_ReadOnly)));
 
-            auto reference = GeoTiff::getSpatialReference(tif->GetProjectionRef());
+            auto reference = Geotiff::Geotiff(tif->GetProjectionRef());
             const auto transformation = OGRCreateCoordinateTransformation(&reference, &WGS84);
 
             double transform[6] = {};
@@ -90,7 +90,7 @@ void LocationElevationService::load(const std::string &path) {
             auto prio = std::min(lngStep, latStep);
             maxStepWidth = std::max(prio, maxStepWidth);
 
-            auto v = std::make_pair(b, prioAndFileName{prio, geotiff});
+            auto v = std::make_pair(b, PrioAndFilename{prio, geotiff});
             //        std::cout << std::fixed << " insert = " << bg::wkt<box>(v.first) << " - " << v.second.prio << " - " << v.second.fileName << std::endl;
             rtree.insert(v);
             loaded += 1;
@@ -98,7 +98,7 @@ void LocationElevationService::load(const std::string &path) {
         }
 }
 
-std::shared_ptr<GeoTiff> LocationElevationService::load_tiff(const char * filename) {
+std::shared_ptr<Geotiff> LocationElevationService::load_tiff(const char * filename) {
     const auto search = m_cache.find(filename);
     if (search != m_cache.end()) {
         const auto geoTiff = m_cache.at(filename);
@@ -110,7 +110,7 @@ std::shared_ptr<GeoTiff> LocationElevationService::load_tiff(const char * filena
     if (!std::filesystem::exists(filename)) {
         return nullptr;
     }
-    auto geoTiff = std::make_shared<GeoTiff>(filename);
+    auto geoTiff = std::make_shared<Geotiff>(filename);
     if (geoTiff == nullptr) {
         return nullptr;
     }

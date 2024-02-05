@@ -17,7 +17,7 @@ static const OGRSpatialReference getWGS84Reference() {
 
 static auto WGS84 = getWGS84Reference();
 
-class GeoTiff {
+class Geotiff {
     GDALDatasetUniquePtr dataSet;
     OGRCoordinateTransformation *transformation;
     double transform[6] = {};
@@ -33,7 +33,7 @@ public:
         return reference;
     }
 
-    explicit GeoTiff(const char *filename) {
+    explicit Geotiff(const char *filename) {
         dataSet = GDALDatasetUniquePtr(GDALDataset::FromHandle(GDALOpenShared(filename, GA_ReadOnly)));
         if (dataSet == nullptr) return;
         const auto reference = getSpatialReference(dataSet->GetProjectionRef());
