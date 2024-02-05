@@ -38,7 +38,7 @@ struct Config {
         std::vector<std::string> geo_tiff_folder;
         config.add_options()
                 ("remove_tag,T", po::value<std::string>(&remove_tag_regex_str)->default_value("(.*:)?source(:.*)?|(.*:)?note(:.*)?|url|created_by|fixme|wikipedia"), "Regex to match removable tags")
-                ("geo_tiff_folders,F", po::value<std::vector<std::string>>(&geo_tiff_folder)->composing(), "Absolute paths to GeoTiff folders. Default: srtmdata")
+                ("geo_tiff_folders,F", po::value<std::vector<std::string>>(&geo_tiff_folder)->composing(), "Absolute paths to Geotiff folders. Default: srtmdata")
                 ("cache_tile_size,S", po::value<int>(&cache_size)->default_value(10), "Maximum amount of tiles stored in cache")
                 ("debug_output", "debug_output");
 

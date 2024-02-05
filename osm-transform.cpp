@@ -1,6 +1,6 @@
-#include "Config.h"
-#include "FirstPassHandler.h"
-#include "RewriteHandler.h"
+#include "config.h"
+#include "firstpass_handler.h"
+#include "rewrite_handler.h"
 
 #include <chrono>
 #include <filesystem>

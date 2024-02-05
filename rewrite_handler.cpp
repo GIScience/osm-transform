@@ -1,4 +1,4 @@
-#include "RewriteHandler.h"
+#include "rewrite_handler.h"
 
 #include <osmium/builder/osm_object_builder.hpp>
 #include <osmium/osm/node.hpp>

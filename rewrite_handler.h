@@ -13,8 +13,8 @@
 #include <osmium/index/nwr_array.hpp>
 #include <osmium/memory/buffer.hpp>
 
-#include "LocationElevationService.h"
-#include "GeoTiff.h"
+#include "geotiff.h"
+#include "location_elevation_service.h"
 
 class RewriteHandler : public osmium::handler::Handler {
 

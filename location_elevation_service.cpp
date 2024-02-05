@@ -1,8 +1,8 @@
-#include "LocationElevationService.h"
+#include "location_elevation_service.h"
 
 #include <filesystem>
 
-#include "GeoTiff.h"
+#include "geotiff.h"
 
 namespace fs = std::filesystem;
 
