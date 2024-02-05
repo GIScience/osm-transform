@@ -56,7 +56,7 @@ public:
         const auto maxX = dataSet->GetRasterXSize();
         const auto maxY = dataSet->GetRasterYSize();
         if (x < -1 || y < -1 || x > maxX || y > maxY) {
-            cout << "Coordinate out of bounds: POINT (" << lat << " " << lng << ")" << endl;
+            std::cout << "Coordinate out of bounds: POINT (" << lat << " " << lng << ")\n";
             return NO_DATA_VALUE;
         }
 
