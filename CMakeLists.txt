@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.27)
+cmake_minimum_required(VERSION 3.22)
 project(osm-transform
         VERSION 0.1.0
         DESCRIPTION "Package to customize OSM files")
@@ -9,7 +9,7 @@ set(CMAKE_CXX_STANDARD 20)
 
 # https://cmake.org/cmake/help/git-master/module/FindBoost.html
 find_package(Boost REQUIRED system regex program_options)
-find_package(GDAL CONFIG REQUIRED)
+find_package(GDAL REQUIRED)
 
 file(GLOB sources CONFIGURE_DEPENDS *.h *.cpp)
 add_executable(${PROJECT_NAME} ${sources})
