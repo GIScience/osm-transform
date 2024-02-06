@@ -6,7 +6,6 @@
 #include <filesystem>
 #include <iostream>
 #include <string>
-#include <vector>
 
 #include <boost/regex.hpp>
 
@@ -139,7 +138,7 @@ void second_pass(Config &config, boost::regex &remove_tag_regex, osmium::nwr_arr
            reduction, static_cast<float>(reduction) / static_cast<float>(insize) * 100);
     if (config.add_elevation) {
         auto valid_nodes = valid_ids.nodes().size();
-        printf("All Nodes: %19llu Nodes\n",
+        printf("All Nodes: %19lu Nodes\n",
                valid_nodes);
         printf("Custom Elevation: %14.2f %% (%lld)\n",
                static_cast<double>(handler.nodes_with_elevation_high_precision_) /
