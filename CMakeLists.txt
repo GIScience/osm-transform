@@ -5,6 +5,9 @@ project(osm-transform
 # expose name & version
 add_definitions( -DPROJECT_VERSION="${PROJECT_VERSION}" -DPROJECT_NAME="${PROJECT_NAME}")
 
+# ignore BOOST deprecated headers
+add_definitions("-DBOOST_ALLOW_DEPRECATED_HEADERS")
+
 set(CMAKE_CXX_STANDARD 20)
 
 # https://cmake.org/cmake/help/git-master/module/FindBoost.html
