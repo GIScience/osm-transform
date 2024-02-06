@@ -140,21 +140,21 @@ void second_pass(Config &config, boost::regex &remove_tag_regex, osmium::nwr_arr
         auto valid_nodes = valid_ids.nodes().size();
         printf("All Nodes: %19lu Nodes\n",
                valid_nodes);
-        printf("Custom Elevation: %14.2f %% (%lld)\n",
+        printf("Custom Elevation: %12.2f %% (%llu)\n",
                static_cast<double>(handler.nodes_with_elevation_high_precision_) /
                        static_cast<double>(valid_nodes) * 100, handler.nodes_with_elevation_high_precision_);
-        printf("SRTM Elevation: %14.2f %% (%lld)\n",
+        printf("SRTM Elevation: %14.2f %% (%llu)\n",
                static_cast<double>(handler.nodes_with_elevation_srtm_precision_) /
                        static_cast<double>(valid_nodes) * 100, handler.nodes_with_elevation_srtm_precision_);
-        printf("GMTED Elevation: %13.2f %% (%lld)\n",
+        printf("GMTED Elevation: %13.2f %% (%llu)\n",
                static_cast<double>(handler.nodes_with_elevation_gmted_precision_) /
                        static_cast<double>(valid_nodes) * 100, handler.nodes_with_elevation_gmted_precision_);
-        printf("Failed Elevation: %12.2f %% (%lld)\n",
+        printf("Failed Elevation: %12.2f %% (%llu)\n",
                static_cast<double>(handler.nodes_with_elevation_not_found_) /
                        static_cast<double>(valid_nodes) * 100,
                handler.nodes_with_elevation_not_found_);
         if (!config.override_values)
-            printf("%30.2f %% already present (%lld)\n",
+            printf("%30.2f %% already present (%llu)\n",
                    (static_cast<float>(handler.nodes_with_elevation_) / static_cast<float>(valid_nodes)) *
                            100.0,
                    handler.nodes_with_elevation_);
