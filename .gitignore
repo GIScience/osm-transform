@@ -13,3 +13,4 @@ test/gmted
 gmted*/*
 gmteddata
 cmake-build-debug
+/cmake-build-release/
