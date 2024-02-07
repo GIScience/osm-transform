@@ -3,66 +3,63 @@
 Tool for reduction of OSM data and processing cost for elevation data extraction during graph building.
 Removes metadata, unused elements and tags, and adds `ele` tags to all retained nodes.
 
-## Installation
+## Usage
 
-There are several possibilities to install osm-transform.
+There are several possibilities to build and run osm-transform.
 
-### Installation via Docker
+### Run with Docker
 
-To install with Docker, first, make sure that Docker is installed on the machine,
-clone this repository and then build the Docker image.
+To run osm-transform with Docker, first, make sure that [Docker](https://www.docker.com/) is installed on the machine and clone this repository. From the root directory, you can run:
 
-```
-sudo docker build -t osm-transform .
-```
-
-Once built, you can run the preprocessor as a container with the following command:
-
-```
-sudo docker run -i -v /[your local absolute path to the dir of the]/osm-transform:/osm osm-transform -m -o planet-latest.osm.pbf 
+```shell
+./docker_run.sh -p planet-latest.osm.pbf
 ```
 
-where the `-v` option is the mapping to the folder containing the required files: `cgiar_srtm` and `cgiar_geotiff`
-folders, the osm data, and the `osm-transform.cfg` file.
-`-o` is the string representing the script options (see below) and the last item (`planet-latest.osm.pbf`) is the osm
-file to use.
+This builds the Docker image and runs the preprocessor as a container, passing the provided OSM file as source file. The script mapping the current working directory to the working directory within the container. To change this behavior, you could also pass the option `-w`.
 
-### Installation at the command line
+```shell
+./docker_run.sh -w /path/to/osm-transform-working-dir -p planet-latest.osm.pbf
+```
 
-To install on the command line you can either use cmake or directly compile with g++.
+Note that in this case the path to the OSM file needs to be relative to the working directory you passed.
+
+You can build and run the Docker container manually: 
+
+```shell
+docker build -t osm-transform .
+docker run -it -v .:/osm osm-transform -p planet-latest.osm.pbf
+```
+
+The `-v` option is mapping the current working directory to the working directory within the container. `-p planet-latest.osm.pbf` points to the OSM file to use.
+
+### Build from the command line
+
+To build osm-transform on the command line we recommend you use cmake/ninja/g++.
 
 Prerequisites for installing osm-transform at the command line are the following libraries:
 
 - [libgdal](https://gdal.org/)
+- [libproj](https://proj.org/)
 - [libosmium](https://osmcode.org/libosmium/)
 - [boost](https://www.boost.org/)
-- [libconfig](https://github.com/hyperrealm/libconfig)
 
-```
+From the project root directory, run
+
+```shell
 # on ubuntu
-sudo apt install g++ libgdal-dev libosmium-dev libboost-all-dev libconfig-dev
+sudo apt install g++ cmake ninja-build libgdal-dev libproj-dev libosmium-dev libboost-all-dev
+cmake -DCMAKE_BUILD_TYPE=Release -DCMAKE_MAKE_PROGRAM=/usr/bin/ninja -G Ninja -B ./cmake-build
+cmake --build ./cmake-build --target osm-transform -j 14
+cp ./cmake-build/osm-transform .
 ```
 
-To compile with cmake, you need to generate the Makefile once, then you
-can call `make`to compile.
-```
-# generate Makefile with cmake
-mkdir build
-cd build
-cmake ..
+You can then use the tool by running 
 
-# compile with make
-make
+```shell
+./osm-transform -p planet-latest.osm.pbf
 ```
 
-Directly compiling with `g++` is done as follows:
-
-```
-# With g++
-g++ osm-transform.cpp -o osm-transform --std=c++11 -m64 -lpthread -lz -lexpat -lbz2 -lconfig++ -I/usr/include/gdal -lgdal -lboost_regex -lboost_system -O3
-```
-
-### CLion (Nova) cmake setup
+### Developers: CLion (Nova) cmake setup
 - Open the root folder of the cloned repository (osm-transform) with CLion
 - Choose reload CMake project automatically if CMakeLists.txt changes
 - Go to preferences->Build,Execution,Deployment->Toolchain
@@ -99,6 +96,7 @@ python getGMTED.py
 ```
 
 ## Usage
+[//]: # (TODO update)
 
 ```
 ./osm-transform [OPTIONS] [OSM file]
