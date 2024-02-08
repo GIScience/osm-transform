@@ -1,0 +1,12 @@
+cmake_minimum_required(VERSION 3.22)
+
+find_package(Boost COMPONENTS unit_test_framework REQUIRED)
+
+file(GLOB sources CONFIGURE_DEPENDS *.h *.cpp)
+
+add_executable(test-osm-transform test-osm-transform.cpp)
+target_link_libraries(test-osm-transform PRIVATE Boost::unit_test_framework)
+
+enable_testing()
+
+

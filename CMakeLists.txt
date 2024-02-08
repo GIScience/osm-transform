@@ -18,3 +18,6 @@ file(GLOB sources CONFIGURE_DEPENDS *.h *.cpp)
 add_executable(${PROJECT_NAME} ${sources})
 
 target_link_libraries(${PROJECT_NAME} PRIVATE z bz2 expat GDAL::GDAL Boost::system Boost::regex Boost::program_options)
+
+# unit tests
+add_subdirectory(test)
