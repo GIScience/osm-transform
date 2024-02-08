@@ -1,20 +1,20 @@
 # This workflow will build a Java project with Maven
 # For more information see: https://help.github.com/actions/language-and-framework-guides/building-and-testing-java-with-maven
 
-name: Python CI with Pytest
+name: Run tests
 
 on:
   push:
-    branches: [ master, main ]
+    branches: [ main ]
   pull_request:
-    branches: [ master, main ]
+    branches: [ main ]
 
 jobs:
   run_pre_checks:
     name: Run style and lint checks
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v4
         with:
           fetch-depth: 0
       - name: Check the commit style against the 'conventional commit styling'
@@ -30,7 +30,25 @@ jobs:
           ignore_label: 'ignore-for-release'
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-  run_tests:
+
+  run_boost_tests:
+    needs:
+      - run_pre_checks
+    name: Run Boost tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Setup compile chain
+        run: sudo apt-get -y -qq install g++ cmake ninja-build libgdal-dev libproj-dev libosmium-dev libboost-all-dev
+      - name: Run tests
+        run: |
+          cmake -DCMAKE_BUILD_TYPE=Release -DCMAKE_MAKE_PROGRAM=/usr/bin/ninja -G Ninja -B ./cmake-build-test  
+          cmake --build ./cmake-build-test --target test-osm-transform -j 14
+          ./cmake-build-test/test/test-osm-transform 
+
+  run_python_tests:
     needs:
       - run_pre_checks
     strategy:
@@ -43,7 +61,7 @@ jobs:
     name: Run & test Python ${{ matrix.python-version }} on ${{ matrix.os }} with Poetry ${{ matrix.poetry-version }}
     runs-on: ${{ matrix.os }}
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
         with:
           fetch-depth: 0
       - name: Set up Python ${{ matrix.python-version }}
