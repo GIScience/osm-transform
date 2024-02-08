@@ -32,11 +32,13 @@ private:
     boost::geometry::index::rtree<rtree_entry,  boost::geometry::index::quadratic<16>> rtree_;
     std::unordered_map<std::string, std::shared_ptr<Geotiff>> cache_;
     std::list<std::string> lru_;
-    uint cache_size_ = 10;
+    ulong mem_size_ = 0;
+    ulong cache_limit_ = 150000000;
+    std::map<std::string, std::uint64_t> tile_size_;
 
 public:
 
-    explicit LocationElevationService(uint cache_size);
+    explicit LocationElevationService(ulong cache_limit);
 
     void load(const std::string &path);
 

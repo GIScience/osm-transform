@@ -98,6 +98,14 @@ void LocationElevationService::load(const std::string &path) {
 
 std::shared_ptr<Geotiff> LocationElevationService::load_tiff(const char * filename) {
     const auto search = cache_.find(filename);
+    ulong filesize = 0;
+    if (tile_size_.count(filename)) {
+        filesize = tile_size_[filename];
+    } else {
+        filesize = std::filesystem::file_size(filename);
+        tile_size_.insert(std::make_pair(filename, filesize));
+    }
+
     if (search != cache_.end()) {
         const auto geoTiff = cache_.at(filename);
         lru_.remove(filename);
@@ -112,15 +120,19 @@ std::shared_ptr<Geotiff> LocationElevationService::load_tiff(const char * filena
     if (geotiff == nullptr) {
         return nullptr;
     }
-    cache_.insert(make_pair(filename, geotiff));
-    if (lru_.size() == cache_size_) {
-        cache_.erase(lru_.back());
+
+    while (mem_size_ > 0 && mem_size_ + tile_size_[filename] > cache_limit_) {
+        auto to_remove = lru_.back();
+        mem_size_ -= tile_size_[to_remove];
+        cache_.erase(to_remove);
         lru_.pop_back();
     }
+    cache_.insert(make_pair(filename, geotiff));
+    mem_size_ += tile_size_[filename];
+    lru_.emplace_front(filename);
 
-        printf("Dataset opened. (format: %s; size: %d x %d x %d)\n", geotiff->GetDescription(),
-           geotiff->GetRasterXSize(), geotiff->GetRasterYSize(), geotiff->GetRasterCount());
-        lru_.emplace_front(filename);
+    printf("Dataset opened. (format: %s; size: %d x %d x %d, cache mem size: %lu / %lu)\n", geotiff->GetDescription(),
+       geotiff->GetRasterXSize(), geotiff->GetRasterYSize(), geotiff->GetRasterCount(), mem_size_, cache_limit_);
 
     return geotiff;
 }
@@ -139,6 +151,6 @@ double LocationElevationService::elevation(osmium::Location l) {
 
     return geotiff->elevation(l.lon(), l.lat());
 }
-LocationElevationService::LocationElevationService(uint cache_size) : cache_size_(cache_size) {
+LocationElevationService::LocationElevationService(ulong cache_limit) : cache_limit_(cache_limit) {
     GDALAllRegister();
 }
