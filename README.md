@@ -112,7 +112,7 @@ The `osm-transform.cfg` file is used to set up the tool. The default configurati
 
 ```
 # number of elevation tiles to keep open in memory simultaneously
-cache_size = 10;
+cache_limit = 10;
 
 # regex for detecting tags that can safely be removed
 remove_tag = "(.*:)?source(:.*)?|(.*:)?note(:.*)?|url|created_by|fixme|wikipedia";
@@ -128,7 +128,7 @@ rels_max_id =     20000000L;
 #debug_no_tag_filter = true;
 ```
 
-- The `cache_size` determines how many tile GTIFs are kept open in memory during the processing.
+- The `cache_limit` determines how many tile GTIFs are kept open in memory during the processing.
   A too high number might result in paging overhead degrading performance.
 - All tags matching the `remove_tag` regex are stripped from the data.
 - The max IDs settings must be adjusted when OSM data grows.
