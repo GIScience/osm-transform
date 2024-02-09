@@ -42,6 +42,10 @@ public:
         raster_no_data_value_ = dataset_->GetRasterBand(1)->GetNoDataValue(&raster_has_no_data_);
     }
 
+    virtual ~Geotiff() {
+        OGRCoordinateTransformation::DestroyCT(transformation_);
+    }
+
     double elevation(double lng, double lat) const {
         transformation_->Transform(1, &lng, &lat);
         auto x = static_cast<int>(floor((lng - transform_[0]) / transform_[1]));
