@@ -16,6 +16,7 @@
 #include <osmium/osm/relation.hpp>
 
 class FirstPassHandler : public osmium::handler::Handler {
+    friend std::ostream &operator<<(std::ostream &out, const FirstPassHandler &handler);
     const std::set<std::string> kInvalidatingTags{"building", "landuse",
         "boundary", "natural", "place", "waterway", "aeroway",
         "aviation", "military", "power", "communication", "man_made"};
