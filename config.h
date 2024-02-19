@@ -27,12 +27,10 @@ struct Config {
         generic.add_options()
                 ("version,v", "print version string") //
                 ("help", "produce help message") //
-                (",e", "skip elevation data merge") //
-                (",o", "keep original elevation tags where present") //
+                ("skip,e", "skip elevation data merge") //
+                ("overwrite,o", "keep original elevation tags where present") //
                 ("osm-pbf,p", po::value<std::vector<std::string>>(), "Absolute file path to osm pbf file to process.") //
                 ("config-file,f", po::value<std::string>(&config_file_path), "Absolute file path to config file to use");
-
-
 
         po::options_description config("Configuration");
         std::vector<std::string> geo_tiff_folder;
@@ -41,7 +39,6 @@ struct Config {
                 ("geo_tiff_folders,F", po::value<std::vector<std::string>>(&geo_tiff_folder)->composing(), "Absolute paths to Geotiff folders. Default: srtmdata")
                 ("cache_tile_size,S", po::value<int>(&cache_size)->default_value(10), "Maximum amount of tiles stored in cache")
                 ("debug_output", "debug_output");
-
 
         // Hidden options, will be allowed both on command line and
         // in config file, but will not be shown to the user.
@@ -101,11 +98,11 @@ struct Config {
             exit(1);
         }
 
-        if (vm.contains("e")) {
+        if (vm.contains("skip")) {
             add_elevation = false;
         }
 
-        if (vm.contains("o")) {
+        if (vm.contains("overwrite")) {
             override_values = false;
         }
 
