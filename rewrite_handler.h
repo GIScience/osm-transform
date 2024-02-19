@@ -6,6 +6,7 @@
 
 #include <boost/regex.hpp>
 
+#include <osmium/builder/osm_object_builder.hpp>
 #include <osmium/handler.hpp>
 #include <osmium/index/id_set.hpp>
 #include <osmium/index/map/all.hpp>
@@ -28,6 +29,7 @@ class RewriteHandler : public osmium::handler::Handler {
     osmium::object_id_type next_node_id_;
     std::unique_ptr<osmium::index::map::Map<osmium::unsigned_object_id_type, osmium::Location>> &location_index_;
     LocationElevationService &location_elevation_;
+    bool interpolate_;
 
     void copy_tags(osmium::builder::Builder &parent, const osmium::TagList &tags, const double ele = kNoDataValue);
 
@@ -40,6 +42,8 @@ class RewriteHandler : public osmium::handler::Handler {
     auto get_node_location(const osmium::object_id_type id) -> osmium::Location {
         return location_index_->get_noexcept(static_cast<osmium::unsigned_object_id_type>(id));
     }
+
+    void interpolate(const osmium::Way &way, osmium::builder::NodeRefListBuilder<osmium::WayNodeList> &wnl_builder);
 
     void newNode(osmium::object_id_type id, LocationElevation &le);
 
@@ -55,13 +59,13 @@ public:
     unsigned long long nodes_with_elevation_ = 0;
     unsigned long long nodes_with_elevation_not_found_ = 0;
 
-    explicit RewriteHandler(const osmium::object_id_type next_node_id, std::unique_ptr<osmium::index::map::Map<osmium::unsigned_object_id_type, osmium::Location>> &location_index,
-                            LocationElevationService &elevation_service,
-                            boost::regex &remove_tags, osmium::nwr_array<osmium::index::IdSetDense<osmium::unsigned_object_id_type>> &valid_ids) : next_node_id_(next_node_id),
-                                                                                                                                          location_index_(location_index),
-                                                                                                                                          location_elevation_(elevation_service),
-                                                                                                                                          remove_tags_(remove_tags),
-                                                                                                                                          valid_ids_(valid_ids) {
+    explicit RewriteHandler(const osmium::object_id_type next_node_id, std::unique_ptr<osmium::index::map::Map<osmium::unsigned_object_id_type, osmium::Location>> &location_index, LocationElevationService &elevation_service, boost::regex &remove_tags, osmium::nwr_array<osmium::index::IdSetDense<osmium::unsigned_object_id_type>> &valid_ids, bool interpolate) :
+         next_node_id_(next_node_id),
+         location_index_(location_index),
+         location_elevation_(elevation_service),
+         remove_tags_(remove_tags),
+         valid_ids_(valid_ids),
+         interpolate_(interpolate) {
     }
 
     void set_buffers(osmium::memory::Buffer *output_buffer, osmium::memory::Buffer *output_node_buffer) {
@@ -77,6 +81,7 @@ public:
     void way(const osmium::Way &way);
 
     void relation(const osmium::Relation &relation);
+
 };
 
 

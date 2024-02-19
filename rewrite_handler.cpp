@@ -52,7 +52,9 @@ void RewriteHandler::node(const osmium::Node &node) {
             }
         }
         copy_tags(builder, node.tags(), ele);
-        location_index_->set(static_cast<osmium::unsigned_object_id_type>(node.id()), node.location());
+        if (interpolate_) {
+            location_index_->set(static_cast<osmium::unsigned_object_id_type>(node.id()), node.location());
+        }
     }
 
     buffer_->commit();
@@ -67,40 +69,49 @@ void RewriteHandler::way(const osmium::Way &way) {
         copy_tags(builder, way.tags());
         {
             osmium::builder::WayNodeListBuilder wnl_builder{builder};
-            auto from = way.nodes()[0];
-            auto from_location = get_node_location(from.ref());
-            wnl_builder.add_node_ref(from);
-            for (int i = 1; i < way.nodes().size(); i++) {
-                auto to = way.nodes()[i];
-                auto toLocation = get_node_location(to.ref());
-
-                for (auto le: location_elevation_.interpolate(from_location, toLocation)) {
-
-                    auto new_node_id = next_node_id_++;
-                    newNode(new_node_id, le);
-                    new_node_buffer_->commit();
-                    wnl_builder.add_node_ref(new_node_id);
+            if (interpolate_) {
+                interpolate(way, wnl_builder);
+            } else {
+                for (auto& ref : way.nodes()) {
+                    wnl_builder.add_node_ref(ref);
                 }
-
-
-                wnl_builder.add_node_ref(to);
-                from = to;
-                from_location = toLocation;
             }
         }
     }
     buffer_->commit();
 }
+void RewriteHandler::interpolate(const osmium::Way &way, osmium::builder::WayNodeListBuilder &wnl_builder) {
+    auto from = way.nodes()[0];
+    auto from_location = get_node_location(from.ref());
+    wnl_builder.add_node_ref(from);
+    for (int i = 1; i < way.nodes().size(); i++) {
+        auto to = way.nodes()[i];
+        if (interpolate_) {
+            auto toLocation = get_node_location(to.ref());
+            for (auto le: location_elevation_.interpolate(from_location, toLocation)) {
+                auto new_node_id = next_node_id_++;
+                newNode(new_node_id, le);
+                wnl_builder.add_node_ref(new_node_id);
+            }
+            from_location = toLocation;
+        }
+        wnl_builder.add_node_ref(to);
+        from = to;
+    }
+}
 
 void RewriteHandler::newNode(osmium::object_id_type id, LocationElevation &le) {
-    osmium::builder::NodeBuilder nodeBuilder(*new_node_buffer_);
-    nodeBuilder.set_id(id);
-    nodeBuilder.set_location(le.location);
     {
-        osmium::builder::TagListBuilder nodeTagsBuilder{nodeBuilder};
-        nodeTagsBuilder.add_tag("ele", std::to_string(le.ele));
-        nodeTagsBuilder.add_tag("highway", "traffic_signal");
+        osmium::builder::NodeBuilder nodeBuilder(*new_node_buffer_);
+        nodeBuilder.set_id(id);
+        nodeBuilder.set_location(le.location);
+        {
+            osmium::builder::TagListBuilder nodeTagsBuilder{nodeBuilder};
+            nodeTagsBuilder.add_tag("ele", std::to_string(le.ele));
+            nodeTagsBuilder.add_tag("highway", "traffic_signal");
+        }
     }
+    new_node_buffer_->commit();
 }
 
 void RewriteHandler::relation(const osmium::Relation &relation) {
@@ -133,6 +144,7 @@ double RewriteHandler::getElevationGMTED(const double lat, const double lng, con
     if (debug) printf("Filename for coordinates %.6f - %.6f : %s\n", lng, lat, filename);
     return getElevationFromFile(lat, lng, filename);
 }
+
 double RewriteHandler::getElevationFromFile(const double lat, const double lng, char *filename) {
     const auto geo_tiff = location_elevation_.load_tiff(filename);
     if (geo_tiff == nullptr)

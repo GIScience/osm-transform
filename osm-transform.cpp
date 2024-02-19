@@ -101,7 +101,7 @@ void second_pass(Config &config, boost::regex &remove_tag_regex, osmium::nwr_arr
     header.set("generator", "osm-transform_ v0.1.0");
 
     osmium::io::Writer writer{output, header, osmium::io::overwrite::allow};
-    RewriteHandler handler(1000000000, location_index, location_elevation_service, remove_tag_regex, valid_ids);
+    RewriteHandler handler(1000000000, location_index, location_elevation_service, remove_tag_regex, valid_ids, config.interpolate);
     handler.add_elevation_ = config.add_elevation;
     handler.override_values_ = config.override_values;
 

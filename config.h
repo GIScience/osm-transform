@@ -11,6 +11,7 @@ struct Config {
 
     bool add_elevation = true;
     bool override_values = true;
+    bool interpolate = false;
 
     bool debug_output = false;
 
@@ -29,6 +30,7 @@ struct Config {
                 ("help", "produce help message") //
                 ("skip,e", "skip elevation data merge") //
                 ("overwrite,o", "keep original elevation tags where present") //
+                ("interpolate,i", "interpolate intermediate nodes")
                 ("osm-pbf,p", po::value<std::vector<std::string>>(), "Absolute file path to osm pbf file to process.") //
                 ("config-file,f", po::value<std::string>(&config_file_path), "Absolute file path to config file to use");
 
@@ -96,6 +98,10 @@ struct Config {
         if (!std::filesystem::exists(filename)) {
             std::cerr << "osm-pbf does not exist " << filename << std::endl;
             exit(1);
+        }
+
+        if (vm.contains("interpolate")) {
+            interpolate = true;
         }
 
         if (vm.contains("skip")) {
