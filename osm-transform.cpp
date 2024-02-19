@@ -18,12 +18,6 @@
 
 using namespace std;
 
-ostream &operator<<(ostream &out, const FirstPassHandler &handler) {
-    return out << "valid nodes: " << handler.valid_ids_.nodes().size() << " (" << handler.node_count_ << "), "
-           << "valid ways: " << handler.valid_ids_.ways().size() << " (" << handler.way_count_ << "), "
-           << "valid relations: " << handler.valid_ids_.relations().size() << " (" << handler.relation_count_ << ")";
-}
-
 auto remove_extension(const string &filename) {
     const size_t lastdot = filename.find_first_of('.');
     if (lastdot == string::npos) return filename;
@@ -76,7 +70,7 @@ void first_pass(Config &config, boost::regex &remove_tag_regex, osmium::nwr_arra
     progress.remove();
     reader.close();
 
-    cout << handler << endl;
+    handler.printStats();
 
     printf("Processed in %.3f s\n\n", chrono::duration_cast<chrono::milliseconds>(chrono::steady_clock::now() - start).count() / 1000.0);
 }

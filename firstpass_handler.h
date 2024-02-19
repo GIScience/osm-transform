@@ -16,12 +16,14 @@
 #include <osmium/osm/relation.hpp>
 
 class FirstPassHandler : public osmium::handler::Handler {
-    friend std::ostream &operator<<(std::ostream &out, const FirstPassHandler &handler);
-
     const std::set<std::string> kInvalidatingTags{"building", "landuse",
         "boundary", "natural", "place", "waterway", "aeroway",
         "aviation", "military", "power", "communication", "man_made"};
     boost::regex &remove_tags_;
+
+    unsigned long long node_count_ = 0;
+    unsigned long long relation_count_ = 0;
+    unsigned long long way_count_ = 0;
 
     static bool tag_validates(const osmium::Tag &tag) {
         const std::string key = tag.key();
@@ -64,10 +66,6 @@ class FirstPassHandler : public osmium::handler::Handler {
     }
 
 public:
-    unsigned long long node_count_ = 0;
-    unsigned long long relation_count_ = 0;
-    unsigned long long way_count_ = 0;
-
     osmium::nwr_array<osmium::index::IdSetDense<osmium::unsigned_object_id_type>> &valid_ids_;
 
     explicit FirstPassHandler(
@@ -103,7 +101,12 @@ public:
         }
         valid_ids_.relations().set(rel.id());
     }
+    void printStats() {
+        std::cout << "valid nodes: " << valid_ids_.nodes().size() << " (" << node_count_ << "), "
+            << "valid ways: " << valid_ids_.ways().size() << " (" << way_count_ << "), "
+            << "valid relations: " << valid_ids_.relations().size() << " (" << relation_count_ << ")"
+            << std::endl;
+    };
 };
-
 
 #endif //FIRSTPASSHANDLER_H
