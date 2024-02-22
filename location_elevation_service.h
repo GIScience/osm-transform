@@ -35,10 +35,11 @@ private:
     ulong mem_size_ = 0;
     ulong cache_limit_ = 150000000;
     std::map<std::string, std::uint64_t> tile_size_;
+    double interpolate_threshold_;
 
 public:
 
-    explicit LocationElevationService(ulong cache_limit);
+    explicit LocationElevationService(ulong cache_limit, double interpolation_threshold);
 
     void load(const std::string &path);
 

@@ -151,6 +151,6 @@ double LocationElevationService::elevation(osmium::Location l) {
 
     return geotiff->elevation(l.lon(), l.lat());
 }
-LocationElevationService::LocationElevationService(ulong cache_limit) : cache_limit_(cache_limit) {
+LocationElevationService::LocationElevationService(ulong cache_limit, double interpolate_threshold) : cache_limit_(cache_limit), interpolate_threshold_(interpolate_threshold) {
     GDALAllRegister();
 }

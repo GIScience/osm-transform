@@ -76,7 +76,7 @@ void first_pass(Config &config, boost::regex &remove_tag_regex, osmium::nwr_arra
 }
 
 void second_pass(Config &config, boost::regex &remove_tag_regex, osmium::nwr_array<osmium::index::IdSetDense<osmium::unsigned_object_id_type>> &valid_ids) {
-    LocationElevationService location_elevation_service(config.cache_limit);
+    LocationElevationService location_elevation_service(config.cache_limit, config.interpolate_threshold);
     location_elevation_service.load("tiffs");
 
     const auto& map_factory = osmium::index::MapFactory<osmium::unsigned_object_id_type, osmium::Location>::instance();
