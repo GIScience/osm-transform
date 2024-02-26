@@ -31,8 +31,8 @@ auto show_memory_used() {
     }
 }
 
-void first_pass(Config &config, boost::regex &remove_tag_regex, osmium::nwr_array<osmium::index::IdSetDense<osmium::unsigned_object_id_type>> &valid_ids);
-void second_pass(Config &config, boost::regex &remove_tag_regex, osmium::nwr_array<osmium::index::IdSetDense<osmium::unsigned_object_id_type>> &valid_ids);
+void first_pass(Config &config, boost::regex &remove_tag_regex, osmium::nwr_array<osmium::index::IdSetDense<osmium::unsigned_object_id_type>> &valid_ids, osmium::nwr_array<osmium::index::IdSetSmall<osmium::unsigned_object_id_type>> &no_elevation);
+void second_pass(Config &config, boost::regex &remove_tag_regex, osmium::nwr_array<osmium::index::IdSetDense<osmium::unsigned_object_id_type>> &valid_ids, osmium::nwr_array<osmium::index::IdSetSmall<osmium::unsigned_object_id_type>> &no_elevation);
 
 int main(int argc, char **argv) {
     Config config;
@@ -42,9 +42,10 @@ int main(int argc, char **argv) {
 
         boost::regex remove_tag_regex(config.remove_tag_regex_str, boost::regex::icase);
         osmium::nwr_array<osmium::index::IdSetDense<osmium::unsigned_object_id_type>> valid_ids;
+        osmium::nwr_array<osmium::index::IdSetSmall<osmium::unsigned_object_id_type>> no_elevation;
 
-        first_pass(config, remove_tag_regex, valid_ids);
-        second_pass(config, remove_tag_regex, valid_ids);
+        first_pass(config, remove_tag_regex, valid_ids, no_elevation);
+        second_pass(config, remove_tag_regex, valid_ids, no_elevation);
 
         show_memory_used();
 
@@ -55,13 +56,15 @@ int main(int argc, char **argv) {
     return 0;
 }
 
-void first_pass(Config &config, boost::regex &remove_tag_regex, osmium::nwr_array<osmium::index::IdSetDense<osmium::unsigned_object_id_type>> &valid_ids) {
+void first_pass(Config &config, boost::regex &remove_tag_regex,
+                osmium::nwr_array<osmium::index::IdSetDense<osmium::unsigned_object_id_type>> &valid_ids,
+                osmium::nwr_array<osmium::index::IdSetSmall<osmium::unsigned_object_id_type>> &no_elevation) {
     cout << "Processing first pass: validate ways & relations..." << endl;
     auto start = chrono::steady_clock::now();
 
     osmium::io::Reader reader{config.filename, osmium::osm_entity_bits::way | osmium::osm_entity_bits::relation,  osmium::io::read_meta::no};
     osmium::ProgressBar progress{reader.file_size(), osmium::isatty(2)};
-    FirstPassHandler handler(remove_tag_regex, valid_ids);
+    FirstPassHandler handler(remove_tag_regex, valid_ids, no_elevation);
     while (osmium::memory::Buffer input_buffer = reader.read()) {
         osmium::apply(input_buffer, handler);
         progress.update(reader.offset());
@@ -75,7 +78,9 @@ void first_pass(Config &config, boost::regex &remove_tag_regex, osmium::nwr_arra
     printf("Processed in %.3f s\n\n", chrono::duration_cast<chrono::milliseconds>(chrono::steady_clock::now() - start).count() / 1000.0);
 }
 
-void second_pass(Config &config, boost::regex &remove_tag_regex, osmium::nwr_array<osmium::index::IdSetDense<osmium::unsigned_object_id_type>> &valid_ids) {
+void second_pass(Config &config, boost::regex &remove_tag_regex,
+                 osmium::nwr_array<osmium::index::IdSetDense<osmium::unsigned_object_id_type>> &valid_ids,
+                 osmium::nwr_array<osmium::index::IdSetSmall<osmium::unsigned_object_id_type>> &no_elevation) {
     LocationElevationService location_elevation_service(config.cache_limit, config.interpolate_threshold);
     location_elevation_service.load("tiffs");
 
@@ -95,9 +100,8 @@ void second_pass(Config &config, boost::regex &remove_tag_regex, osmium::nwr_arr
     header.set("generator", "osm-transform_ v0.1.0");
 
     osmium::io::Writer writer{output, header, osmium::io::overwrite::allow};
-    RewriteHandler handler(1000000000, location_index, location_elevation_service, remove_tag_regex, valid_ids, config.interpolate);
+    RewriteHandler handler(1000000000, location_index, location_elevation_service, remove_tag_regex, valid_ids, no_elevation, config.interpolate);
     handler.add_elevation_ = config.add_elevation;
-    handler.override_values_ = config.override_values;
 
     const auto new_node_output = remove_extension(std::filesystem::path(config.filename.c_str()).stem()) + ".ors.new_nodes.pbf";
     osmium::io::Writer node_writer{new_node_output, header, osmium::io::overwrite::allow};
@@ -147,11 +151,6 @@ void second_pass(Config &config, boost::regex &remove_tag_regex, osmium::nwr_arr
                static_cast<double>(handler.nodes_with_elevation_not_found_) /
                        static_cast<double>(valid_nodes) * 100,
                handler.nodes_with_elevation_not_found_);
-        if (!config.override_values)
-            printf("%30.2f %% already present (%llu)\n",
-                   (static_cast<float>(handler.nodes_with_elevation_) / static_cast<float>(valid_nodes)) *
-                           100.0,
-                   handler.nodes_with_elevation_);
     }
     cout << endl;
 }

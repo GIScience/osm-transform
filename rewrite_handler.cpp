@@ -12,15 +12,7 @@ void RewriteHandler::copy_tags(osmium::builder::Builder &parent, const osmium::T
         total_tags_++;
         if (!boost::regex_match(tag.key(), remove_tags_)) {
             const auto key = tag.key();
-            if (strcmp(key, "ele") == 0) {
-                // keep ele tags only if no ele value passed
-                if (ele == kNoDataValue) {
-                    valid_tags_++;
-                    std::string tagval(tag.value());
-                    const auto value = regex_replace(tagval, non_digit_regex_, "");
-                    builder.add_tag("ele", value);
-                }
-            } else {
+            if (strcmp(key, "ele") != 0 || !add_elevation_) {
                 valid_tags_++;
                 builder.add_tag(tag);
             }
@@ -37,10 +29,8 @@ void RewriteHandler::node(const osmium::Node &node) {
         builder.set_id(node.id());
         builder.set_location(node.location());
         double ele = kNoDataValue;
-        if (add_elevation_) {
-            if (!override_values_ && node.tags().has_key("ele")) {
-                nodes_with_elevation_++;
-            } else if ((ele = location_elevation_.elevation(node.location())) != kNoDataValue) {
+        if (add_elevation_ && !no_elevation_.nodes().get(node.id())) {
+            if ((ele = location_elevation_.elevation(node.location())) != kNoDataValue) {
                 nodes_with_elevation_high_precision_++;
             } else if ((ele = getElevationCGIAR(node.location().lat(), node.location().lon())) != kNoDataValue) {
                 nodes_with_elevation_srtm_precision_++;
@@ -48,7 +38,7 @@ void RewriteHandler::node(const osmium::Node &node) {
                 nodes_with_elevation_gmted_precision_++;
             } else {
                 nodes_with_elevation_not_found_++;
-                ele = 0.0;// GH elevation code defaults to 0
+           //     ele = 0.0;// GH elevation code defaults to 0
             }
         }
         copy_tags(builder, node.tags(), ele);
@@ -67,19 +57,22 @@ void RewriteHandler::way(const osmium::Way &way) {
         osmium::builder::WayBuilder builder{*buffer_};
         builder.set_id(way.id());
         copy_tags(builder, way.tags());
-        {
-            osmium::builder::WayNodeListBuilder wnl_builder{builder};
-            if (interpolate_) {
-                interpolate(way, wnl_builder);
-            } else {
-                for (auto& ref : way.nodes()) {
-                    wnl_builder.add_node_ref(ref);
-                }
-            }
-        }
+        add_refs(way, builder);
     }
     buffer_->commit();
 }
+void RewriteHandler::add_refs(const osmium::Way &way, osmium::builder::Builder &builder) {
+    osmium::builder::WayNodeListBuilder wnl_builder{builder};
+    if (interpolate_ && !no_elevation_.ways().get(way.id())) {
+        interpolate(way, wnl_builder);
+        return;
+    }
+    for (auto& ref : way.nodes()) {
+        wnl_builder.add_node_ref(ref);
+    }
+}
+
+
 void RewriteHandler::interpolate(const osmium::Way &way, osmium::builder::WayNodeListBuilder &wnl_builder) {
     auto from = way.nodes()[0];
     auto from_location = get_node_location(from.ref());

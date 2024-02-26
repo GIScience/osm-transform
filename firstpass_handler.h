@@ -19,6 +19,7 @@ class FirstPassHandler : public osmium::handler::Handler {
     const std::set<std::string> kInvalidatingTags{"building", "landuse",
         "boundary", "natural", "place", "waterway", "aeroway",
         "aviation", "military", "power", "communication", "man_made"};
+    const std::set<std::string> kNoElevationsKeys{"bridge", "tunnel", "cutting", "indoor" };
     boost::regex &remove_tags_;
 
     unsigned long long node_count_ = 0;
@@ -44,7 +45,7 @@ class FirstPassHandler : public osmium::handler::Handler {
     bool has_no_relevant_tags(const osmium::TagList &tags) const {
         bool no_tags_remain = true;
         bool has_invalidating_tags = false;
-        for (const osmium::Tag &tag: tags) {
+        for (const auto &tag: tags) {
             if (accept_tag(tag)) {
                 no_tags_remain = false;
                 if (tag_validates(tag)) {
@@ -57,6 +58,18 @@ class FirstPassHandler : public osmium::handler::Handler {
         return no_tags_remain || has_invalidating_tags;
     }
 
+    bool is_no_elevation(const osmium::Way &way) {
+        for (const auto &tag : way.tags()) {
+            if (kNoElevationsKeys.contains(tag.key())){
+                const std::string value = tag.value();
+                if (value != "no") {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
     inline bool is_removable(const osmium::Way &way) const {
         return way.nodes().size() < 2 || has_no_relevant_tags(way.tags());
     }
@@ -67,12 +80,15 @@ class FirstPassHandler : public osmium::handler::Handler {
 
 public:
     osmium::nwr_array<osmium::index::IdSetDense<osmium::unsigned_object_id_type>> &valid_ids_;
+    osmium::nwr_array<osmium::index::IdSetSmall<osmium::unsigned_object_id_type>> &no_elevation_;
 
     explicit FirstPassHandler(
         boost::regex &remove_tags,
-        osmium::nwr_array<osmium::index::IdSetDense<osmium::unsigned_object_id_type>> &valid_ids
+        osmium::nwr_array<osmium::index::IdSetDense<osmium::unsigned_object_id_type>> &valid_ids,
+        osmium::nwr_array<osmium::index::IdSetSmall<osmium::unsigned_object_id_type>> &no_elevation
     ): remove_tags_(remove_tags),
-       valid_ids_(valid_ids)
+       valid_ids_(valid_ids),
+       no_elevation_(no_elevation)
     {}
 
     void node(const osmium::Node &node) {
@@ -86,6 +102,12 @@ public:
         if (is_removable(way)) { return; }
         for (const osmium::NodeRef &n: way.nodes()) {
             valid_ids_.nodes().set(n.ref());
+        }
+        if (is_no_elevation(way)) {
+            for (const auto &n: way.nodes()) {
+                no_elevation_.nodes().set(n.ref());
+            }
+            no_elevation_.ways().set(way.id());
         }
         valid_ids_.ways().set(way.id());
     }

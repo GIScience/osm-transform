@@ -10,7 +10,6 @@ struct Config {
     std::string remove_tag_regex_str;
 
     bool add_elevation = true;
-    bool override_values = true;
     bool interpolate = false;
 
     bool debug_output = false;
@@ -30,7 +29,6 @@ struct Config {
                 ("version,v", "print version string") //
                 ("help", "produce help message") //
                 ("skip,e", "skip elevation data merge") //
-                ("overwrite,o", "keep original elevation tags where present") //
                 ("interpolate,i", "interpolate intermediate nodes")
                 ("osm-pbf,p", po::value<std::vector<std::string>>(), "Absolute file path to osm pbf file to process.") //
                 ("config-file,f", po::value<std::string>(&config_file_path), "Absolute file path to config file to use");
@@ -108,10 +106,6 @@ struct Config {
 
         if (vm.contains("skip")) {
             add_elevation = false;
-        }
-
-        if (vm.contains("overwrite")) {
-            override_values = false;
         }
 
         debug_output = vm.contains("debug_output");
