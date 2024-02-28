@@ -53,7 +53,7 @@ public:
         const auto max_x = dataset_->GetRasterXSize();
         const auto max_y = dataset_->GetRasterYSize();
         if (x < -1 || y < -1 || x > max_x || y > max_y) {
-            std::cout << "Coordinate out of bounds: POINT (" << lat << " " << lng << ")\n";
+            std::cout << "Coordinate out of bounds: Image coordinates (" << x << ", " << y << ") POINT (" << lat << " " << lng << ")\n";
             return kNoDataValue;
         }
 

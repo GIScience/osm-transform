@@ -37,7 +37,6 @@ void second_pass(Config &config, boost::regex &remove_tag_regex, osmium::nwr_arr
 int main(int argc, char **argv) {
     Config config;
     config.cmd(argc, argv);
-
     try {
 
         boost::regex remove_tag_regex(config.remove_tag_regex_str, boost::regex::icase);
@@ -46,9 +45,7 @@ int main(int argc, char **argv) {
 
         first_pass(config, remove_tag_regex, valid_ids, no_elevation);
         second_pass(config, remove_tag_regex, valid_ids, no_elevation);
-
         show_memory_used();
-
     } catch (const exception &e) {
         cerr << e.what() << '\n';
         return (3);
@@ -81,7 +78,7 @@ void first_pass(Config &config, boost::regex &remove_tag_regex,
 void second_pass(Config &config, boost::regex &remove_tag_regex,
                  osmium::nwr_array<osmium::index::IdSetDense<osmium::unsigned_object_id_type>> &valid_ids,
                  osmium::nwr_array<osmium::index::IdSetSmall<osmium::unsigned_object_id_type>> &no_elevation) {
-    LocationElevationService location_elevation_service(config.cache_limit, config.interpolate_threshold);
+    LocationElevationService location_elevation_service(config.cache_limit);
     location_elevation_service.load("tiffs");
 
     const auto& map_factory = osmium::index::MapFactory<osmium::unsigned_object_id_type, osmium::Location>::instance();
@@ -100,7 +97,7 @@ void second_pass(Config &config, boost::regex &remove_tag_regex,
     header.set("generator", "osm-transform_ v0.1.0");
 
     osmium::io::Writer writer{output, header, osmium::io::overwrite::allow};
-    RewriteHandler handler(1000000000, location_index, location_elevation_service, remove_tag_regex, valid_ids, no_elevation, config.interpolate);
+    RewriteHandler handler(1000000000, location_index, location_elevation_service, remove_tag_regex, valid_ids, no_elevation, config.interpolate, config.interpolate_threshold);
     handler.add_elevation_ = config.add_elevation;
 
     const auto new_node_output = remove_extension(std::filesystem::path(config.filename.c_str()).stem()) + ".ors.new_nodes.pbf";
@@ -138,15 +135,18 @@ void second_pass(Config &config, boost::regex &remove_tag_regex,
         auto valid_nodes = valid_ids.nodes().size();
         printf("All Nodes: %19lu Nodes\n",
                valid_nodes);
+        printf("Elevation found: %13.2f %% (%llu)\n",
+               static_cast<double>(handler.nodes_with_elevation_) /
+                       static_cast<double>(valid_nodes) * 100, handler.nodes_with_elevation_);
         printf("Custom Elevation: %12.2f %% (%llu)\n",
-               static_cast<double>(handler.nodes_with_elevation_high_precision_) /
-                       static_cast<double>(valid_nodes) * 100, handler.nodes_with_elevation_high_precision_);
+               static_cast<double>(location_elevation_service.found_custom_) /
+                       static_cast<double>(valid_nodes) * 100, location_elevation_service.found_custom_);
         printf("SRTM Elevation: %14.2f %% (%llu)\n",
-               static_cast<double>(handler.nodes_with_elevation_srtm_precision_) /
-                       static_cast<double>(valid_nodes) * 100, handler.nodes_with_elevation_srtm_precision_);
+               static_cast<double>(location_elevation_service.found_srtm_) /
+                       static_cast<double>(valid_nodes) * 100, location_elevation_service.found_srtm_);
         printf("GMTED Elevation: %13.2f %% (%llu)\n",
-               static_cast<double>(handler.nodes_with_elevation_gmted_precision_) /
-                       static_cast<double>(valid_nodes) * 100, handler.nodes_with_elevation_gmted_precision_);
+               static_cast<double>(location_elevation_service.found_gmted_) /
+                       static_cast<double>(valid_nodes) * 100, location_elevation_service.found_gmted_);
         printf("Failed Elevation: %12.2f %% (%llu)\n",
                static_cast<double>(handler.nodes_with_elevation_not_found_) /
                        static_cast<double>(valid_nodes) * 100,

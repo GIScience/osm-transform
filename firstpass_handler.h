@@ -81,6 +81,7 @@ class FirstPassHandler : public osmium::handler::Handler {
 public:
     osmium::nwr_array<osmium::index::IdSetDense<osmium::unsigned_object_id_type>> &valid_ids_;
     osmium::nwr_array<osmium::index::IdSetSmall<osmium::unsigned_object_id_type>> &no_elevation_;
+    unsigned long long node_max_id_ = 0;
 
     explicit FirstPassHandler(
         boost::regex &remove_tags,
@@ -93,6 +94,9 @@ public:
 
     void node(const osmium::Node &node) {
         if (node.id() < 0) return;
+        if (node.id() > node_max_id_) {
+            node_max_id_ = node.id();
+        }
         node_count_++;
     }
 

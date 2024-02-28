@@ -11,6 +11,7 @@ namespace bgm = bg::model;
 namespace bgi = bg::index;
 
 typedef bgm::point<double, 2, bg::cs::geographic<bg::degree>> point;
+typedef bgm::segment<point> segment;
 typedef bgm::box<point> box;
 typedef std::pair<box, PrioAndFilename> rtree_entry;
 
@@ -18,20 +19,15 @@ inline auto sortRTreeEntryByPrio(const rtree_entry &a, const rtree_entry &b) { r
 
 std::vector<LocationElevation> LocationElevationService::interpolate(osmium::Location from, osmium::Location to) {
     std::vector<LocationElevation> data;
-
     std::vector<rtree_entry> query_result;
-    rtree_.query(bgi::contains(point(from.lon(),from.lat())), std::back_inserter(query_result));
+    box bbox;
+    bg::envelope(segment(point(from.lon(),from.lat()), point(to.lon(),to.lat())), bbox);
+    rtree_.query(bgi::intersects(bbox), std::back_inserter(query_result));
     std::sort(query_result.begin(), query_result.end(), sortRTreeEntryByPrio);
-    if (query_result.empty()) {
+    if (query_result.empty()) { // no tiles found on the whole edge
         return data;
     }
-
-    auto entry = query_result.front();
-    auto step_width = entry.second.prio;
-    auto filename = entry.second.filename;
-
-
-    auto geo_tiff = load_tiff(filename.c_str());
+    auto step_width =  query_result.front().second.prio;
 
     auto delta_x = to.lon() - from.lon();
     auto delta_y = to.lat() - from.lat();
@@ -43,57 +39,73 @@ std::vector<LocationElevation> LocationElevationService::interpolate(osmium::Loc
     const auto sy = ny * step_width;
 
     auto steps = static_cast<int>(delta_x / sx);
-    for (auto s = 1; s <= steps; s++) {
+    for (auto s = 0; s <= steps; s++) {
         double lng = from.lon() + sx * s;
         double lat = from.lat() + sy * s;
-        double ele = geo_tiff->elevation(lng, lat);
         auto loc = osmium::Location(lng, lat);
+        double ele = elevation(loc, false);
         data.push_back(LocationElevation {loc, ele});
     }
+    data.push_back(LocationElevation {to, elevation(to, false)});
     return data;
 }
 
+double LocationElevationService::get_elevation_value(double lng, double lat, std::string* filename) {
+    auto geo_tiff = load_tiff(filename->c_str());
+    return geo_tiff->elevation(lng, lat);
+}
 
-void LocationElevationService::load(const std::string &path) {
-        std::vector<std::string> geotiffs;
+inline void put_tiffs_in_dir(const std::string &path, std::vector<std::string> &geotiffs) {
+    try {
         for (auto &p: fs::recursive_directory_iterator(path)) {
             auto ext = p.path().extension().string();
             if (!boost::iequals(ext, ".tif") && !boost::iequals(ext, ".tiff") && !boost::iequals(ext, ".gtiff")) { continue; }
             const std::string filename{p.path().string()};
             geotiffs.push_back(filename);
         }
-        std::cout << "Load geotiff index...\n";
-        osmium::ProgressBar pTiffs{geotiffs.size(), osmium::isatty(2)};
-        auto loaded = 0;
-        for (const auto& geotiff: geotiffs) {
-            const auto tif = GDALDatasetUniquePtr(GDALDataset::FromHandle(GDALOpen(geotiff.c_str(), GA_ReadOnly)));
+    } catch (std::filesystem::filesystem_error const& ex) {
+        std::cout << "WARNING: Failed to read geotiffs from " << path << ". This might lead to a lesser success rate when determining location elevations.\n";
+    }
+}
 
-            auto reference = Geotiff::getSpatialReference(tif->GetProjectionRef());
-            const auto transformation = OGRCreateCoordinateTransformation(&reference, &WGS84);
+void LocationElevationService::load(const std::string &path) {
+    std::vector<std::string> geotiffs;
+    put_tiffs_in_dir(path, geotiffs);
+    put_tiffs_in_dir("srtmdata", geotiffs);
+    put_tiffs_in_dir("gmteddata", geotiffs);
+    std::cout << "Load geotiff index...\n";
+    osmium::ProgressBar pTiffs{geotiffs.size(), osmium::isatty(2)};
+    auto loaded = 0;
+    for (const auto& geotiff: geotiffs) {
+        const auto tif = GDALDatasetUniquePtr(GDALDataset::FromHandle(GDALOpen(geotiff.c_str(), GA_ReadOnly)));
 
-            double transform[6] = {};
-            tif->GetGeoTransform(transform);
+        auto reference = Geotiff::getSpatialReference(tif->GetProjectionRef());
+        const auto transformation = OGRCreateCoordinateTransformation(&reference, &WGS84);
 
-            const double lng_min = transform[0] + 0 * transform[1] + 0 * transform[2];
-            const double lat_max = transform[3] + 0 * transform[4] + 0 * transform[5];
-            const double lng_max = lng_min + tif->GetRasterXSize() * transform[1] + tif->GetRasterXSize() * transform[2];
-            const double lat_min = lat_max + tif->GetRasterYSize() * transform[4] + tif->GetRasterYSize() * transform[5];
+        double transform[6] = {};
+        tif->GetGeoTransform(transform);
 
-            double lng[2] = {lng_min, lng_max};
-            double lat[2] = {lat_min, lat_max};
-            transformation->Transform(2, lng, lat);
+        const double lng_min = transform[0] + 0 * transform[1] + 0 * transform[2];
+        const double lat_max = transform[3] + 0 * transform[4] + 0 * transform[5];
+        const double lng_max = lng_min + tif->GetRasterXSize() * transform[1] + tif->GetRasterXSize() * transform[2];
+        const double lat_min = lat_max + tif->GetRasterYSize() * transform[4] + tif->GetRasterYSize() * transform[5];
 
-            box b(point(lng[0], lat[0]), point(lng[1], lat[1]));
-            double lngStep = (lng[1] - lng[0]) / static_cast<double>(tif->GetRasterXSize());
-            double latStep = (lat[1] - lat[0]) / static_cast<double>(tif->GetRasterYSize());
-            auto prio = std::min(lngStep, latStep);
+        double lng[2] = {lng_min, lng_max};
+        double lat[2] = {lat_min, lat_max};
+        transformation->Transform(2, lng, lat);
 
-            auto v = std::make_pair(b, PrioAndFilename{prio, geotiff});
-            //        std::cout << std::fixed << " insert = " << bg::wkt<box>(v.first) << " - " << v.second.prio << " - " << v.second.filename << std::endl;
-            rtree_.insert(v);
-            loaded += 1;
-            pTiffs.update(loaded);
-        }
+        box b(point(lng[0], lat[0]), point(lng[1], lat[1]));
+        double lngStep = (lng[1] - lng[0]) / static_cast<double>(tif->GetRasterXSize());
+        double latStep = (lat[1] - lat[0]) / static_cast<double>(tif->GetRasterYSize());
+        auto prio = std::min(lngStep, latStep);
+
+        auto v = std::make_pair(b, PrioAndFilename{prio, geotiff});
+        //        std::cout << std::fixed << " insert = " << bg::wkt<box>(v.first) << " - " << v.second.prio << " - " << v.second.filename << std::endl;
+        rtree_.insert(v);
+        loaded += 1;
+        pTiffs.update(loaded);
+    }
+    std::cout << "RTree size; " << rtree_.size() << std::endl;
 }
 
 std::shared_ptr<Geotiff> LocationElevationService::load_tiff(const char * filename) {
@@ -137,20 +149,29 @@ std::shared_ptr<Geotiff> LocationElevationService::load_tiff(const char * filena
     return geotiff;
 }
 
-double LocationElevationService::elevation(osmium::Location l) {
+double LocationElevationService::elevation(osmium::Location l, bool count) {
     std::vector<rtree_entry> query_result;
     rtree_.query(bgi::contains(point(l.lon(),l.lat())), std::back_inserter(query_result));
     std::sort(query_result.begin(), query_result.end(), sortRTreeEntryByPrio);
     if (query_result.empty()) {
         return kNoDataValue;
     }
+    auto filename = query_result.front().second.filename;
+    auto geo_tiff = load_tiff(filename.c_str());
+    double ele = geo_tiff->elevation(lng, lat);
 
-    auto entry = query_result.front();
-    auto filename = entry.second.filename;
-    auto geotiff = load_tiff(filename.c_str());
-
-    return geotiff->elevation(l.lon(), l.lat());
+    if (ele != kNoDataValue && count) {
+        if (filename.starts_with("srtm")) {
+            found_srtm_++;
+        } else if (filename.contains("gmted")) {
+            found_gmted_++;
+        } else {
+            found_custom_++;
+        }
+    }
+    return ele;
 }
-LocationElevationService::LocationElevationService(ulong cache_limit, double interpolate_threshold) : cache_limit_(cache_limit), interpolate_threshold_(interpolate_threshold) {
+
+LocationElevationService::LocationElevationService(ulong cache_limit) : cache_limit_(cache_limit) {
     GDALAllRegister();
 }
