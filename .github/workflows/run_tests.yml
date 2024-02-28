@@ -41,7 +41,7 @@ jobs:
         with:
           fetch-depth: 0
       - name: Setup compile chain
-        run: sudo apt-get -y -qq install g++ cmake ninja-build libgdal-dev libproj-dev libosmium-dev libboost-all-dev
+        run: sudo apt-get -y -qq update && sudo apt-get -y -qq install g++ cmake ninja-build libgdal-dev libproj-dev libosmium-dev libboost-all-dev
       - name: Run tests
         run: |
           cmake -DCMAKE_BUILD_TYPE=Release -DCMAKE_MAKE_PROGRAM=/usr/bin/ninja -G Ninja -B ./cmake-build-test  
