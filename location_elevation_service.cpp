@@ -50,11 +50,6 @@ std::vector<LocationElevation> LocationElevationService::interpolate(osmium::Loc
     return data;
 }
 
-double LocationElevationService::get_elevation_value(double lng, double lat, std::string* filename) {
-    auto geo_tiff = load_tiff(filename->c_str());
-    return geo_tiff->elevation(lng, lat);
-}
-
 inline void put_tiffs_in_dir(const std::string &path, std::vector<std::string> &geotiffs) {
     try {
         for (auto &p: fs::recursive_directory_iterator(path)) {
@@ -158,7 +153,7 @@ double LocationElevationService::elevation(osmium::Location l, bool count) {
     }
     auto filename = query_result.front().second.filename;
     auto geo_tiff = load_tiff(filename.c_str());
-    double ele = geo_tiff->elevation(lng, lat);
+    double ele = geo_tiff->elevation(l.lon(), l.lat());
 
     if (ele != kNoDataValue && count) {
         if (filename.starts_with("srtm")) {
