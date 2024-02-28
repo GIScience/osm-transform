@@ -25,7 +25,7 @@ void RewriteHandler::node(const osmium::Node &node) {
     if (node.id() < 0) return;
     if (valid_ids_.nodes().get(node.id())) {
         processed_elements_++;
-        osmium::builder::NodeBuilder builder{*buffer_};
+        osmium::builder::NodeBuilder builder{*node_buffer_};
         builder.set_id(node.id());
         builder.set_location(node.location());
         double ele = kNoDataValue;
@@ -42,7 +42,7 @@ void RewriteHandler::node(const osmium::Node &node) {
         }
     }
 
-    buffer_->commit();
+    node_buffer_->commit();
 }
 
 void RewriteHandler::way(const osmium::Way &way) {
@@ -98,7 +98,7 @@ void RewriteHandler::interpolate(const osmium::Way &way, osmium::builder::WayNod
 
 void RewriteHandler::newNode(osmium::object_id_type id, LocationElevation &le) {
     {
-        osmium::builder::NodeBuilder nodeBuilder(*new_node_buffer_);
+        osmium::builder::NodeBuilder nodeBuilder(*node_buffer_);
         nodeBuilder.set_id(id);
         nodeBuilder.set_location(le.location);
         {
@@ -107,7 +107,7 @@ void RewriteHandler::newNode(osmium::object_id_type id, LocationElevation &le) {
             nodeTagsBuilder.add_tag("highway", "traffic_signal");
         }
     }
-    new_node_buffer_->commit();
+    node_buffer_->commit();
 }
 
 void RewriteHandler::relation(const osmium::Relation &relation) {

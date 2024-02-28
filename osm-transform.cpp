@@ -37,6 +37,7 @@ void second_pass(Config &config, boost::regex &remove_tag_regex, osmium::nwr_arr
 int main(int argc, char **argv) {
     Config config;
     config.cmd(argc, argv);
+
     try {
 
         boost::regex remove_tag_regex(config.remove_tag_regex_str, boost::regex::icase);
@@ -45,7 +46,9 @@ int main(int argc, char **argv) {
 
         first_pass(config, remove_tag_regex, valid_ids, no_elevation);
         second_pass(config, remove_tag_regex, valid_ids, no_elevation);
+
         show_memory_used();
+
     } catch (const exception &e) {
         cerr << e.what() << '\n';
         return (3);
@@ -75,6 +78,17 @@ void first_pass(Config &config, boost::regex &remove_tag_regex,
     printf("Processed in %.3f s\n\n", chrono::duration_cast<chrono::milliseconds>(chrono::steady_clock::now() - start).count() / 1000.0);
 }
 
+
+void copy(const std::string& input, osmium::io::Writer& writer) {
+    osmium::io::Reader reader{input};
+    osmium::ProgressBar progress{reader.file_size(), osmium::isatty(2)};
+    while (osmium::memory::Buffer buffer = reader.read()) {
+        writer(std::move(buffer));
+        progress.update(reader.offset());
+    }
+    reader.close();
+}
+
 void second_pass(Config &config, boost::regex &remove_tag_regex,
                  osmium::nwr_array<osmium::index::IdSetDense<osmium::unsigned_object_id_type>> &valid_ids,
                  osmium::nwr_array<osmium::index::IdSetSmall<osmium::unsigned_object_id_type>> &no_elevation) {
@@ -84,7 +98,6 @@ void second_pass(Config &config, boost::regex &remove_tag_regex,
     const auto& map_factory = osmium::index::MapFactory<osmium::unsigned_object_id_type, osmium::Location>::instance();
     auto location_index = map_factory.create_map("flex_mem");
 
-    string output = remove_extension(std::filesystem::path(config.filename.c_str()).stem()) + ".ors.pbf";
     const auto total_elements = valid_ids.nodes().size() + valid_ids.ways().size() + valid_ids.relations().size();
     unsigned long long processed_elements = 0;
 
@@ -96,29 +109,58 @@ void second_pass(Config &config, boost::regex &remove_tag_regex,
     osmium::io::Header header(reader.header());
     header.set("generator", "osm-transform_ v0.1.0");
 
-    osmium::io::Writer writer{output, header, osmium::io::overwrite::allow};
     RewriteHandler handler(1000000000, location_index, location_elevation_service, remove_tag_regex, valid_ids, no_elevation, config.interpolate, config.interpolate_threshold);
     handler.add_elevation_ = config.add_elevation;
 
-    const auto new_node_output = remove_extension(std::filesystem::path(config.filename.c_str()).stem()) + ".ors.new_nodes.pbf";
-    osmium::io::Writer node_writer{new_node_output, header, osmium::io::overwrite::allow};
-    osmium::ProgressBar progress{total_elements, osmium::isatty(2)};
-    while (auto input_buffer = reader.read()) {
-        osmium::memory::Buffer output_buffer{input_buffer.committed()};
-        osmium::memory::Buffer new_node_output_buffer{input_buffer.committed()};
-        handler.set_buffers(&output_buffer, &new_node_output_buffer);
 
-        osmium::apply(input_buffer, handler);
-        writer(std::move(output_buffer));
-        node_writer(std::move(new_node_output_buffer));
+    if (config.interpolate) {
+        auto wr_output = remove_extension(std::filesystem::path(config.filename.c_str()).stem()) + ".ors.wr.pbf";
+        osmium::io::Writer wr_writer{wr_output, header, osmium::io::overwrite::allow};
+        const auto n_output = remove_extension(std::filesystem::path(config.filename.c_str()).stem()) + ".ors.n.pbf";
+        osmium::io::Writer n_writer{n_output, header, osmium::io::overwrite::allow};
+        osmium::ProgressBar progress{total_elements, osmium::isatty(2)};
+        while (auto input_buffer = reader.read()) {
+            osmium::memory::Buffer output_buffer{input_buffer.committed()};
+            osmium::memory::Buffer node_output_buffer{input_buffer.committed()};
+            handler.set_buffers(&output_buffer, &node_output_buffer);
 
-        processed_elements += handler.processed_elements_;
-        progress.update(processed_elements);
+            osmium::apply(input_buffer, handler);
+            wr_writer(std::move(output_buffer));
+            n_writer(std::move(node_output_buffer));
+
+            processed_elements += handler.processed_elements_;
+            progress.update(processed_elements);
+        }
+        n_writer.close();
+        wr_writer.close();
+        progress.done();
+        reader.close();
+
+        auto output = remove_extension(std::filesystem::path(config.filename.c_str()).stem()) + ".ors.pbf";
+        osmium::io::Writer writer{output, header, osmium::io::overwrite::allow};
+        auto total_size = std::filesystem::file_size(n_output) + std::filesystem::file_size(wr_output);
+        copy(n_output, writer);
+        copy(wr_output, writer);
+        writer.close();
+    } else {
+        auto output = remove_extension(std::filesystem::path(config.filename.c_str()).stem()) + ".ors.pbf";
+        osmium::io::Writer writer{output, header, osmium::io::overwrite::allow};
+        osmium::ProgressBar progress{total_elements, osmium::isatty(2)};
+        while (auto input_buffer = reader.read()) {
+            osmium::memory::Buffer output_buffer{input_buffer.committed()};
+            handler.set_buffers(&output_buffer, &output_buffer);
+
+            osmium::apply(input_buffer, handler);
+            writer(std::move(output_buffer));
+
+            processed_elements += handler.processed_elements_;
+            progress.update(processed_elements);
+        }
+        writer.close();
+        progress.done();
+        reader.close();
     }
-    progress.done();
-    reader.close();
-    writer.close();
-    node_writer.close();
+
 
     const auto mem = location_index->used_memory() / (1024UL );
     std::cout << "\nAbout " << mem << " KBytes used for node location index (in main memory or on disk).\n";

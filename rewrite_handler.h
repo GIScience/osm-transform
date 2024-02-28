@@ -26,7 +26,7 @@ class RewriteHandler : public osmium::handler::Handler {
     boost::regex &remove_tags_;
     const boost::regex non_digit_regex_ = boost::regex("[^0-9.]");
 
-    osmium::memory::Buffer *new_node_buffer_;
+    osmium::memory::Buffer *node_buffer_;
     osmium::object_id_type next_node_id_;
     std::unique_ptr<osmium::index::map::Map<osmium::unsigned_object_id_type, osmium::Location>> &location_index_;
     LocationElevationService &location_elevation_;
@@ -76,7 +76,7 @@ public:
 
     void set_buffers(osmium::memory::Buffer *output_buffer, osmium::memory::Buffer *output_node_buffer) {
         buffer_ = output_buffer;
-        new_node_buffer_ = output_node_buffer;
+        node_buffer_ = output_node_buffer;
         processed_elements_ = 0;
         total_tags_ = 0;
         valid_tags_ = 0;
