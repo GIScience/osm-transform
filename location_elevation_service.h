@@ -35,19 +35,23 @@ private:
     ulong mem_size_ = 0;
     ulong cache_limit_ = 150000000;
     std::map<std::string, std::uint64_t> tile_size_;
-    double interpolate_threshold_;
+    bool debug_active = true;
 
 public:
+    unsigned long long found_custom_ = 0;
+    unsigned long long found_srtm_ = 0;
+    unsigned long long found_gmted_ = 0;
 
-    explicit LocationElevationService(ulong cache_limit, double interpolation_threshold);
+    explicit LocationElevationService(ulong cache_limit);
 
     void load(const std::string &path);
 
     std::shared_ptr<Geotiff> load_tiff(const char* filename);
 
-    double elevation(osmium::Location l);
+    double elevation(osmium::Location l, bool count);
 
     std::vector<LocationElevation> interpolate(osmium::Location from, osmium::Location to);
+
 };
 
 

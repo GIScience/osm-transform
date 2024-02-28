@@ -31,6 +31,7 @@ class RewriteHandler : public osmium::handler::Handler {
     std::unique_ptr<osmium::index::map::Map<osmium::unsigned_object_id_type, osmium::Location>> &location_index_;
     LocationElevationService &location_elevation_;
     bool interpolate_;
+    double interpolate_threshold_;
 
     void copy_tags(osmium::builder::Builder &parent, const osmium::TagList &tags, const double ele = kNoDataValue);
 
@@ -55,9 +56,7 @@ public:
     unsigned long long total_tags_ = 0;
     unsigned long long valid_tags_ = 0;
     bool add_elevation_ = false;
-    unsigned long long nodes_with_elevation_srtm_precision_ = 0;
-    unsigned long long nodes_with_elevation_high_precision_ = 0;
-    unsigned long long nodes_with_elevation_gmted_precision_ = 0;
+    unsigned long long nodes_with_elevation_ = 0;
     unsigned long long nodes_with_elevation_not_found_ = 0;
 
     explicit RewriteHandler(const osmium::object_id_type next_node_id,
@@ -65,14 +64,14 @@ public:
                             LocationElevationService &elevation_service,
                             boost::regex &remove_tags,
                             osmium::nwr_array<osmium::index::IdSetDense<osmium::unsigned_object_id_type>> &valid_ids,
-                            osmium::nwr_array<osmium::index::IdSetSmall<osmium::unsigned_object_id_type>> &no_elevation, bool interpolate) :
-         next_node_id_(next_node_id),
-         location_index_(location_index),
-         location_elevation_(elevation_service),
-         remove_tags_(remove_tags),
-         valid_ids_(valid_ids),
-         no_elevation_(no_elevation),
-         interpolate_(interpolate) {
+                            osmium::nwr_array<osmium::index::IdSetSmall<osmium::unsigned_object_id_type>> &no_elevation, bool interpolate,
+                            double interpolate_threshold) : next_node_id_(next_node_id),
+                                                              location_index_(location_index),
+                                                              location_elevation_(elevation_service),
+                                                              remove_tags_(remove_tags),
+                                                              valid_ids_(valid_ids),
+                                                              no_elevation_(no_elevation),
+                                                              interpolate_(interpolate), interpolate_threshold_(interpolate_threshold) {
     }
 
     void set_buffers(osmium::memory::Buffer *output_buffer, osmium::memory::Buffer *output_node_buffer) {

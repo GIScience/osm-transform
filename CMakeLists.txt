@@ -8,7 +8,7 @@ add_definitions( -DPROJECT_VERSION="${PROJECT_VERSION}" -DPROJECT_NAME="${PROJEC
 # ignore BOOST deprecated headers
 add_definitions("-DBOOST_ALLOW_DEPRECATED_HEADERS")
 
-set(CMAKE_CXX_STANDARD 20)
+set(CMAKE_CXX_STANDARD 23)
 
 # https://cmake.org/cmake/help/git-master/module/FindBoost.html
 find_package(Boost REQUIRED system regex program_options)
