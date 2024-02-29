@@ -73,24 +73,22 @@ void RewriteHandler::interpolate(const osmium::Way &way, osmium::builder::WayNod
     wnl_builder.add_node_ref(from);
     for (int i = 1; i < way.nodes().size(); i++) {
         auto to = way.nodes()[i];
-        if (interpolate_) {
-            auto to_location = get_node_location(to.ref());
-            auto les = location_elevation_.interpolate(from_location, to_location);
-            for (int index = 1; index < les.size() -1; ++index) {
-                auto before_ele = les.at(index - 1).ele;
-                auto after_ele = les.at(index + 1).ele;
-                auto le = les.at(index);
-                if (le.ele == kNoDataValue)  {
-                    continue;
-                }
-                if (abs(le.ele - (before_ele + after_ele) / 2) >= interpolate_threshold_) {
-                    auto new_node_id = next_node_id_++;
-                    newNode(new_node_id, le);
-                    wnl_builder.add_node_ref(new_node_id);
-                }
+        auto to_location = get_node_location(to.ref());
+        auto les = location_elevation_.interpolate(from_location, to_location);
+        for (int index = 1; index < les.size() -1; ++index) {
+            auto before_ele = les.at(index - 1).ele;
+            auto after_ele = les.at(index + 1).ele;
+            auto le = les.at(index);
+            if (le.ele == kNoDataValue)  {
+                continue;
             }
-            from_location = to_location;
+            if (abs(le.ele - (before_ele + after_ele) / 2) >= interpolate_threshold_) {
+                auto new_node_id = next_node_id_++;
+                newNode(new_node_id, le);
+                wnl_builder.add_node_ref(new_node_id);
+            }
         }
+        from_location = to_location;
         wnl_builder.add_node_ref(to);
         from = to;
     }
