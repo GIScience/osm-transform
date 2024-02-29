@@ -56,6 +56,7 @@ public:
     unsigned long long total_tags_ = 0;
     unsigned long long valid_tags_ = 0;
     bool add_elevation_ = false;
+    unsigned long long new_nodes_ = 0;
     unsigned long long nodes_with_elevation_ = 0;
     unsigned long long nodes_with_elevation_not_found_ = 0;
 

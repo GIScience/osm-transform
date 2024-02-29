@@ -108,6 +108,7 @@ void RewriteHandler::newNode(osmium::object_id_type id, LocationElevation &le) {
         }
     }
     node_buffer_->commit();
+    new_nodes_++;
 }
 
 void RewriteHandler::relation(const osmium::Relation &relation) {

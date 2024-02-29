@@ -177,6 +177,9 @@ void second_pass(Config &config, boost::regex &remove_tag_regex,
         auto valid_nodes = valid_ids.nodes().size();
         printf("All Nodes: %19lu Nodes\n",
                valid_nodes);
+        if (config.interpolate) {
+            printf("New Nodes: %19llu Nodes\n", handler.new_nodes_);
+        }
         printf("Elevation found: %13.2f %% (%llu)\n",
                static_cast<double>(handler.nodes_with_elevation_) /
                        static_cast<double>(valid_nodes) * 100, handler.nodes_with_elevation_);
