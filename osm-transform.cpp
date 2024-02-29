@@ -98,6 +98,7 @@ void second_pass(Config &config, boost::regex &remove_tag_regex,
     const auto& map_factory = osmium::index::MapFactory<osmium::unsigned_object_id_type, osmium::Location>::instance();
     auto location_index = map_factory.create_map("flex_mem");
 
+    auto output = remove_extension(std::filesystem::path(config.filename.c_str()).stem()) + ".ors.pbf";
     const auto total_elements = valid_ids.nodes().size() + valid_ids.ways().size() + valid_ids.relations().size();
     unsigned long long processed_elements = 0;
 
@@ -136,14 +137,13 @@ void second_pass(Config &config, boost::regex &remove_tag_regex,
         progress.done();
         reader.close();
 
-        auto output = remove_extension(std::filesystem::path(config.filename.c_str()).stem()) + ".ors.pbf";
+
         osmium::io::Writer writer{output, header, osmium::io::overwrite::allow};
         auto total_size = std::filesystem::file_size(n_output) + std::filesystem::file_size(wr_output);
         copy(n_output, writer);
         copy(wr_output, writer);
         writer.close();
     } else {
-        auto output = remove_extension(std::filesystem::path(config.filename.c_str()).stem()) + ".ors.pbf";
         osmium::io::Writer writer{output, header, osmium::io::overwrite::allow};
         osmium::ProgressBar progress{total_elements, osmium::isatty(2)};
         while (auto input_buffer = reader.read()) {
