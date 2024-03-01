@@ -9,28 +9,17 @@ There are several possibilities to build and run osm-transform.
 
 ### Run with Docker
 
-To run osm-transform with Docker, first, make sure that [Docker](https://www.docker.com/) is installed on the machine and clone this repository. From the root directory, you can run:
+To run osm-transform with Docker, first, make sure that [Docker](https://www.docker.com/) is installed on the machine
+and clone this repository. From the root directory, you can run:
 
 ```shell
 ./docker_run.sh -p planet-latest.osm.pbf
 ```
 
-This builds the Docker image and runs the preprocessor as a container, passing the provided OSM file as source file. The script mapping the current working directory to the working directory within the container. To change this behavior, you could also pass the option `-w`.
-
-```shell
-./docker_run.sh -w /path/to/osm-transform-working-dir -p planet-latest.osm.pbf
-```
-
-Note that in this case the path to the OSM file needs to be relative to the working directory you passed.
-
-You can build and run the Docker container manually: 
-
-```shell
-docker build -t osm-transform .
-docker run -it -v .:/osm osm-transform -p planet-latest.osm.pbf
-```
-
-The `-v` option is mapping the current working directory to the working directory within the container. `-p planet-latest.osm.pbf` points to the OSM file to use.
+This builds the Docker image and runs the preprocessor as a container, passing the provided OSM file as source file. The
+script maps the current working directory to the working directory within the container. Note that in this case all
+files required to run osm-transform must be located within the project folder, and the path to the OSM file needs to be
+relative to the project directory. All arguments are passed to osm-transform. 
 
 ### Build from the command line
 

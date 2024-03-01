@@ -1,10 +1,10 @@
-FROM ubuntu:jammy
+FROM ubuntu:jammy as build
 # For Mac with amd chip use
 #FROM --platform=linux/amd64 ubuntu:jammy
 
 RUN apt-get -qq update && apt-get -y -qq install apt-utils
 
-RUN DEBIAN_FRONTEND=noninteractive apt-get -y -qq install \
+RUN DEBIAN_FRONTEND=noninteractive apt-get -qq update && apt-get -qq install \
 	g++ \
     cmake \
     ninja-build \
@@ -13,11 +13,12 @@ RUN DEBIAN_FRONTEND=noninteractive apt-get -y -qq install \
 	libosmium-dev \
 	libboost-all-dev
 
-COPY . /src
+COPY ./test /src/test
+COPY *.h *.cpp CMakeLists.txt /src/
 WORKDIR /src
 
-RUN cmake -DCMAKE_BUILD_TYPE=Release -DCMAKE_MAKE_PROGRAM=/usr/bin/ninja -G Ninja -S /src/ -B /src/cmake-build
-RUN cmake --build /src/cmake-build --target osm-transform -j 14
+RUN cmake -DCMAKE_BUILD_TYPE=Release -DCMAKE_MAKE_PROGRAM=/usr/bin/ninja -G Ninja -S /src -B /src/cmake-build
+RUN cmake --build /src/cmake-build --target osm-transform
 
 RUN mkdir /osm
 WORKDIR /osm

@@ -9,7 +9,6 @@
 
 #include <boost/regex.hpp>
 
-#include <osmium/io/any_input.hpp>
 #include <osmium/io/any_output.hpp>
 #include <osmium/util/file.hpp>
 #include <osmium/util/progress_bar.hpp>

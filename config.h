@@ -26,22 +26,20 @@ struct Config {
         po::options_description generic("Generic options");
         generic.add_options()
                 ("version,v", "print version string")
-                ("help,h", "produce help message")
-                ("skip,e", "skip elevation data merge")
-                ("interpolate,i", "interpolate intermediate nodes")
-                ("osm-pbf,p", po::value<std::vector<std::string>>(), "path to osm pbf file to process")
-                ("config-file,f", po::value<std::string>(&config_file_path), "path to config file to use")
-                ("debug_mode,d", "debug_mode");
+                ("help,h", "produce help message");
 
         po::options_description config("Configuration");
-
         config.add_options()
+                ("osm-pbf,p", po::value<std::vector<std::string>>(), "path to osm pbf file to process")
+                ("skip,e", "skip elevation data merge")
+                ("interpolate,i", "interpolate intermediate nodes")
                 ("remove_tag,T", po::value<std::string>(&remove_tag_regex_str)->default_value("(.*:)?source(:.*)?|(.*:)?note(:.*)?|url|created_by|fixme|wikipedia"), "regex to match removable tags")
                 ("geo_tiff_folders,F", po::value<std::vector<std::string>>(&geo_tiff_folders)->multitoken()->default_value(std::vector<std::string>{"tiffs", "srtmdata", "gmteddata"}, "tiffs, srtmdata, gmteddata"), "paths to geotiff folders")
                 ("cache_limit,S", po::value<int>(&cache_limit)->default_value(1073741824), "maximum memory used to store tiles in cache")
                 ("threshold,t", po::value<double>(&interpolate_threshold)->default_value(0.5), "only used in combination with interpolation, threshold for elevation")
+                ("config-file,f", po::value<std::string>(&config_file_path), "path to config file to use")
                 ("index-type", po::value<std::string>(&index_type)->default_value("flex_mem"), "index type for locations, needed for interpolate. see https://docs.osmcode.org/osmium/latest/osmium-index-types.html")
-                ("debug_output", "debug_output");
+                ("debug_mode,d", "debug_mode");
 
         // Hidden options, will be allowed both on command line and
         // in config file, but will not be shown to the user.
