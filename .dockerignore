@@ -1,3 +1,4 @@
 **/*.tif
+**/*.pbf
 Dockerfile
 .venv*
