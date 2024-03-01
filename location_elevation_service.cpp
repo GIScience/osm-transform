@@ -51,6 +51,10 @@ std::vector<LocationElevation> LocationElevationService::interpolate(osmium::Loc
 }
 
 inline void put_tiffs_in_dir(const std::string &path, std::vector<std::string> &geotiffs) {
+    if (std::filesystem::is_regular_file(path)){
+        geotiffs.push_back(path);
+        return;
+    }
     try {
         for (auto &p: fs::recursive_directory_iterator(path)) {
             auto ext = p.path().extension().string();
@@ -92,15 +96,12 @@ void LocationElevationService::load(const std::string &path) {
         box b(point(lng[0], lat[0]), point(lng[1], lat[1]));
         double lngStep = (lng[1] - lng[0]) / static_cast<double>(tif->GetRasterXSize());
         double latStep = (lat[1] - lat[0]) / static_cast<double>(tif->GetRasterYSize());
-        auto prio = std::min(lngStep, latStep);
-
+        const auto prio = std::min(lngStep, latStep);
         auto v = std::make_pair(b, PrioAndFilename{prio, geotiff});
-        //        std::cout << std::fixed << " insert = " << bg::wkt<box>(v.first) << " - " << v.second.prio << " - " << v.second.filename << std::endl;
         rtree_.insert(v);
         loaded += 1;
         pTiffs.update(loaded);
     }
-    std::cout << "RTree size; " << rtree_.size() << std::endl;
 }
 
 std::shared_ptr<Geotiff> LocationElevationService::load_tiff(const char * filename) {

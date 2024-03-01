@@ -8,6 +8,7 @@
 struct Config {
     std::string filename;
     std::string remove_tag_regex_str;
+    std::vector<std::string> geo_tiff_folder;
 
     bool add_elevation = true;
     bool interpolate = false;
@@ -35,7 +36,7 @@ struct Config {
                 ("config-file,f", po::value<std::string>(&config_file_path), "Absolute file path to config file to use");
 
         po::options_description config("Configuration");
-        std::vector<std::string> geo_tiff_folder;
+
         config.add_options()
                 ("remove_tag,T", po::value<std::string>(&remove_tag_regex_str)->default_value("(.*:)?source(:.*)?|(.*:)?note(:.*)?|url|created_by|fixme|wikipedia"), "Regex to match removable tags")
                 ("geo_tiff_folders,F", po::value<std::vector<std::string>>(&geo_tiff_folder)->composing(), "Absolute paths to Geotiff folders. Default: srtmdata")

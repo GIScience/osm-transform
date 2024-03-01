@@ -93,7 +93,10 @@ void second_pass(Config &config, boost::regex &remove_tag_regex,
                  osmium::nwr_array<osmium::index::IdSetDense<osmium::unsigned_object_id_type>> &valid_ids,
                  osmium::nwr_array<osmium::index::IdSetSmall<osmium::unsigned_object_id_type>> &no_elevation) {
     LocationElevationService location_elevation_service(config.cache_limit);
-    location_elevation_service.load("tiffs");
+
+    for(const auto &folder : config.geo_tiff_folder) {
+        location_elevation_service.load(folder);
+    }
 
     const auto& map_factory = osmium::index::MapFactory<osmium::unsigned_object_id_type, osmium::Location>::instance();
     auto location_index = map_factory.create_map(config.index_type);
