@@ -96,7 +96,7 @@ void second_pass(Config &config, boost::regex &remove_tag_regex,
     location_elevation_service.load("tiffs");
 
     const auto& map_factory = osmium::index::MapFactory<osmium::unsigned_object_id_type, osmium::Location>::instance();
-    auto location_index = map_factory.create_map("flex_mem");
+    auto location_index = map_factory.create_map(config.index_type);
 
     auto output = remove_extension(std::filesystem::path(config.filename.c_str()).stem()) + ".ors.pbf";
     const auto total_elements = valid_ids.nodes().size() + valid_ids.ways().size() + valid_ids.relations().size();

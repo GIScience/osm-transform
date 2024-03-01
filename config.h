@@ -16,6 +16,7 @@ struct Config {
 
     int cache_limit;
     double interpolate_threshold;
+    std::string index_type;
 
     auto cmd(int argc, char **argv) {
 
@@ -40,6 +41,7 @@ struct Config {
                 ("geo_tiff_folders,F", po::value<std::vector<std::string>>(&geo_tiff_folder)->composing(), "Absolute paths to Geotiff folders. Default: srtmdata")
                 ("cache_limit,S", po::value<int>(&cache_limit)->default_value(1073741824), "Maximum memory used to store tiles in cache")
                 ("threshold,t", po::value<double>(&interpolate_threshold)->default_value(1.0), "only used in combination with interpolation, threshold for elevation")
+                ("index-type", po::value<std::string>(&index_type)->default_value("flex_mem"), "index type for locations, needed for interpolate. see https://docs.osmcode.org/osmium/latest/osmium-index-types.html")
                 ("debug_output", "debug_output");
 
         // Hidden options, will be allowed both on command line and
