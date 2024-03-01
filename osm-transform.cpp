@@ -106,7 +106,7 @@ void second_pass(Config &config, boost::regex &remove_tag_regex,
     cout << "Processing second pass: rebuild data..." << endl;
     osmium::io::Reader reader{config.filename, osmium::osm_entity_bits::node | osmium::osm_entity_bits::way | osmium::osm_entity_bits::relation, osmium::io::read_meta::no};
 
-    // keep existing headers incluing osm data dates
+    // keep existing headers including osm data dates
     osmium::io::Header header(reader.header());
     header.set("generator", "osm-transform_ v0.1.0");
 
@@ -141,7 +141,9 @@ void second_pass(Config &config, boost::regex &remove_tag_regex,
         osmium::io::Writer writer{output, header, osmium::io::overwrite::allow};
         auto total_size = std::filesystem::file_size(n_output) + std::filesystem::file_size(wr_output);
         copy(n_output, writer);
+        std::remove(n_output.c_str());
         copy(wr_output, writer);
+        std::remove(wr_output.c_str());
         writer.close();
     } else {
         osmium::io::Writer writer{output, header, osmium::io::overwrite::allow};
