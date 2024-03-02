@@ -1,4 +1,5 @@
-**/*.tif
-**/*.pbf
-Dockerfile
-.venv*
+*
+!src
+!test
+!scripts
+!CMakeLists.txt
