@@ -51,10 +51,6 @@ std::vector<LocationElevation> LocationElevationService::interpolate(osmium::Loc
 }
 
 inline void put_tiffs_in_dir(const std::string &path, std::vector<std::string> &geotiffs) {
-    if (std::filesystem::is_regular_file(path)){
-        geotiffs.push_back(path);
-        return;
-    }
     try {
         for (auto &p: fs::recursive_directory_iterator(path)) {
             auto ext = p.path().extension().string();
@@ -67,11 +63,11 @@ inline void put_tiffs_in_dir(const std::string &path, std::vector<std::string> &
     }
 }
 
-void LocationElevationService::load(const std::string &path) {
+void LocationElevationService::load(const std::vector<std::string> &paths) {
     std::vector<std::string> geotiffs;
-    put_tiffs_in_dir(path, geotiffs);
-    put_tiffs_in_dir("srtmdata", geotiffs);
-    put_tiffs_in_dir("gmteddata", geotiffs);
+    for (const auto& path : paths) {
+        put_tiffs_in_dir(path, geotiffs);
+    }
     std::cout << "Load geotiff index...\n";
     osmium::ProgressBar pTiffs{geotiffs.size(), osmium::isatty(2)};
     auto loaded = 0;
@@ -97,11 +93,13 @@ void LocationElevationService::load(const std::string &path) {
         double lngStep = (lng[1] - lng[0]) / static_cast<double>(tif->GetRasterXSize());
         double latStep = (lat[1] - lat[0]) / static_cast<double>(tif->GetRasterYSize());
         const auto prio = std::min(lngStep, latStep);
+
         auto v = std::make_pair(b, PrioAndFilename{prio, geotiff});
         rtree_.insert(v);
         loaded += 1;
         pTiffs.update(loaded);
     }
+    std::cout << std::endl << "geotiff tiles indexed: " << rtree_.size() << std::endl;
 }
 
 std::shared_ptr<Geotiff> LocationElevationService::load_tiff(const char * filename) {
@@ -124,7 +122,7 @@ std::shared_ptr<Geotiff> LocationElevationService::load_tiff(const char * filena
     if (!std::filesystem::exists(filename)) {
         return nullptr;
     }
-    auto geotiff = std::make_shared<Geotiff>(filename);
+    auto geotiff = std::make_shared<Geotiff>(filename, debug_mode_);
     if (geotiff == nullptr) {
         return nullptr;
     }
@@ -139,9 +137,10 @@ std::shared_ptr<Geotiff> LocationElevationService::load_tiff(const char * filena
     mem_size_ += tile_size_[filename];
     lru_.emplace_front(filename);
 
-    printf("Dataset opened. (format: %s; size: %d x %d x %d, cache mem size: %lu / %lu)\n", geotiff->GetDescription(),
-       geotiff->GetRasterXSize(), geotiff->GetRasterYSize(), geotiff->GetRasterCount(), mem_size_, cache_limit_);
-
+    if (debug_mode_) {
+        printf("Dataset opened. (format: %s; size: %d x %d x %d, cache mem size: %lu / %lu)\n", geotiff->GetDescription(),
+               geotiff->GetRasterXSize(), geotiff->GetRasterYSize(), geotiff->GetRasterCount(), mem_size_, cache_limit_);
+    }
     return geotiff;
 }
 
@@ -168,6 +167,6 @@ double LocationElevationService::elevation(osmium::Location l, bool count) {
     return ele;
 }
 
-LocationElevationService::LocationElevationService(ulong cache_limit) : cache_limit_(cache_limit) {
+LocationElevationService::LocationElevationService(ulong cache_limit, bool debug_mode) : cache_limit_(cache_limit), debug_mode_(debug_mode) {
     GDALAllRegister();
 }

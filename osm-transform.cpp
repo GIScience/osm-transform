@@ -9,7 +9,6 @@
 
 #include <boost/regex.hpp>
 
-#include <osmium/io/any_input.hpp>
 #include <osmium/io/any_output.hpp>
 #include <osmium/util/file.hpp>
 #include <osmium/util/progress_bar.hpp>
@@ -37,7 +36,6 @@ void second_pass(Config &config, boost::regex &remove_tag_regex, osmium::nwr_arr
 int main(int argc, char **argv) {
     Config config;
     config.cmd(argc, argv);
-
     try {
 
         boost::regex remove_tag_regex(config.remove_tag_regex_str, boost::regex::icase);
@@ -46,9 +44,7 @@ int main(int argc, char **argv) {
 
         first_pass(config, remove_tag_regex, valid_ids, no_elevation);
         second_pass(config, remove_tag_regex, valid_ids, no_elevation);
-
         show_memory_used();
-
     } catch (const exception &e) {
         cerr << e.what() << '\n';
         return (3);
@@ -92,11 +88,8 @@ void copy(const std::string& input, osmium::io::Writer& writer) {
 void second_pass(Config &config, boost::regex &remove_tag_regex,
                  osmium::nwr_array<osmium::index::IdSetDense<osmium::unsigned_object_id_type>> &valid_ids,
                  osmium::nwr_array<osmium::index::IdSetSmall<osmium::unsigned_object_id_type>> &no_elevation) {
-    LocationElevationService location_elevation_service(config.cache_limit);
-
-    for(const auto &folder : config.geo_tiff_folder) {
-        location_elevation_service.load(folder);
-    }
+    LocationElevationService location_elevation_service(config.cache_limit, config.debug_mode);
+    location_elevation_service.load(config.geo_tiff_folders);
 
     const auto& map_factory = osmium::index::MapFactory<osmium::unsigned_object_id_type, osmium::Location>::instance();
     auto location_index = map_factory.create_map(config.index_type);
@@ -166,12 +159,13 @@ void second_pass(Config &config, boost::regex &remove_tag_regex,
         reader.close();
     }
 
-
-    const auto mem = location_index->used_memory() / (1024UL );
-    std::cout << "\nAbout " << mem << " KBytes used for node location index (in main memory or on disk).\n";
+    if (config.debug_mode)  {
+        const auto mem = location_index->used_memory() / (1024UL );
+        std::cout << "About " << mem << " KBytes used for node location index (in main memory or on disk).\n";
+    }
 
     const auto end = chrono::steady_clock::now();
-    printf("\nProcessed in %.3f s\n", chrono::duration_cast<chrono::milliseconds>(end - start).count() / 1000.0);
+    printf("Processed in %.3f s\n", chrono::duration_cast<chrono::milliseconds>(end - start).count() / 1000.0);
 
     const auto insize = std::filesystem::file_size(config.filename);
     const auto outsize = std::filesystem::file_size(output);
@@ -180,10 +174,9 @@ void second_pass(Config &config, boost::regex &remove_tag_regex,
            reduction, static_cast<float>(reduction) / static_cast<float>(insize) * 100);
     if (config.add_elevation) {
         auto valid_nodes = valid_ids.nodes().size();
-        printf("All Nodes: %19lu Nodes\n",
-               valid_nodes);
+        printf("All Nodes: %19lu Nodes\n",valid_nodes);
         if (config.interpolate) {
-            printf("New Nodes: %19llu Nodes\n", handler.new_nodes_);
+            printf("Added Nodes: %17llu Nodes\n",handler.nodes_added_by_interpolation_);
         }
         printf("Elevation found: %13.2f %% (%llu)\n",
                static_cast<double>(handler.nodes_with_elevation_) /
@@ -201,6 +194,10 @@ void second_pass(Config &config, boost::regex &remove_tag_regex,
                static_cast<double>(handler.nodes_with_elevation_not_found_) /
                        static_cast<double>(valid_nodes) * 100,
                handler.nodes_with_elevation_not_found_);
+        if (valid_nodes > handler.nodes_with_elevation_ + handler.nodes_with_elevation_not_found_) {
+            std::cout << "\nNotice: More nodes were referenced in ways & relations than were found in the data. This typically happens\n"
+                         "with OSM extracts with nodes omitted for ways & relations extending beyond the extent of the extract.\n";
+        }
     }
     cout << endl;
 }

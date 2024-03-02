@@ -35,16 +35,16 @@ private:
     ulong mem_size_ = 0;
     ulong cache_limit_ = 150000000;
     std::map<std::string, std::uint64_t> tile_size_;
-    bool debug_active = true;
+    bool debug_mode_ = false;
 
 public:
     unsigned long long found_custom_ = 0;
     unsigned long long found_srtm_ = 0;
     unsigned long long found_gmted_ = 0;
 
-    explicit LocationElevationService(ulong cache_limit);
+    explicit LocationElevationService(ulong cache_limit, bool debug_mode);
 
-    void load(const std::string &path);
+    void load(const std::vector<std::string> &paths);
 
     std::shared_ptr<Geotiff> load_tiff(const char* filename);
 

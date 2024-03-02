@@ -8,13 +8,10 @@
 struct Config {
     std::string filename;
     std::string remove_tag_regex_str;
-    std::vector<std::string> geo_tiff_folder;
-
+    std::vector<std::string> geo_tiff_folders;
     bool add_elevation = true;
     bool interpolate = false;
-
-    bool debug_output = false;
-
+    bool debug_mode = false;
     int cache_limit;
     double interpolate_threshold;
     std::string index_type;
@@ -28,20 +25,21 @@ struct Config {
         // allowed only on command line
         po::options_description generic("Generic options");
         generic.add_options()
-                ("version,v", "print version string") //
-                ("help", "produce help message") //
-                ("skip,e", "skip elevation data merge") //
+                ("version,v", "print version string")
+                ("help,h", "produce help message")
+                ("skip,e", "skip elevation data merge")
                 ("interpolate,i", "interpolate intermediate nodes")
-                ("osm-pbf,p", po::value<std::vector<std::string>>(), "Absolute file path to osm pbf file to process.") //
-                ("config-file,f", po::value<std::string>(&config_file_path), "Absolute file path to config file to use");
+                ("osm-pbf,p", po::value<std::vector<std::string>>(), "path to osm pbf file to process")
+                ("config-file,f", po::value<std::string>(&config_file_path), "path to config file to use")
+                ("debug_mode,d", "debug_mode");
 
         po::options_description config("Configuration");
 
         config.add_options()
-                ("remove_tag,T", po::value<std::string>(&remove_tag_regex_str)->default_value("(.*:)?source(:.*)?|(.*:)?note(:.*)?|url|created_by|fixme|wikipedia"), "Regex to match removable tags")
-                ("geo_tiff_folders,F", po::value<std::vector<std::string>>(&geo_tiff_folder)->composing(), "Absolute paths to Geotiff folders. Default: srtmdata")
-                ("cache_limit,S", po::value<int>(&cache_limit)->default_value(1073741824), "Maximum memory used to store tiles in cache")
-                ("threshold,t", po::value<double>(&interpolate_threshold)->default_value(1.0), "only used in combination with interpolation, threshold for elevation")
+                ("remove_tag,T", po::value<std::string>(&remove_tag_regex_str)->default_value("(.*:)?source(:.*)?|(.*:)?note(:.*)?|url|created_by|fixme|wikipedia"), "regex to match removable tags")
+                ("geo_tiff_folders,F", po::value<std::vector<std::string>>(&geo_tiff_folders)->multitoken()->default_value(std::vector<std::string>{"tiffs", "srtmdata", "gmteddata"}, "tiffs, srtmdata, gmteddata"), "paths to geotiff folders")
+                ("cache_limit,S", po::value<int>(&cache_limit)->default_value(1073741824), "maximum memory used to store tiles in cache")
+                ("threshold,t", po::value<double>(&interpolate_threshold)->default_value(0.5), "only used in combination with interpolation, threshold for elevation")
                 ("index-type", po::value<std::string>(&index_type)->default_value("flex_mem"), "index type for locations, needed for interpolate. see https://docs.osmcode.org/osmium/latest/osmium-index-types.html")
                 ("debug_output", "debug_output");
 
@@ -72,7 +70,7 @@ struct Config {
         }
         try {
             if (std::filesystem::exists(config_file_path)) {
-                po::store(po::parse_config_file(config_file_path.c_str(), config_file_options, false),vm);
+                po::store(po::parse_config_file(config_file_path.c_str(), config_file_options, false), vm);
                 po::notify(vm);
             }
         } catch (boost::program_options::unknown_option &e) {
@@ -111,7 +109,10 @@ struct Config {
             add_elevation = false;
         }
 
-        debug_output = vm.contains("debug_output");
+        debug_mode = vm.contains("debug_mode");
+        if (debug_mode) {
+            std::cout << "DEBUG MODE" << "\n";
+        }
     }
 };
 

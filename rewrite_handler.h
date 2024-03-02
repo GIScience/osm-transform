@@ -35,12 +35,6 @@ class RewriteHandler : public osmium::handler::Handler {
 
     void copy_tags(osmium::builder::Builder &parent, const osmium::TagList &tags, const double ele = kNoDataValue);
 
-    double getElevationCGIAR(const double lat, const double lng, const bool debug = false);
-
-    double getElevationGMTED(const double lat, const double lng, const bool debug = false);
-
-    double getElevationFromFile(const double lat, const double lng, char *filename);
-
     auto get_node_location(const osmium::object_id_type id) -> osmium::Location {
         return location_index_->get_noexcept(static_cast<osmium::unsigned_object_id_type>(id));
     }
@@ -56,9 +50,9 @@ public:
     unsigned long long total_tags_ = 0;
     unsigned long long valid_tags_ = 0;
     bool add_elevation_ = false;
-    unsigned long long new_nodes_ = 0;
     unsigned long long nodes_with_elevation_ = 0;
     unsigned long long nodes_with_elevation_not_found_ = 0;
+    unsigned long long nodes_added_by_interpolation_ = 0;
 
     explicit RewriteHandler(const osmium::object_id_type next_node_id,
                             std::unique_ptr<osmium::index::map::Map<osmium::unsigned_object_id_type, osmium::Location>> &location_index,

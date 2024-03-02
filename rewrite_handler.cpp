@@ -102,11 +102,10 @@ void RewriteHandler::newNode(osmium::object_id_type id, LocationElevation &le) {
         {
             osmium::builder::TagListBuilder nodeTagsBuilder{nodeBuilder};
             nodeTagsBuilder.add_tag("ele", std::to_string(le.ele));
-            nodeTagsBuilder.add_tag("highway", "traffic_signal");
         }
     }
+    nodes_added_by_interpolation_++;
     node_buffer_->commit();
-    new_nodes_++;
 }
 
 void RewriteHandler::relation(const osmium::Relation &relation) {
@@ -119,30 +118,4 @@ void RewriteHandler::relation(const osmium::Relation &relation) {
         copy_tags(builder, relation.tags());
     }
     buffer_->commit();
-}
-double RewriteHandler::getElevationCGIAR(const double lat, const double lng, const bool debug) {
-    const int lng_index = floor(1 + (180 + lng) / 5);
-    const int lat_index = floor(1 + (60 - lat) / 5);
-    char filename[100];
-    snprintf(filename, 24, "srtmdata/srtm_%02d_%02d.tif", lng_index, lat_index);
-    if (debug) printf("Filename for coordinates %.6f - %.6f : %s\n", lng, lat, filename);
-    return getElevationFromFile(lat, lng, filename);
-}
-double RewriteHandler::getElevationGMTED(const double lat, const double lng, const bool debug) {
-    const int lng_index = static_cast<int>(-180 + floor((180 + lng) / 30) * 30);
-    const int lat_index = static_cast<int>(-70 + floor((70 + lat) / 20) * 20);
-    const char lng_pre = lng_index < 0 ? 'W' : 'E';
-    const char lat_pre = lat_index < 0 ? 'S' : 'N';
-    char filename[100];
-    snprintf(filename, 44, "gmteddata/%02d%c%03d%c_20101117_gmted_mea075.tif", abs(lat_index), lat_pre, abs(lng_index),
-             lng_pre);
-    if (debug) printf("Filename for coordinates %.6f - %.6f : %s\n", lng, lat, filename);
-    return getElevationFromFile(lat, lng, filename);
-}
-
-double RewriteHandler::getElevationFromFile(const double lat, const double lng, char *filename) {
-    const auto geo_tiff = location_elevation_.load_tiff(filename);
-    if (geo_tiff == nullptr)
-        return kNoDataValue;
-    return geo_tiff->elevation(lng, lat);
 }

@@ -23,6 +23,7 @@ class Geotiff {
     double transform_[6] = {};
     int raster_has_no_data_ = 0;
     double raster_no_data_value_ = 0.0;
+    bool debug_mode_ = false;
 
 public:
 
@@ -33,13 +34,14 @@ public:
         return reference;
     }
 
-    explicit Geotiff(const char *filename) {
+    explicit Geotiff(const char *filename, bool debug_mode) {
         dataset_ = GDALDatasetUniquePtr(GDALDataset::FromHandle(GDALOpenShared(filename, GA_ReadOnly)));
         if (dataset_ == nullptr) return;
         const auto reference = getSpatialReference(dataset_->GetProjectionRef());
         transformation_ = OGRCreateCoordinateTransformation(&WGS84, &reference);
         dataset_->GetGeoTransform(transform_);
         raster_no_data_value_ = dataset_->GetRasterBand(1)->GetNoDataValue(&raster_has_no_data_);
+        debug_mode_ = debug_mode;
     }
 
     virtual ~Geotiff() {
@@ -53,7 +55,9 @@ public:
         const auto max_x = dataset_->GetRasterXSize();
         const auto max_y = dataset_->GetRasterYSize();
         if (x < -1 || y < -1 || x > max_x || y > max_y) {
-            std::cout << "Coordinate out of bounds: Image coordinates (" << x << ", " << y << ") POINT (" << lat << " " << lng << ")\n";
+            if (debug_mode_) {
+                std::cout << "Coordinate out of bounds: Image coordinates (" << x << ", " << y << ") POINT (" << lat << " " << lng << ")\n";
+            }
             return kNoDataValue;
         }
 
