@@ -87,15 +87,15 @@ struct Config {
             exit(0);
         }
 
-        if (!vm.contains("osm-pbf")) {
+        if (!vm.contains("osm_pbf")) {
             std::cerr << "no file name" << std::endl;
             exit(1);
         }
 
-        filename = vm["osm-pbf"].as<std::vector<std::string>>()[0];
+        filename = vm["osm_pbf"].as<std::vector<std::string>>()[0];
 
         if (!std::filesystem::exists(filename)) {
-            std::cerr << "osm-pbf does not exist " << filename << std::endl;
+            std::cerr << "osm_pbf does not exist " << filename << std::endl;
             exit(1);
         }
 
