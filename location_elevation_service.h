@@ -10,6 +10,7 @@
 
 #include <osmium/osm/location.hpp>
 
+typedef unsigned long ulong;
 
 struct LocationElevation {
     osmium::Location location;

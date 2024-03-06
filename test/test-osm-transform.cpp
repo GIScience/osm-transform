@@ -17,7 +17,8 @@ BOOST_AUTO_TEST_CASE(test_has_no_relevant_tags)
     boost::regex::icase
   );
   osmium::nwr_array<osmium::index::IdSetDense<osmium::unsigned_object_id_type>> valid_ids;
-  FirstPassHandler fph(remove_tags, valid_ids);
+  osmium::nwr_array<osmium::index::IdSetSmall<osmium::unsigned_object_id_type>> no_elevation;
+  FirstPassHandler fph(remove_tags, valid_ids, no_elevation);
 
   // Create tag list with relevant and irrelevant tags
   osmium::memory::Buffer buf1{1024, osmium::memory::Buffer::auto_grow::yes};
