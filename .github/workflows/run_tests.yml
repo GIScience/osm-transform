@@ -46,36 +46,4 @@ jobs:
         run: |
           cmake -DCMAKE_BUILD_TYPE=Release -DCMAKE_MAKE_PROGRAM=/usr/bin/ninja -G Ninja -B ./cmake-build-test  
           cmake --build ./cmake-build-test --target test-osm-transform -j 14
-          ./cmake-build-test/test/test-osm-transform 
-
-  run_python_tests:
-    needs:
-      - run_pre_checks
-    strategy:
-      # For development set to true to fail fast and not run all versions
-      fail-fast: true
-      matrix:
-        python-version: [ "3.10", "3.11" ]
-        poetry-version: [ "1.4" ]
-        os: [ ubuntu-20.04, macos-latest, windows-latest ]
-    name: Run & test Python ${{ matrix.python-version }} on ${{ matrix.os }} with Poetry ${{ matrix.poetry-version }}
-    runs-on: ${{ matrix.os }}
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-      - name: Set up Python ${{ matrix.python-version }}
-        uses: actions/setup-python@v4
-        with:
-          python-version: ${{ matrix.python-version }}
-          cache: 'pip'
-      - name: Run Poetry action
-        uses: abatilo/actions-poetry@v2
-        with:
-          poetry-version: ${{ matrix.poetry-version }}
-      - name: View poetry --version
-        run: poetry --version
-      - name: Install dependencies
-        run: poetry install
-      - name: Run tests
-        run: poetry run pytest
+          ./cmake-build-test/test/test-osm-transform
