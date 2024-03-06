@@ -36,6 +36,7 @@ private:
     ulong mem_size_ = 0;
     ulong cache_limit_ = 150000000;
     std::map<std::string, std::uint64_t> tile_size_;
+    bool initialized_ = false;
     bool debug_mode_ = false;
 
 public:
@@ -53,6 +54,9 @@ public:
 
     std::vector<LocationElevation> interpolate(osmium::Location from, osmium::Location to);
 
+    bool is_initialized() {
+        return initialized_;
+    }
 };
 
 

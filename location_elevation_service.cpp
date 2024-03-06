@@ -103,6 +103,7 @@ void LocationElevationService::load(const std::vector<std::string> &paths) {
         loaded += 1;
         pTiffs.update(loaded);
     }
+    initialized_ = true;
     std::cout << std::endl << "geotiff tiles indexed: " << rtree_.size() << std::endl;
 }
 
