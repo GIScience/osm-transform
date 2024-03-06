@@ -51,6 +51,10 @@ std::vector<LocationElevation> LocationElevationService::interpolate(osmium::Loc
 }
 
 inline void put_tiffs_in_dir(const std::string &path, std::vector<std::string> &geotiffs) {
+    if (std::filesystem::is_regular_file(path)){
+        geotiffs.push_back(path);
+        return;
+    }
     try {
         for (auto &p: fs::recursive_directory_iterator(path)) {
             auto ext = p.path().extension().string();
