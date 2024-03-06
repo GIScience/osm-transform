@@ -16,6 +16,7 @@
 
 #include "geotiff.h"
 #include "location_elevation_service.h"
+#include "location_area_service.h"
 
 class RewriteHandler : public osmium::handler::Handler {
 
@@ -30,6 +31,7 @@ class RewriteHandler : public osmium::handler::Handler {
     osmium::object_id_type next_node_id_;
     std::unique_ptr<osmium::index::map::Map<osmium::unsigned_object_id_type, osmium::Location>> &location_index_;
     LocationElevationService &location_elevation_;
+    LocationAreaService &location_area_;
     bool interpolate_;
     double interpolate_threshold_;
 
@@ -57,16 +59,21 @@ public:
     explicit RewriteHandler(const osmium::object_id_type next_node_id,
                             std::unique_ptr<osmium::index::map::Map<osmium::unsigned_object_id_type, osmium::Location>> &location_index,
                             LocationElevationService &elevation_service,
+                            LocationAreaService &area_service,
                             boost::regex &remove_tags,
                             osmium::nwr_array<osmium::index::IdSetDense<osmium::unsigned_object_id_type>> &valid_ids,
-                            osmium::nwr_array<osmium::index::IdSetSmall<osmium::unsigned_object_id_type>> &no_elevation, bool interpolate,
-                            double interpolate_threshold) : next_node_id_(next_node_id),
-                                                              location_index_(location_index),
-                                                              location_elevation_(elevation_service),
-                                                              remove_tags_(remove_tags),
-                                                              valid_ids_(valid_ids),
-                                                              no_elevation_(no_elevation),
-                                                              interpolate_(interpolate), interpolate_threshold_(interpolate_threshold) {
+                            osmium::nwr_array<osmium::index::IdSetSmall<osmium::unsigned_object_id_type>> &no_elevation,
+                            bool interpolate,
+                            double interpolate_threshold
+                            ) : next_node_id_(next_node_id),
+                                location_index_(location_index),
+                                location_elevation_(elevation_service),
+                                location_area_(area_service),
+                                remove_tags_(remove_tags),
+                                valid_ids_(valid_ids),
+                                no_elevation_(no_elevation),
+                                interpolate_(interpolate),
+                                interpolate_threshold_(interpolate_threshold) {
     }
 
     void set_buffers(osmium::memory::Buffer *output_buffer, osmium::memory::Buffer *output_node_buffer) {

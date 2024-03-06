@@ -43,7 +43,7 @@ int main(int argc, char **argv) {
         osmium::nwr_array<osmium::index::IdSetDense<osmium::unsigned_object_id_type>> valid_ids;
         osmium::nwr_array<osmium::index::IdSetSmall<osmium::unsigned_object_id_type>> no_elevation;
 
-        first_pass(config, remove_tag_regex, valid_ids, no_elevation);
+//        first_pass(config, remove_tag_regex, valid_ids, no_elevation);
         second_pass(config, remove_tag_regex, valid_ids, no_elevation);
         show_memory_used();
     } catch (const exception &e) {
@@ -90,7 +90,22 @@ void second_pass(Config &config, boost::regex &remove_tag_regex,
                  osmium::nwr_array<osmium::index::IdSetDense<osmium::unsigned_object_id_type>> &valid_ids,
                  osmium::nwr_array<osmium::index::IdSetSmall<osmium::unsigned_object_id_type>> &no_elevation) {
     LocationElevationService location_elevation_service(config.cache_limit, config.debug_mode);
-    location_elevation_service.load(config.geo_tiff_folders);
+    if (config.add_elevation) {
+        auto start = chrono::steady_clock::now();
+        location_elevation_service.load(config.geo_tiff_folders);
+        printf("Processed in %.3f s\n\n", chrono::duration_cast<chrono::milliseconds>(chrono::steady_clock::now() - start).count() / 1000.0);
+    }
+
+    LocationAreaService location_area_service(config.debug_mode);
+    if (!config.area_mapping.empty()) {
+        auto start = chrono::steady_clock::now();
+        location_area_service.load(config.area_mapping);
+        printf("Processed in %.3f s\n\n", chrono::duration_cast<chrono::milliseconds>(chrono::steady_clock::now() - start).count() / 1000.0);
+        // DEBUG
+        location_area_service.get_area(osmium::Location(6.306152343750001, 50.05713877598692));
+//        exit(0);
+        // END DEBUG
+    }
 
     const auto& map_factory = osmium::index::MapFactory<osmium::unsigned_object_id_type, osmium::Location>::instance();
     auto location_index = map_factory.create_map(config.index_type);
@@ -107,7 +122,7 @@ void second_pass(Config &config, boost::regex &remove_tag_regex,
     osmium::io::Header header(reader.header());
     header.set("generator", "osm-transform_ v0.1.0");
 
-    RewriteHandler handler(1000000000, location_index, location_elevation_service, remove_tag_regex, valid_ids, no_elevation, config.interpolate, config.interpolate_threshold);
+    RewriteHandler handler(1000000000, location_index, location_elevation_service, location_area_service, remove_tag_regex, valid_ids, no_elevation, config.interpolate, config.interpolate_threshold);
     handler.add_elevation_ = config.add_elevation;
 
 

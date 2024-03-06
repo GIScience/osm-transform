@@ -29,7 +29,7 @@ void RewriteHandler::node(const osmium::Node &node) {
         builder.set_id(node.id());
         builder.set_location(node.location());
         double ele = kNoDataValue;
-        if (add_elevation_ ) { //&& !no_elevation_.nodes().get(node.id())) {
+        if (add_elevation_ && location_elevation_.is_initialized()) { //&& !no_elevation_.nodes().get(node.id())) {
             if ((ele = location_elevation_.elevation(node.location(), true)) != kNoDataValue) {
                 nodes_with_elevation_++;
             } else {
@@ -58,7 +58,7 @@ void RewriteHandler::way(const osmium::Way &way) {
 }
 void RewriteHandler::add_refs(const osmium::Way &way, osmium::builder::Builder &builder) {
     osmium::builder::WayNodeListBuilder wnl_builder{builder};
-    if (interpolate_ && !no_elevation_.ways().get(way.id())) {
+    if (interpolate_ && location_elevation_.is_initialized() && !no_elevation_.ways().get(way.id())) {
         interpolate(way, wnl_builder);
         return;
     }

@@ -15,6 +15,7 @@ struct Config {
     int cache_limit;
     double interpolate_threshold;
     std::string index_type;
+    std::string area_mapping;
 
     auto cmd(int argc, char **argv) {
 
@@ -37,6 +38,7 @@ struct Config {
                 ("geo_tiff_folders,F", po::value<std::vector<std::string>>(&geo_tiff_folders)->multitoken()->default_value(std::vector<std::string>{"tiffs", "srtmdata", "gmteddata"}, "tiffs, srtmdata, gmteddata"), "paths to geotiff folders")
                 ("cache_limit,S", po::value<int>(&cache_limit)->default_value(1073741824), "maximum memory used to store tiles in cache")
                 ("threshold,t", po::value<double>(&interpolate_threshold)->default_value(0.5), "only used in combination with interpolation, threshold for elevation")
+                ("area_mapping,a", po::value<std::string>(&area_mapping), "path to area mapping file to use")
                 ("config_file,f", po::value<std::string>(&config_file_path), "path to config file to use")
                 ("index_type", po::value<std::string>(&index_type)->default_value("flex_mem"), "index type for locations, needed for interpolate. see https://docs.osmcode.org/osmium/latest/osmium-index-types.html")
                 ("debug_mode,d", "debug_mode");
@@ -103,7 +105,7 @@ struct Config {
             interpolate = true;
         }
 
-        if (vm.contains("skip")) {
+        if (vm.contains("skip_elevation")) {
             add_elevation = false;
         }
 
