@@ -63,7 +63,7 @@ private:
                         mapping_index_[i] = id;
                     } else {
                         mapping_index_[i] = area_id_multiple_;
-                        mapping_area_.insert({i, AreaIntersect(id, poGeom->Intersection(&e))});
+                        mapping_area_.insert({i, AreaIntersect{id, poGeom->Intersection(&e)}});
                     }
                 }
             }
