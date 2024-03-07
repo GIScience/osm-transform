@@ -12,10 +12,14 @@ struct Config {
     bool add_elevation = true;
     bool interpolate = false;
     bool debug_mode = false;
-    int cache_limit;
-    double interpolate_threshold;
+    std::uint32_t cache_limit;
+    std::float_t interpolate_threshold;
     std::string index_type;
     std::string area_mapping;
+    std::uint16_t area_mapping_id_col;
+    std::uint16_t area_mapping_geo_col;
+    std::string area_mapping_geo_type;
+    bool area_mapping_has_header;
 
     auto cmd(int argc, char **argv) {
 
@@ -36,9 +40,13 @@ struct Config {
                 ("interpolate,i", "interpolate intermediate nodes")
                 ("remove_tag,T", po::value<std::string>(&remove_tag_regex_str)->default_value("(.*:)?source(:.*)?|(.*:)?note(:.*)?|url|created_by|fixme|wikipedia"), "regex to match removable tags")
                 ("geo_tiff_folders,F", po::value<std::vector<std::string>>(&geo_tiff_folders)->multitoken()->default_value(std::vector<std::string>{"tiffs", "srtmdata", "gmteddata"}, "tiffs, srtmdata, gmteddata"), "paths to geotiff folders")
-                ("cache_limit,S", po::value<int>(&cache_limit)->default_value(1073741824), "maximum memory used to store tiles in cache")
-                ("threshold,t", po::value<double>(&interpolate_threshold)->default_value(0.5), "only used in combination with interpolation, threshold for elevation")
+                ("cache_limit,S", po::value<std::uint32_t>(&cache_limit)->default_value(1073741824), "maximum memory used to store tiles in cache")
+                ("threshold,t", po::value<std::float_t>(&interpolate_threshold)->default_value(0.5), "only used in combination with interpolation, threshold for elevation")
                 ("area_mapping,a", po::value<std::string>(&area_mapping), "path to area mapping file to use")
+                ("area_mapping_id_col", po::value<std::uint16_t>(&area_mapping_id_col)->default_value(0), "column number (zero-based) in area mapping file of area id")
+                ("area_mapping_geo_col", po::value<std::uint16_t>(&area_mapping_geo_col)->default_value(1), "column number (zero-based) in area mapping file of area geometry")
+                ("area_mapping_geo_type", po::value<std::string>(&area_mapping_geo_type)->default_value("wkt"), "type of geometry string in area mapping file")
+                ("area_mapping_has_header", po::value<bool>(&area_mapping_has_header)->default_value(true), "area mapping file has header row")
                 ("config_file,f", po::value<std::string>(&config_file_path), "path to config file to use")
                 ("index_type", po::value<std::string>(&index_type)->default_value("flex_mem"), "index type for locations, needed for interpolate. see https://docs.osmcode.org/osmium/latest/osmium-index-types.html")
                 ("debug_mode,d", "debug_mode");
