@@ -96,7 +96,7 @@ void second_pass(Config &config, boost::regex &remove_tag_regex,
         printf("Processed in %.3f s\n\n", chrono::duration_cast<chrono::milliseconds>(chrono::steady_clock::now() - start).count() / 1000.0);
     }
 
-    LocationAreaService location_area_service(config.debug_mode);
+    LocationAreaService location_area_service(config.debug_mode, config.area_mapping_id_col, config.area_mapping_geo_col, config.area_mapping_geo_type, config.area_mapping_has_header);
     if (!config.area_mapping.empty()) {
         auto start = chrono::steady_clock::now();
         location_area_service.load(config.area_mapping);
