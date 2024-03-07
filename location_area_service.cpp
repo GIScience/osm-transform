@@ -20,7 +20,7 @@ inline bool geo_col_check(std::string& data, std::string& geo_type) {
 }
 
 void LocationAreaService::load(const std::string& path) {
-    std::cout << "Load area mapping ..." << std::endl;
+    std::cout << "Load area mapping..." << std::endl;
 
     std::ifstream in(path.c_str());
     if (!in.is_open()) {
@@ -125,7 +125,6 @@ void LocationAreaService::add_area_to_mapping_index(area_id_t id, const std::str
     std::uint32_t contained_grid_tiles = 0;
     for (grid_id_t i = 0; i < grid_size_; i++) {
         OGRPolygon e = grid_[i];
-
         if (e.Intersects(poGeom)) {
             intersecting_grid_tiles++;
             if (poGeom->Contains(&e)) {
@@ -140,8 +139,7 @@ void LocationAreaService::add_area_to_mapping_index(area_id_t id, const std::str
     if (debug_mode_) {
         std::cout << " => intersecting grid tiles: " << intersecting_grid_tiles << ", contained grid tiles: " << contained_grid_tiles << std::endl;
     }
-
-    OGRGeometryFactory::destroyGeometry	(poGeom);
+    OGRGeometryFactory::destroyGeometry(poGeom);
 }
 
 std::vector<std::string> LocationAreaService::get_area(osmium::Location l) {

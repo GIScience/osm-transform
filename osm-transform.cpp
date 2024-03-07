@@ -38,12 +38,11 @@ int main(int argc, char **argv) {
     Config config;
     config.cmd(argc, argv);
     try {
-
         boost::regex remove_tag_regex(config.remove_tag_regex_str, boost::regex::icase);
         osmium::nwr_array<osmium::index::IdSetDense<osmium::unsigned_object_id_type>> valid_ids;
         osmium::nwr_array<osmium::index::IdSetSmall<osmium::unsigned_object_id_type>> no_elevation;
 
-//        first_pass(config, remove_tag_regex, valid_ids, no_elevation);
+        first_pass(config, remove_tag_regex, valid_ids, no_elevation);
         second_pass(config, remove_tag_regex, valid_ids, no_elevation);
         show_memory_used();
     } catch (const exception &e) {
@@ -101,10 +100,6 @@ void second_pass(Config &config, boost::regex &remove_tag_regex,
         auto start = chrono::steady_clock::now();
         location_area_service.load(config.area_mapping);
         printf("Processed in %.3f s\n\n", chrono::duration_cast<chrono::milliseconds>(chrono::steady_clock::now() - start).count() / 1000.0);
-        // DEBUG
-        location_area_service.get_area(osmium::Location(6.306152343750001, 50.05713877598692));
-//        exit(0);
-        // END DEBUG
     }
 
     const auto& map_factory = osmium::index::MapFactory<osmium::unsigned_object_id_type, osmium::Location>::instance();
@@ -208,8 +203,7 @@ void second_pass(Config &config, boost::regex &remove_tag_regex,
                        static_cast<double>(valid_nodes) * 100, location_elevation_service.found_gmted_);
         printf("Failed Elevation: %12.2f %% (%llu)\n",
                static_cast<double>(handler.nodes_with_elevation_not_found_) /
-                       static_cast<double>(valid_nodes) * 100,
-               handler.nodes_with_elevation_not_found_);
+                       static_cast<double>(valid_nodes) * 100, handler.nodes_with_elevation_not_found_);
         if (valid_nodes > handler.nodes_with_elevation_ + handler.nodes_with_elevation_not_found_) {
             std::cout << "\nNotice: More nodes were referenced in ways & relations than were found in the data. This typically happens\n"
                          "with OSM extracts with nodes omitted for ways & relations extending beyond the extent of the extract.\n";
