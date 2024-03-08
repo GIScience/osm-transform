@@ -35,7 +35,9 @@ class RewriteHandler : public osmium::handler::Handler {
     bool interpolate_;
     double interpolate_threshold_;
 
-    void copy_tags(osmium::builder::Builder &parent, const osmium::TagList &tags, const double ele = kNoDataValue);
+    void copy_tags(osmium::builder::Builder &parent, const osmium::TagList &tags, double ele, const std::vector<std::string>& countries);
+    void copy_tags(osmium::builder::Builder &parent, const osmium::TagList &tags);
+
 
     auto get_node_location(const osmium::object_id_type id) -> osmium::Location {
         return location_index_->get_noexcept(static_cast<osmium::unsigned_object_id_type>(id));
