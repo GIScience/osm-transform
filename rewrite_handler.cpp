@@ -6,19 +6,34 @@
 #include <osmium/osm/tag.hpp>
 #include <osmium/osm/way.hpp>
 
-void RewriteHandler::copy_tags(osmium::builder::Builder &parent, const osmium::TagList &tags, const double ele) {
+void RewriteHandler::copy_tags(osmium::builder::Builder &parent, const osmium::TagList &tags)  {
     osmium::builder::TagListBuilder builder{parent};
     for (const auto &tag: tags) {
         total_tags_++;
         if (!boost::regex_match(tag.key(), remove_tags_)) {
             const auto key = tag.key();
-            if (strcmp(key, "ele") != 0 || !add_elevation_) {
-                valid_tags_++;
-                builder.add_tag(tag);
+            valid_tags_++;
+            builder.add_tag(tag);
+        }
+    }
+}
+
+void RewriteHandler::copy_tags(osmium::builder::Builder &parent, const osmium::TagList &tags, const double ele, const std::vector<std::string>& countries) {
+    osmium::builder::TagListBuilder builder{parent};
+    for (const auto &tag: tags) {
+        total_tags_++;
+        if (!boost::regex_match(tag.key(), remove_tags_)) {
+            const auto key = tag.key();
+            if (strcmp(key, "country") == 0 || (strcmp(key, "ele") == 0 && add_elevation_)) {
+                continue;
             }
+
+            valid_tags_++;
+            builder.add_tag(tag);
         }
     }
     if (ele > kNoDataValue) { builder.add_tag("ele", std::to_string(ele)); }
+    if (!countries.empty()) { builder.add_tag("country", boost::algorithm::join(countries, ",")); }
 }
 
 void RewriteHandler::node(const osmium::Node &node) {
@@ -36,7 +51,8 @@ void RewriteHandler::node(const osmium::Node &node) {
                 nodes_with_elevation_not_found_++;
             }
         }
-        copy_tags(builder, node.tags(), ele);
+        auto countries = location_area_.get_area(node.location());
+        copy_tags(builder, node.tags(), ele, countries);
         if (interpolate_) {
             location_index_->set(static_cast<osmium::unsigned_object_id_type>(node.id()), node.location());
         }
