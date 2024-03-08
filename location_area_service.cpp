@@ -8,7 +8,9 @@
 
 namespace fs = std::filesystem;
 
-inline bool geo_col_check(std::string& data, std::string& geo_type) {
+const std::string LocationAreaService::delim_str_ = ";";
+
+inline bool geo_col_check(std::string &data, std::string &geo_type) {
     if (geo_type == "wkt") {
         return data.starts_with("MULTIPOLYGON") || data.starts_with("POLYGON");
     }
@@ -19,8 +21,62 @@ inline bool geo_col_check(std::string& data, std::string& geo_type) {
     return false;
 }
 
-void LocationAreaService::load(const std::string& path) {
+inline std::vector<std::string> split_str(std::string &line, const std::string &delim) {
+    std::vector<std::string> tokens;
+    size_t pos;
+    while ((pos = line.find(delim)) != std::string::npos) {
+        tokens.push_back(line.substr(0, pos));
+        line.erase(0, pos + delim.length());
+    }
+    tokens.push_back(line);
+    return tokens;
+}
+
+void LocationAreaService::load(const std::string &path) {
     std::cout << "Load area mapping..." << std::endl;
+
+    auto area_file_path = processed_file_prefix_ + "area.csv";
+    auto index_file_path = processed_file_prefix_ + "index.csv";
+    auto id_file_path = processed_file_prefix_ + "id.csv";
+
+    if (std::filesystem::exists(area_file_path) && std::filesystem::exists(id_file_path) && std::filesystem::exists(index_file_path)) {
+        std::string l;
+        std::ifstream area_file(area_file_path.c_str());
+        if (area_file.is_open()) {
+            while (getline(area_file, l)) {
+                auto row = split_str(l, delim_str_);
+                OGRGeometry *poGeom;
+                OGRErr eErr = OGRERR_NONE;
+                eErr = OGRGeometryFactory::createFromWkt(row[2].c_str(), nullptr, &poGeom);
+                if (eErr != OGRERR_NONE) {
+                    std::cout << "WARNING: processed area mapping file is corrupted!" << std::endl;
+                    continue;
+                }
+                mapping_area_.insert({std::stoi(row[0]), AreaIntersect{static_cast<area_id_t>(std::stoi(row[1])), poGeom}});
+            }
+            area_file.close();
+        }
+        std::ifstream index_file(index_file_path.c_str());
+        if (index_file.is_open()) {
+            while (getline(index_file, l)) {
+                auto row = split_str(l, delim_str_);
+                mapping_index_[std::stoi(row[0])] = std::stoi(row[1]);
+            }
+            index_file.close();
+        }
+        std::ifstream id_file(id_file_path.c_str());
+        if (id_file.is_open()) {
+            while (getline(id_file, l)) {
+                auto row = split_str(l, delim_str_);
+                mapping_id_[std::stoi(row[0])] = row[1];
+            }
+            id_file.close();
+        }
+        std::cout << "Successfully loaded from previously processed area mappings." << std::endl;
+        output_mapping();
+        initialized_ = true;
+        return;
+    }
 
     std::ifstream in(path.c_str());
     if (!in.is_open()) {
@@ -61,37 +117,66 @@ void LocationAreaService::load(const std::string& path) {
         }
         index++;
     }
-    if (debug_mode_) {
-        std::uint32_t no_area_count = 0;
-        std::uint32_t single_area_count = 0;
-        std::uint32_t multiple_area_count = 0;
-        std::uint32_t split_geos_count = 0;
-        for (const auto v: mapping_index_) {
-            switch (v) {
-                case 0:
-                    no_area_count++;
-                    break;
-                default:
-                    single_area_count++;
-                    break;
-                case area_id_multiple_:
-                    multiple_area_count++;
-                    break;
-            }
-        }
+
+    std::cout << "Save processed area mapping" << std::endl;
+    std::ofstream o_area_file(area_file_path);
+    if (o_area_file.is_open()) {
         for (const auto &[k, a]: mapping_area_) {
-            //            std::cout << "area[" << k << "] = (" << a.id << ", " << a.geo << ") " << std::endl;
-            split_geos_count++;
+            o_area_file << k << delim_str_ << a.id << delim_str_ << a.geo->exportToWkt(OGRWktOptions(), nullptr) << std::endl;
         }
-        std::cout << "Grid [ NO AREA: " << no_area_count << " SINGLE: " << single_area_count << " MULTIPLE: " << multiple_area_count << " ] Split geometries: " << split_geos_count << std::endl;
+        o_area_file.close();
     }
+    std::ofstream o_id_file(id_file_path);
+    if (o_id_file.is_open()) {
+        for (const auto &[k, a]: mapping_id_) {
+            o_id_file << k << delim_str_ << a << std::endl;
+        }
+        o_id_file.close();
+    }
+    std::ofstream o_index_file(index_file_path);
+    if (o_index_file.is_open()) {
+        for (auto k = 0; auto a: mapping_index_) {
+            if (a != 0) {
+                o_index_file << k << delim_str_ << a << std::endl;
+            }
+            k++;
+        }
+        o_index_file.close();
+    }
+
+    output_mapping();
     if (valid_rows > 0) {
         std::cout << "Areas indexed: " << valid_rows << std::endl;
         initialized_ = true;
     }
 }
 
-void LocationAreaService::add_area_to_mapping_index(area_id_t id, const std::string& geometry) {
+void LocationAreaService::output_mapping() {
+    std::uint32_t no_area_count = 0;
+    std::uint32_t single_area_count = 0;
+    std::uint32_t multiple_area_count = 0;
+    std::uint32_t split_geos_count = 0;
+    for (const auto v: mapping_index_) {
+        switch (v) {
+            case 0:
+                no_area_count++;
+                break;
+            default:
+                single_area_count++;
+                break;
+            case area_id_multiple_:
+                multiple_area_count++;
+                break;
+        }
+    }
+    for (const auto &[k, a]: mapping_area_) {
+        //            std::cout << "area[" << k << "] = (" << a.id << ", " << a.geo << ") " << std::endl;
+        split_geos_count++;
+    }
+    std::cout << "Areas: " << mapping_id_.size() << ", Split geometries: " << split_geos_count << ", Grid: [ NO AREA: " << no_area_count << " SINGLE: " << single_area_count << " MULTIPLE: " << multiple_area_count << " ] " << std::endl;
+}
+
+void LocationAreaService::add_area_to_mapping_index(area_id_t id, const std::string &geometry) {
     OGRGeometry *poGeom;
     OGRErr eErr = OGRERR_NONE;
     if (geo_type_ == "wkt") {
@@ -147,18 +232,18 @@ std::vector<std::string> LocationAreaService::get_area(osmium::Location l) {
     if (!initialized_) {
         return areas;
     }
-    grid_id_t grid_index = ((int)l.lat() + 90) * 360 + ((int)l.lon() + 180);
+    grid_id_t grid_index = ((int) l.lat() + 90) * 360 + ((int) l.lon() + 180);
     OGRPoint point(l.lon(), l.lat());
     if (debug_mode_) {
         std::cout << "Lookup point: (" << l.lon() << " " << l.lat() << ") grid index " << grid_index << " => " << mapping_index_[grid_index] << std::endl;
     }
     switch (mapping_index_[grid_index]) {
-        case 0: // no area
+        case 0:// no area
             break;
-        default: // single area
+        default:// single area
             areas.push_back(mapping_id_[mapping_index_[grid_index]]);
             break;
-        case area_id_multiple_: // multiple areas
+        case area_id_multiple_:// multiple areas
             auto range = mapping_area_.equal_range(grid_index);
             for (auto i = range.first; i != range.second; ++i) {
                 if (i->second.geo->Contains(&point)) {
@@ -169,7 +254,7 @@ std::vector<std::string> LocationAreaService::get_area(osmium::Location l) {
     }
     if (debug_mode_) {
         std::cout << "Result: ";
-        for (auto const& area : areas) {
+        for (auto const &area: areas) {
             std::cout << area;
         }
         std::cout << std::endl;
@@ -177,7 +262,7 @@ std::vector<std::string> LocationAreaService::get_area(osmium::Location l) {
     return areas;
 }
 
-LocationAreaService::LocationAreaService(bool debug_mode, std::uint16_t id_col, std::uint16_t geo_col, std::string& geo_type, bool file_has_header) : debug_mode_(debug_mode), id_col_(id_col), geo_col_(geo_col), geo_type_(geo_type), file_has_header_(file_has_header) {
+LocationAreaService::LocationAreaService(bool debug_mode, std::uint16_t id_col, std::uint16_t geo_col, std::string &geo_type, bool file_has_header, std::string &processed_file_prefix) : debug_mode_(debug_mode), id_col_(id_col), geo_col_(geo_col), geo_type_(geo_type), file_has_header_(file_has_header), processed_file_prefix_(processed_file_prefix) {
     GDALAllRegister();
     for (std::uint16_t grid_lat = 0; grid_lat < 180; grid_lat++) {
         for (std::uint16_t grid_lon = 0; grid_lon < 360; grid_lon++) {

@@ -19,6 +19,7 @@ class LocationAreaService {
 private:
     static const grid_id_t grid_size_ = 64800;
     static const area_id_t area_id_multiple_ = std::numeric_limits<area_id_t>::max();
+    static const std::string delim_str_;
 
     OGRPolygon grid_[grid_size_];
     area_id_t mapping_index_[grid_size_] = {0};
@@ -28,6 +29,7 @@ private:
     std::uint16_t id_col_;
     std::uint16_t geo_col_;
     std::string geo_type_;
+    std::string processed_file_prefix_;
     bool file_has_header_ = false;
 
     bool debug_mode_ = false;
@@ -35,8 +37,10 @@ private:
 
     void add_area_to_mapping_index(area_id_t id, const std::string& geometry);
 
+    void output_mapping();
+
 public:
-    explicit LocationAreaService(bool debug_mode, std::uint16_t id_col, std::uint16_t geo_col, std::string& geo_type, bool file_has_header);
+    explicit LocationAreaService(bool debug_mode, std::uint16_t id_col, std::uint16_t geo_col, std::string& geo_type, bool file_has_header, std::string& processed_file_prefix);
 
     void load(const std::string& path);
 
