@@ -1,5 +1,6 @@
 #include "rewrite_handler.h"
 
+#include <boost/algorithm/string.hpp>
 #include <osmium/builder/osm_object_builder.hpp>
 #include <osmium/osm/node.hpp>
 #include <osmium/osm/relation.hpp>
