@@ -8,6 +8,7 @@
 
 #define private public
 #include "../firstpass_handler.h"
+#include "../location_area_service.h"
 
 
 BOOST_AUTO_TEST_CASE(test_has_no_relevant_tags)
@@ -34,4 +35,17 @@ BOOST_AUTO_TEST_CASE(test_has_no_relevant_tags)
   tlb2.add_tag("landuse","forest");
   osmium::TagList &tags_without_relevant_tags = buf2.get<osmium::TagList>(0);
   BOOST_TEST(fph.has_no_relevant_tags(tags_without_relevant_tags) == true);
+}
+
+BOOST_AUTO_TEST_CASE(test_location_area_service)
+{
+    std::string geo_type("wkt");
+    LocationAreaService location_area_service(true, 0, 2, geo_type, true);
+    location_area_service.load("../../mapping_test.csv");
+
+    osmium::Location location = osmium::Location(6.306152343750001, 50.05713877598692);
+    std::vector<std::string> areas = location_area_service.get_area(location);
+
+    BOOST_TEST(areas.size() == 1);
+    BOOST_TEST(areas[0] == "DEU");
 }
