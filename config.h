@@ -20,6 +20,7 @@ struct Config {
     std::uint16_t area_mapping_geo_col;
     std::string area_mapping_geo_type;
     bool area_mapping_has_header;
+    std::string area_mapping_processed_file_prefix;
 
     auto cmd(int argc, char **argv) {
 
@@ -34,6 +35,7 @@ struct Config {
                 ("help,h", "produce help message");
 
         po::options_description config("Configuration");
+
         config.add_options()
                 ("osm_pbf,p", po::value<std::vector<std::string>>(), "path to osm pbf file to process")
                 ("skip_elevation,e", "skip elevation data merge")
@@ -45,12 +47,12 @@ struct Config {
                 ("area_mapping,a", po::value<std::string>(&area_mapping), "path to area mapping file to use")
                 ("area_mapping_id_col", po::value<std::uint16_t>(&area_mapping_id_col)->default_value(0), "column number (zero-based) in area mapping file of area id")
                 ("area_mapping_geo_col", po::value<std::uint16_t>(&area_mapping_geo_col)->default_value(1), "column number (zero-based) in area mapping file of area geometry")
-                ("area_mapping_geo_type", po::value<std::string>(&area_mapping_geo_type)->default_value("wkt"), "type of geometry string in area mapping file")
+                ("area_mapping_geo_type", po::value<std::string>(&area_mapping_geo_type)->default_value("wkt"), "type of geometry string in area mapping file (possible values: 'wkt' (default), 'geojson')")
                 ("area_mapping_has_header", po::value<bool>(&area_mapping_has_header)->default_value(true), "area mapping file has header row")
+                ("area_mapping_processed_file_prefix", po::value<std::string>(&area_mapping_processed_file_prefix)->default_value("mapping_"), "file prefix for processed mapping files")
                 ("config_file,f", po::value<std::string>(&config_file_path), "path to config file to use")
                 ("index_type", po::value<std::string>(&index_type)->default_value("flex_mem"), "index type for locations, needed for interpolate. see https://docs.osmcode.org/osmium/latest/osmium-index-types.html")
                 ("debug_mode,d", "debug_mode");
-
         // Hidden options, will be allowed both on command line and
         // in config file, but will not be shown to the user.
         po::options_description hidden("Hidden options");
