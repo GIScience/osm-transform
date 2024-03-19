@@ -3,7 +3,7 @@
 #include <osmium/memory/buffer.hpp>
 #include <osmium/visitor.hpp>
 
-#include "../rewrite_handler.h"
+#include "rewrite_handler.h"
 
 #include "test_utils.h"
 

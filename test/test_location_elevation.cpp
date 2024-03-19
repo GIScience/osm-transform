@@ -1,6 +1,6 @@
 #include <boost/test/unit_test.hpp>
 
-#include "../location_elevation_service.h"
+#include "location_elevation_service.h"
 
 BOOST_AUTO_TEST_SUITE( test_locacion_elevation )
 BOOST_AUTO_TEST_CASE( test_lookup ) {

@@ -1,6 +1,6 @@
 #include <boost/test/unit_test.hpp>
 
-#include "../location_area_service.h"
+#include "location_area_service.h"
 
 BOOST_AUTO_TEST_SUITE( test_locacion_area )
 BOOST_AUTO_TEST_CASE( test_location_area_service )
