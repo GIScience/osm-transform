@@ -14,3 +14,4 @@ gmted*/*
 gmteddata
 cmake-build-debug
 /cmake-build-release/
+/tiffs/

@@ -8,7 +8,7 @@
 #include <osmium/visitor.hpp>
 
 #define private public
-#include "../firstpass_handler.h"
+#include "firstpass_handler.h"
 #include "test_utils.h"
 
 BOOST_AUTO_TEST_SUITE( test_first_pass )

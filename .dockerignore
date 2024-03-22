@@ -1,4 +1,7 @@
-**/*.tif
-**/*.pbf
-Dockerfile
-.venv*
+# Ignore everything
+*
+
+# Allow
+!CMakeLists.txt
+!src
+!test

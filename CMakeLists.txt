@@ -9,15 +9,27 @@ add_definitions( -DPROJECT_VERSION="${PROJECT_VERSION}" -DPROJECT_NAME="${PROJEC
 add_definitions("-DBOOST_ALLOW_DEPRECATED_HEADERS")
 
 set(CMAKE_CXX_STANDARD 23)
+set(CMAKE_CONFIGURATION_TYPES "Debug,Release" CACHE STRING "Configuration Types" FORCE)
+
+option(BUILD_TESTING "Build the tests" ON)
 
 # https://cmake.org/cmake/help/git-master/module/FindBoost.html
 find_package(Boost REQUIRED regex program_options)
 find_package(GDAL REQUIRED)
 
-file(GLOB sources CONFIGURE_DEPENDS *.h *.cpp)
-add_executable(${PROJECT_NAME} ${sources})
+include_directories(${PROJECT_BINARY_DIR}/src)
 
-target_link_libraries(${PROJECT_NAME} PRIVATE z bz2 expat GDAL::GDAL Boost::regex Boost::program_options)
+set(SOURCE_FILES 
+    location_area_service.cpp
+    location_elevation_service.cpp
+    rewrite_handler.cpp
+)
 
-# unit tests
-add_subdirectory(test)
+add_subdirectory(src)
+
+if (BUILD_TESTING)
+    enable_testing()
+    add_subdirectory(test)
+endif()
+
+
