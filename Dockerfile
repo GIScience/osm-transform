@@ -18,10 +18,10 @@ RUN set -eux; \
  
 COPY . /osm-transform/
  
-RUN set-eux; \
+RUN set -eux; \
    cmake -DCMAKE_BUILD_TYPE=Release -DCMAKE_MAKE_PROGRAM=/usr/bin/ninja -G Ninja -S /osm-transform -B /osm-transform/cmake-build ; \
    cmake --build /osm-transform/cmake-build --target osm-transform ; \
    cmake --install /osm-transform/cmake-build
 
-#ENTRYPOINT ["/src/cmake-build/osm-transform"]
 WORKDIR /osm
+ENTRYPOINT ["/usr/local/bin/osm-transform"]:
