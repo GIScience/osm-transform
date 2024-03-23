@@ -172,7 +172,7 @@ void LocationAreaService::output_mapping() {
         //            std::cout << "area[" << k << "] = (" << a.id << ", " << a.geo << ") " << std::endl;
         split_geos_count++;
     }
-    std::cout << "Areas: " << mapping_id_.size() << ", Split geometries: " << split_geos_count << ", Grid: [ NO AREA: " << no_area_count << " SINGLE: " << single_area_count << " MULTIPLE: " << multiple_area_count << " ] " << std::endl;
+    std::cout << "Areas: " << mapping_id_.size() << ", Split geometries: " << split_geos_count << ", Grid: [ empty: " << no_area_count << ", single: " << single_area_count << ", multiple: " << multiple_area_count << " ] " << std::endl;
 }
 
 void LocationAreaService::add_area_to_mapping_index(area_id_t id, const std::string &geometry) {
