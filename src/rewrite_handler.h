@@ -57,6 +57,9 @@ public:
     unsigned long long nodes_with_elevation_ = 0;
     unsigned long long nodes_with_elevation_not_found_ = 0;
     unsigned long long nodes_added_by_interpolation_ = 0;
+    unsigned long long nodes_with_single_country_ = 0;
+    unsigned long long nodes_with_multiple_countries_ = 0;
+    unsigned long long nodes_with_no_country_ = 0;
 
     explicit RewriteHandler(const osmium::object_id_type next_node_id,
                             std::unique_ptr<osmium::index::map::Map<osmium::unsigned_object_id_type, osmium::Location>> &location_index,
@@ -91,6 +94,13 @@ public:
     void way(const osmium::Way &way);
 
     void relation(const osmium::Relation &relation);
+
+    void printCountryStats() {
+        std::cout << "Nodes with no country: " << nodes_with_no_country_ << ", "
+                  << "single country: " << nodes_with_single_country_ << ", "
+                  << "multiple countries: " << nodes_with_multiple_countries_
+                  << std::endl;
+    };
 };
 
 

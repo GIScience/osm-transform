@@ -175,6 +175,8 @@ void second_pass(Config &config, boost::regex &remove_tag_regex,
         std::cout << "About " << mem << " KBytes used for node location index (in main memory or on disk).\n";
     }
 
+    handler.printCountryStats();
+
     const auto end = chrono::steady_clock::now();
     printf("Processed in %.3f s\n", chrono::duration_cast<chrono::milliseconds>(end - start).count() / 1000.0);
 
@@ -185,7 +187,7 @@ void second_pass(Config &config, boost::regex &remove_tag_regex,
            reduction, static_cast<float>(reduction) / static_cast<float>(insize) * 100);
     if (config.add_elevation) {
         auto valid_nodes = valid_ids.nodes().size();
-        printf("All Nodes: %19lu Nodes\n",valid_nodes);
+        printf("All Nodes: %19llu Nodes\n", valid_nodes);
         if (config.interpolate) {
             printf("Added Nodes: %17llu Nodes\n",handler.nodes_added_by_interpolation_);
         }
