@@ -9,7 +9,6 @@
 
 #include <boost/regex.hpp>
 
-#include <osmium/io/any_input.hpp>
 #include <osmium/io/any_output.hpp>
 #include <osmium/util/file.hpp>
 #include <osmium/util/progress_bar.hpp>
@@ -74,7 +73,6 @@ void first_pass(Config &config, boost::regex &remove_tag_regex,
     printf("Processed in %.3f s\n\n", chrono::duration_cast<chrono::milliseconds>(chrono::steady_clock::now() - start).count() / 1000.0);
 }
 
-
 void copy(const std::string& input, osmium::io::Writer& writer) {
     osmium::io::Reader reader{input};
     osmium::ProgressBar progress{reader.file_size(), osmium::isatty(2)};
@@ -120,7 +118,6 @@ void second_pass(Config &config, boost::regex &remove_tag_regex,
     RewriteHandler handler(1000000000, location_index, location_elevation_service, location_area_service, remove_tag_regex, valid_ids, no_elevation, config.interpolate, config.interpolate_threshold);
     handler.add_elevation_ = config.add_elevation;
 
-
     if (config.interpolate) {
         auto wr_output = remove_extension(std::filesystem::path(config.filename.c_str()).stem()) + ".ors.wr.pbf";
         osmium::io::Writer wr_writer{wr_output, header, osmium::io::overwrite::allow};
@@ -144,9 +141,7 @@ void second_pass(Config &config, boost::regex &remove_tag_regex,
         progress.done();
         reader.close();
 
-
         osmium::io::Writer writer{output, header, osmium::io::overwrite::allow};
-        auto total_size = std::filesystem::file_size(n_output) + std::filesystem::file_size(wr_output);
         copy(n_output, writer);
         std::remove(n_output.c_str());
         copy(wr_output, writer);
@@ -213,5 +208,3 @@ void second_pass(Config &config, boost::regex &remove_tag_regex,
     }
     cout << endl;
 }
-
-
