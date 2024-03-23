@@ -91,7 +91,6 @@ void LocationAreaService::load(const std::string &path) {
 
     area_id_t index = 0;
     area_id_t valid_rows = 0;
-    mapping_id_[index] = "";
     if (!file_has_header_) {
         index++;
     }
