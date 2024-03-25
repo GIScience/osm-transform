@@ -53,6 +53,16 @@ void RewriteHandler::node(const osmium::Node &node) {
             }
         }
         auto countries = location_area_.get_area(node.location());
+        switch (countries.size()) {
+            case 0:
+                nodes_with_no_country_++;
+                break;
+            case 1:
+                nodes_with_single_country_++;
+                break;
+            default:
+                nodes_with_multiple_countries_++;
+        }
         copy_tags(builder, node.tags(), ele, countries);
         if (interpolate_) {
             location_index_->set(static_cast<osmium::unsigned_object_id_type>(node.id()), node.location());
