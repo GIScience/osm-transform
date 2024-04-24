@@ -78,7 +78,8 @@ void download_tiles(const string type) {
             curl_easy_cleanup(curl);
             fclose(fp);
             if (res > 0) {
-                cout << "ERROR " << res << "downloading from url " << url << endl;
+                cout << "ERROR " << res << " downloading from url " << url << endl;
+                continue;
             }
         }
         if (type == "srtm") {
