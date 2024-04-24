@@ -16,16 +16,19 @@ option(BUILD_TESTING "Build the tests" ON)
 # https://cmake.org/cmake/help/git-master/module/FindBoost.html
 find_package(Boost REQUIRED regex program_options)
 find_package(GDAL REQUIRED)
+find_package(ZLIB REQUIRED)
+find_package(CURL REQUIRED)
 
 include_directories(${PROJECT_BINARY_DIR}/src)
 
-set(SOURCE_FILES 
+set(SOURCE_FILES
     location_area_service.cpp
     location_elevation_service.cpp
     rewrite_handler.cpp
 )
 
 add_subdirectory(src)
+target_link_libraries(${PROJECT_NAME} PRIVATE z minizip bz2 expat GDAL::GDAL Boost::regex Boost::program_options CURL::libcurl)
 
 if (BUILD_TESTING)
     enable_testing()

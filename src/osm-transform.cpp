@@ -9,12 +9,15 @@
 
 #include <boost/regex.hpp>
 
-#include <osmium/io/any_input.hpp>
 #include <osmium/io/any_output.hpp>
 #include <osmium/util/file.hpp>
 #include <osmium/util/progress_bar.hpp>
 #include <osmium/util/memory.hpp>
 #include <osmium/visitor.hpp>
+#include <curl/curl.h>
+#include <curl/easy.h>
+#include "minizip/unzip.h"
+#include "minizip/ioapi.h"
 
 using namespace std;
 
@@ -31,6 +34,97 @@ auto show_memory_used() {
     }
 }
 
+void download_tiles(const string type) {
+    string outdir = type + "data";
+    if (mkdir(outdir.c_str(), S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH) == -1) {
+        if (errno == EEXIST) {
+            // alredy exists
+        } else {
+            // something else
+            std::cout << "cannot create tile data folder! Error:" << strerror(errno) << std::endl;
+            return;
+        }
+    }
+    curl_global_init(CURL_GLOBAL_ALL);
+    auto request = 0;
+    auto present = 0;
+    auto loaded = 0;
+    ifstream csv("tiles_"+type+".csv");
+    while(!csv.eof()) {
+        string fname = "";
+        string url = "";
+        getline(csv,fname,',');
+        getline(csv,url);
+        if (fname.empty() || url.empty()) {
+            cout << "Invalid download instruction! " << type << ": " << fname << " - " << url << endl;
+            continue;
+        }
+        request++;
+        string outfile = outdir + "/" + fname;
+        if (filesystem::exists(outfile)) {
+            present++;
+            continue;
+        }
+        CURL *curl;
+        CURLcode res;
+        curl = curl_easy_init();
+        if (curl) {
+            cout << "Download: " << url << endl;
+            auto fp = fopen((outfile + (type == "srtm" ? ".zip" : "")).c_str(),"wb");
+            curl_easy_setopt(curl, CURLOPT_URL, url.c_str());
+            curl_easy_setopt(curl, CURLOPT_WRITEDATA, fp);
+            res = curl_easy_perform(curl);
+            /* always cleanup */
+            curl_easy_cleanup(curl);
+            fclose(fp);
+            if (res > 0) {
+                cout << "ERROR " << res << " downloading from url " << url << endl;
+                continue;
+            }
+        }
+        if (type == "srtm") {
+            cout << "Unpack: " << outfile << endl;
+            unzFile uf = NULL;
+            uf = unzOpen64((outfile + ".zip").c_str());
+            if (uf==NULL) {
+                printf("Cannot open %s.zip\n", outfile.c_str());
+                unzClose(uf);
+                continue;
+            }
+            if (unzLocateFile(uf,fname.c_str(),true)!=UNZ_OK) {
+                printf("file %s not found in the zipfile\n", fname.c_str());
+                unzClose(uf);
+                continue;
+            }
+            if (unzOpenCurrentFile(uf)!=UNZ_OK) {
+                printf("Error within zipfile!\n");
+                unzClose(uf);
+                continue;
+            }
+            ofstream ofile(outfile);
+            if (ofile.is_open()) {
+                int err;
+                int size_buf = 16384;
+                char* buf = (char*)malloc(size_buf);
+                do {
+                    err = unzReadCurrentFile(uf,buf,size_buf);
+                    if (err < 0) {
+                        printf("error %d with zipfile in unzReadCurrentFile\n",err);
+                        break;
+                    }
+                    ofile.write(buf, size_buf);
+                } while (err > 0);
+                ofile.close();
+            }
+            unzCloseCurrentFile(uf);
+            unzClose(uf);
+            filesystem::remove(outfile + ".zip");
+        }
+        loaded++;
+    }
+    cout << "Requested " << request << " tiles. " << present << " files already present, " << loaded << " downloaded." << endl;
+}
+
 void first_pass(Config &config, boost::regex &remove_tag_regex, osmium::nwr_array<osmium::index::IdSetDense<osmium::unsigned_object_id_type>> &valid_ids, osmium::nwr_array<osmium::index::IdSetSmall<osmium::unsigned_object_id_type>> &no_elevation);
 void second_pass(Config &config, boost::regex &remove_tag_regex, osmium::nwr_array<osmium::index::IdSetDense<osmium::unsigned_object_id_type>> &valid_ids, osmium::nwr_array<osmium::index::IdSetSmall<osmium::unsigned_object_id_type>> &no_elevation);
 
@@ -38,6 +132,17 @@ int main(int argc, char **argv) {
     Config config;
     config.cmd(argc, argv);
     try {
+        if (config.download_srtm) {
+            cout << "Downloading SRTM tiles. This might take a while..." << endl;
+            download_tiles("srtm");
+            return 0;
+        }
+        if (config.download_gmted) {
+            cout << "Downloading GMTED tiles. This might take a while..." << endl;
+            download_tiles("gmted");
+            return 0;
+        }
+
         boost::regex remove_tag_regex(config.remove_tag_regex_str, boost::regex::icase);
         osmium::nwr_array<osmium::index::IdSetDense<osmium::unsigned_object_id_type>> valid_ids;
         osmium::nwr_array<osmium::index::IdSetSmall<osmium::unsigned_object_id_type>> no_elevation;
@@ -183,7 +288,7 @@ void second_pass(Config &config, boost::regex &remove_tag_regex,
            reduction, static_cast<float>(reduction) / static_cast<float>(insize) * 100);
     if (config.add_elevation) {
         auto valid_nodes = valid_ids.nodes().size();
-        printf("All Nodes: %19llu Nodes\n", valid_nodes);
+        printf("All Nodes: %19lu Nodes\n", valid_nodes);
         if (config.interpolate) {
             printf("Added Nodes: %17llu Nodes\n",handler.nodes_added_by_interpolation_);
         }

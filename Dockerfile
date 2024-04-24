@@ -12,6 +12,7 @@ RUN set -eux; \
     libboost-regex-dev \
     libboost-program-options-dev \
     libboost-test-dev \
+    ca-certificates \
     ; \
     \
     rm -rf /var/lib/apt/lists/*;
@@ -24,4 +25,4 @@ RUN set -eux; \
    cmake --install /osm-transform/cmake-build
 
 WORKDIR /osm
-ENTRYPOINT ["/usr/local/bin/osm-transform"]:
+ENTRYPOINT ["/usr/local/bin/osm-transform"]
