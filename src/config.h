@@ -21,6 +21,8 @@ struct Config {
     std::string area_mapping_geo_type;
     bool area_mapping_has_header;
     std::string area_mapping_processed_file_prefix;
+    bool download_srtm = false;
+    bool download_gmted = false;
 
     auto cmd(int argc, char **argv) {
 
@@ -39,6 +41,8 @@ struct Config {
         config.add_options()
                 ("osm_pbf,p", po::value<std::vector<std::string>>(), "path to osm pbf file to process")
                 ("skip_elevation,e", "skip elevation data merge")
+                ("srtm", "fetch SRTM tiles and exit")
+                ("gmted", "fetch GMTED tiles and exit")
                 ("interpolate,i", "interpolate intermediate nodes")
                 ("remove_tag,T", po::value<std::string>(&remove_tag_regex_str)->default_value("(.*:)?source(:.*)?|(.*:)?note(:.*)?|url|created_by|fixme|wikipedia"), "regex to match removable tags")
                 ("geo_tiff_folders,F", po::value<std::vector<std::string>>(&geo_tiff_folders)->multitoken()->default_value(std::vector<std::string>{"tiffs", "srtmdata", "gmteddata"}, "tiffs, srtmdata, gmteddata"), "paths to geotiff folders")
@@ -99,6 +103,17 @@ struct Config {
             exit(0);
         }
 
+        debug_mode = vm.contains("debug_mode");
+        if (debug_mode) {
+            std::cout << "DEBUG MODE" << "\n";
+        }
+
+        download_srtm = vm.contains("srtm");
+        download_gmted = vm.contains("gmted");
+        if (download_srtm || download_gmted) {
+            return;
+        }
+
         if (!vm.contains("osm_pbf")) {
             std::cerr << "no file name" << std::endl;
             exit(1);
@@ -117,11 +132,6 @@ struct Config {
 
         if (vm.contains("skip_elevation")) {
             add_elevation = false;
-        }
-
-        debug_mode = vm.contains("debug_mode");
-        if (debug_mode) {
-            std::cout << "DEBUG MODE" << "\n";
         }
     }
 };

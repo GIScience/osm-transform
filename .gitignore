@@ -8,7 +8,7 @@
 osm-transform
 test/srtm
 srtm*/*
-cgiardata
+srtmdata
 test/gmted
 gmted*/*
 gmteddata
