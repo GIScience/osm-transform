@@ -67,11 +67,35 @@ Configuration:
   -t [ --threshold ] arg                (=0.5) only used in combination with interpolation, threshold for elevation
   -f [ --config-file ] arg              absolute file path to config file to use
   -d [ --debug_mode ]                   debug_mode
+
+Generic options:
+  -v [ --version ]                      print version string
+  -h [ --help ]                         produce help message
+
+Configuration:
+  -p [ --osm_pbf ] arg                  path to osm pbf file to process
+  -e [ --skip_elevation ]               skip elevation data merge
+  --srtm                                fetch SRTM tiles and exit
+  --gmted                               fetch GMTED tiles and exit
+  -i [ --interpolate ]                  interpolate intermediate nodes
+  -T [ --remove_tag ] arg               (=(.*:)?source(:.*)?|(.*:)?note(:.*)?|url|created_by|fixme|wikipedia) regex to match removable tags
+  -F [ --geo_tiff_folders ] arg         (=tiffs, srtmdata, gmteddata)  paths to geotiff folders
+  -S [ --cache_limit ] arg              (=1073741824) maximum memory used to store tiles in cache
+  -t [ --threshold ] arg                (=0.5) only used in combination with interpolation, threshold for elevation
+  -a [ --area_mapping ] arg             path to area mapping file to use
+  --area_mapping_id_col arg             (=0) column number (zero-based) in area mapping file of area id
+  --area_mapping_geo_col arg            (=1) column number (zero-based) in area mapping file of area geometry
+  --area_mapping_geo_type arg           (=wkt) type of geometry string in area mapping file (possible values: 'wkt' (default), 'geojson')
+  --area_mapping_has_header arg         (=1) area mapping file has header row
+  --area_mapping_processed_file_prefix arg (=mapping_) file prefix for processed mapping files
+  -f [ --config_file ] arg              path to config file to use
+  --index_type arg (=flex_mem)          index type for locations, needed for interpolate. see https://docs.osmcode.org/osmium/latest/osmium-index-types.html
+  -d [ --debug_mode ]                   debug_mode
 ```
 
 [//]: # (TODO update all below)
 
-The `osm-transform.cfg` file is used to set up the tool. The default configuration is as follows:
+A `osm-transform.cfg` file can be used to set up the tool. The default configuration is as follows:
 
 ```
 # number of elevation tiles to keep open in memory simultaneously
@@ -96,24 +120,26 @@ remove_tag = "(.*:)?source(:.*)?|(.*:)?note(:.*)?|url|created_by|fixme|wikipedia
 
 ### Elevation data
 
-For the elevation data merge, also download the elevations tiles for CGIAR SRTM data (
-see [srtm.csi.cgiar.org](http://srtm.csi.cgiar.org/)) and
-GMTED2010 data (as a fallback option,
-see [GMTED2010](https://www.usgs.gov/land-resources/eros/coastal-changes-and-impacts/gmted2010)).
-A python script is provided that can be used to download (and, in the case of CGIAR data, unpack) these resources.
+For the elevation data merge, also download the elevations tiles for CGIAR SRTM data (see [srtm.csi.cgiar.org](http://srtm.csi.cgiar.org/)) and
+GMTED2010 data (as a fallback option, see [GMTED2010](https://www.usgs.gov/land-resources/eros/coastal-changes-and-impacts/gmted2010)).
+The osm-transform tool provides an operation modeto download (and, in the case of CGIAR data, unpack) these resources.
 Be aware those require approx. 63.1 Gb and 26.3 Gb drive space respectively.
 
-You need [python](https://www.python.org/downloads/) and [poetry](https://python-poetry.org/docs/) installed on your
-system.
 In the project directory, run
 
-```
-poetry install 
-poetry run osm-transform srtm-download
-poetry run osm-transform gmted-download
+```shell
+./docker_run.sh --srtm # download CGIAR SRTM tile files
+./docker_run.sh --gmted # download GMTED tile files
 ```
 
-This will create directories `srtmdata` and `gmteddata` respectively and download the geotiff tiles.
+If you have built the tool on your machine, you can run it natively using the following commands: 
+
+```shell
+./osm-transform --srtm # download CGIAR SRTM tile files
+./osm-transform --gmted # download GMTED tile files
+```
+
+This will create directories `srtmdata` and `gmteddata` respectively and download the geotiff tiles. Note that in those modes the tool does not perform any other operations. 
 
 ## Functionality details
 
@@ -169,7 +195,7 @@ Elevation:                0.04 % failed (660459)
 ```
 
 A log file is written containing all coordinates where no elevation value could be determined.
-The number of cases in the above example is normal (paths on Antarctica etc.).
+The number of cases in the above example is normal (paths on Antarctica and other remote areas etc.).
 
 ### Developers: CLion (Nova) cmake setup
 
