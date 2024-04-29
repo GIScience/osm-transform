@@ -1,5 +1,3 @@
-mod io {
-
     use std::path::PathBuf;
 
     use anyhow;
@@ -58,6 +56,7 @@ mod io {
                 Element::Sentinel => {
                     filter_out = true;
                 }
+
             }
             if !filter_out {
                 writer.write_element(element)?;
@@ -69,4 +68,29 @@ mod io {
         log::info!("Finished pbf io pipeline, time: {}", stopwatch);
         Ok(())
     }
-}
+
+
+
+    #[cfg(test)]
+    mod tests {
+        use pbf::reader::Reader;
+        use super::*;
+
+        #[test]
+        fn process_files_verify_node_added() {
+            let output_path = PathBuf::from("./chemindelagode-mod.pbf");
+            let reader = Reader::new(&output_path).expect("output file not found");
+            let mut found = false;
+            for element in reader.elements().expect("corrupted file") {
+                match &element {
+                    Element::Node { node } => {
+                        if node.id() == 999999 {
+                            found = true;
+                        }
+                    }
+                    _ => ()
+                }
+            }
+            assert!(found);
+        }
+    }
