@@ -1,4 +1,4 @@
-
+mod io;
 
 pub fn hello() {
     println!("Hello, this ist rusty!");
