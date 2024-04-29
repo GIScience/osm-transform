@@ -12,6 +12,35 @@
     use osm_io::osm::pbf;
     use osm_io::osm::pbf::compression_type::CompressionType;
     use osm_io::osm::pbf::file_info::FileInfo;
+    use crate::conf::Config;
+    use crate::{Filter, Handler};
+
+    pub fn process_with_handler(config: Config, filter: &mut Filter) -> Result<(), anyhow::Error> {
+        SimpleLogger::new().init()?;
+        log::info!("Started pbf io pipeline");
+        let mut stopwatch = StopWatch::new();
+        stopwatch.start();
+        let input_path = PathBuf::from("./chemindelagode.pbf");
+        let reader = pbf::reader::Reader::new(&input_path)?;
+
+        for element in reader.elements()? {
+            match &element {
+                Element::Node { node } => {
+                    filter.handle_node(node)
+                }
+                Element::Way { way } => {
+                    filter.handle_way(way)
+                }
+                Element::Relation { relation } => {
+                    filter.handle_relation(relation)
+                }
+                _ => ()
+            }
+        }
+
+        log::info!("Finished pbf io pipeline, time: {}", stopwatch);
+        Ok(())
+    }
 
     pub fn process_file() -> Result<(), anyhow::Error> {
         SimpleLogger::new().init()?;
@@ -74,6 +103,7 @@
     #[cfg(test)]
     mod tests {
         use pbf::reader::Reader;
+        use crate::BboxCollector;
         use super::*;
 
         #[test]
@@ -92,5 +122,26 @@
                 }
             }
             assert!(found);
+        }
+
+        pub fn into_next(handler: impl Handler + Sized + 'static) -> Option<Box<dyn Handler>> {
+            Some(Box::new(handler))
+        }
+
+        #[test]
+        fn process_() {
+            let config = Config{param: 0};
+            // let mut bbox_collector = BboxCollector{next: None, min_lat: 0f64, min_lon: 0f64, max_lat: 0f64, max_lon: 0f64};
+            // let mut filter = Filter{next: into_next(bbox_collector), node_ids: Vec::new(), way_ids: Vec::new()};
+            let mut bbox_collector = BboxCollector::default();
+            let mut filter = Filter::new(bbox_collector);
+            process_with_handler(config, &mut filter);
+            assert!(filter.node_ids.len() > 0);
+
+            // ownership of bbox_collector
+            assert_ne!(bbox_collector.min_lat, 0f64);
+            // assert_ne!(bbox_collector.max_lat, 0f64);
+            // assert_ne!(bbox_collector.min_lon, 0f64);
+            // assert_ne!(bbox_collector.max_lon, 0f64);
         }
     }
