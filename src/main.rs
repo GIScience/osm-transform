@@ -1,3 +1,5 @@
+use rusty_routes_transformer::hello;
+
 fn main() {
-    println!("Hello, world!");
+    hello()
 }
