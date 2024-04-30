@@ -1,28 +1,23 @@
-
-pub mod io;
 pub mod conf;
+pub mod io;
 
+use crate::io::process_with_handler;
+use conf::Config;
+use io::process_file;
 use osm_io::osm::model::node::Node;
 use osm_io::osm::model::relation::Relation;
 use osm_io::osm::model::way::Way;
-use io::process_file;
-use conf::Config;
-use crate::io::process_with_handler;
 
 pub fn run(config: Config) {
     dbg!(config);
     // process_file().expect("did not work");
 
-
     // read pbf, filter node ids belonging to ways -> node_ids, extract bbox, maxId (gefilterte)
     // reader(config, filter, bbox_extracotr, max_id_extractor);
-
 
     // let mut bbox_collector = BboxCollector{next: None, min_lat: 0f64, min_lon: 0f64, max_lat: 0f64, max_lon: 0f64};
     // let mut filter = Filter{next: &bbox_collector, node_ids: Vec::new(), way_ids: Vec::new()};
     // process_with_handler(config, filter);
-
-
 
     // download geotiffs for bbox
     // geo_tiff_downloader(config, bbox_extractor);
@@ -43,7 +38,6 @@ pub fn run(config: Config) {
     //                  remove tags
     //                  write
     //  if interpolated : merge files
-
 }
 
 trait Handler {
@@ -105,7 +99,7 @@ struct BboxCollector {
     pub min_lat: f64,
     pub min_lon: f64,
     pub max_lat: f64,
-    pub max_lon: f64
+    pub max_lon: f64,
 }
 impl BboxCollector {
     pub fn new(next: impl Handler + 'static) -> Self {
@@ -162,7 +156,5 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_hello() {
-
-    }
+    fn test_hello() {}
 }

@@ -1,6 +1,5 @@
-
 #[derive(Debug)]
 
 pub struct Config {
-    pub param: i32
+    pub param: i32,
 }

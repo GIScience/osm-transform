@@ -1,5 +1,5 @@
-use rusty_routes_transformer::run;
 use rusty_routes_transformer::conf::Config;
+use rusty_routes_transformer::run;
 
 fn main() {
     let mut config = read_conf_file();
@@ -12,5 +12,5 @@ fn merge_args(config: &mut Config) {
 }
 
 fn read_conf_file() -> Config {
-    Config{param: 111}
+    Config { param: 111 }
 }
