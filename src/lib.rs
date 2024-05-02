@@ -1,5 +1,6 @@
 pub mod conf;
 pub mod io;
+pub mod handler;
 
 use crate::io::process_with_handler;
 use conf::Config;
