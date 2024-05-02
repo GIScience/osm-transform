@@ -127,7 +127,7 @@ mod tests {
 
     #[test]
     fn process_() {
-        let config = Config { param: 0 };
+        let config = Config::default();
         // let mut bbox_collector = BboxCollector{next: None, min_lat: 0f64, min_lon: 0f64, max_lat: 0f64, max_lon: 0f64};
         // let mut filter = Filter{next: into_next(bbox_collector), node_ids: Vec::new(), way_ids: Vec::new()};
         let mut bbox_collector = BboxCollector::default();

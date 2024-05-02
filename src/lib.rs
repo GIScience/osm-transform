@@ -1,9 +1,11 @@
 pub mod conf;
 pub mod io;
+pub mod area;
 pub mod handler;
 
 use crate::io::process_with_handler;
 use conf::Config;
+use area::AreaHandler;
 use io::process_file;
 use osm_io::osm::model::node::Node;
 use osm_io::osm::model::relation::Relation;
@@ -51,9 +53,7 @@ pub struct HandlerResult {
 
 trait Handler {
     fn handle_node(&mut self, node: &Node) {
-        if let Some(next) = &mut self.get_next() {
-            next.handle_node(node);
-        }
+        self.handle_node_next(node);
     }
 
     fn handle_node_next(&mut self, node: &Node) {
@@ -61,11 +61,8 @@ trait Handler {
             next.handle_node(node);
         }
     }
-
     fn handle_way(&mut self, way: &Way) {
-        if let Some(next) = &mut self.get_next() {
-            next.handle_way(way);
-        }
+        self.handle_way_next(way);
     }
 
     fn handle_way_next(&mut self, way: &Way) {
@@ -73,7 +70,6 @@ trait Handler {
             next.handle_way(way);
         }
     }
-
     fn handle_relation(&mut self, relation: &Relation) {
         self.handle_relation_next(relation)
     }
@@ -96,6 +92,8 @@ trait Handler {
         }
     }
 }
+
+
 
 pub fn into_next(handler: impl Handler + Sized + 'static) -> Option<Box<dyn Handler>> {
     Some(Box::new(handler))
@@ -206,8 +204,10 @@ impl Handler for BboxCollector {
 
 #[cfg(test)]
 mod tests {
+    use std::os::unix::raw::uid_t;
     use super::*;
 
     #[test]
     fn test_hello() {}
+
 }

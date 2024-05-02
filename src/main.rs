@@ -12,5 +12,5 @@ fn merge_args(config: &mut Config) {
 }
 
 fn read_conf_file() -> Config {
-    Config { param: 111 }
+    Config { param: 111, country_path: "./test/mapping_test.csv".to_string() }
 }

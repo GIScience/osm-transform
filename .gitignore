@@ -17,3 +17,8 @@ Cargo.lock
 # Added by cargo
 
 /target
+
+*_index.csv
+*_area.csv
+*_id.csv
+*_name.csv
