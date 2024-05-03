@@ -8,8 +8,6 @@ struct HandlerResult {
     pub bbox_min_lon: f64,
     pub bbox_max_lat: f64,
     pub bbox_min_lat: f64,
-
-
 }
 
 impl HandlerResult {
@@ -79,6 +77,7 @@ enum FilterType {
     AcceptMatching,
     RemoveMatching,
 }
+
 struct NodesFilterForTagValueMatch {
     pub tag: String,
     pub regex: Regex,
@@ -90,12 +89,20 @@ struct NodesFilterForTagValueMatch {
 enum HandlerDef {
     NodesFilterDef(NodesFilterDef),
     NodesCounterDef(NodesCounterDef),
-    BBoxCollectorDef
+    BBoxCollectorDef,
 }
+
 #[derive(Debug)]
-struct NodesFilterDef{tag: String, regex: Regex, filter_type: FilterType }
+struct NodesFilterDef {
+    tag: String,
+    regex: Regex,
+    filter_type: FilterType,
+}
+
 #[derive(Debug)]
-struct NodesCounterDef{ count_type: CountType }
+struct NodesCounterDef {
+    count_type: CountType,
+}
 
 fn as_chain(mut defs: Vec<HandlerDef>) -> Box<dyn Handler> {
     defs.reverse();
@@ -104,11 +111,11 @@ fn as_chain(mut defs: Vec<HandlerDef>) -> Box<dyn Handler> {
         match hander_def {
             HandlerDef::NodesFilterDef(def) => {
                 // println!("regex: {:?}, filter_type: {:?}", &def.regex, &def.filter_type);
-                previous = Box::new(NodesFilterForTagValueMatch {tag: def.tag, filter_type: def.filter_type, regex: def.regex, next: previous });
+                previous = Box::new(NodesFilterForTagValueMatch { tag: def.tag, filter_type: def.filter_type, regex: def.regex, next: previous });
             }
             HandlerDef::NodesCounterDef(def) => {
                 // println!("count_type: {:?}", &def.count_type);
-                previous = Box::new(NodesCounter{count: 0, count_type: def.count_type, next: previous });
+                previous = Box::new(NodesCounter { count: 0, count_type: def.count_type, next: previous });
             }
             HandlerDef::BBoxCollectorDef => {
                 previous = Box::new(BboxCollector::new(previous));
@@ -117,6 +124,7 @@ fn as_chain(mut defs: Vec<HandlerDef>) -> Box<dyn Handler> {
     }
     previous
 }
+
 impl Handler for NodesFilterForTagValueMatch {
     fn handle_node(&mut self, node: &Node) {
         match self.filter_type {
@@ -154,6 +162,7 @@ struct BboxCollector {
     pub max_lat: f64,
     pub max_lon: f64,
 }
+
 impl BboxCollector {
     pub fn new(next: Box<dyn Handler>) -> Self {
         Self {
@@ -165,6 +174,7 @@ impl BboxCollector {
         }
     }
 }
+
 impl Handler for BboxCollector {
     fn handle_node(&mut self, node: &Node) {
         if &self.min_lat == &0.0 {
@@ -200,7 +210,6 @@ impl Handler for BboxCollector {
 }
 
 
-
 #[cfg(test)]
 mod tests {
     use osm_io::osm::model::coordinate::Coordinate;
@@ -211,20 +220,24 @@ mod tests {
 
     const EXISTING_TAG: &str = "EXISTING_TAG";
     const MISSING_TAG: &str = "MISSING_TAG";
-    fn existing_tag() -> String {"EXISTING_TAG".to_string()}
-    fn missing_tag() -> String {"MISSING_TAG".to_string()}
+
+    fn existing_tag() -> String { "EXISTING_TAG".to_string() }
+
+    fn missing_tag() -> String { "MISSING_TAG".to_string() }
+
     #[test]
     fn test_handle_nodes_with_as_chain() {
         let handlers = vec![
-            HandlerDef::NodesCounterDef(NodesCounterDef{count_type: CountType::ALL}),
-            HandlerDef::NodesFilterDef(NodesFilterDef{tag: existing_tag(), regex: Regex::new(".*p.*").unwrap(), filter_type: FilterType::AcceptMatching }),
-            HandlerDef::NodesFilterDef(NodesFilterDef{tag: existing_tag(), regex: Regex::new(".*z.*").unwrap(), filter_type: FilterType::RemoveMatching }),
+            HandlerDef::NodesCounterDef(NodesCounterDef { count_type: CountType::ALL }),
+            HandlerDef::NodesFilterDef(NodesFilterDef { tag: existing_tag(), regex: Regex::new(".*p.*").unwrap(), filter_type: FilterType::AcceptMatching }),
+            HandlerDef::NodesFilterDef(NodesFilterDef { tag: existing_tag(), regex: Regex::new(".*z.*").unwrap(), filter_type: FilterType::RemoveMatching }),
             HandlerDef::BBoxCollectorDef,
-            HandlerDef::NodesCounterDef(NodesCounterDef{count_type: CountType::ACCEPTED}),
+            HandlerDef::NodesCounterDef(NodesCounterDef { count_type: CountType::ACCEPTED }),
         ];
         let mut handler = as_chain(handlers);
         handle_test_nodes_and_verify_result(&mut *handler);
     }
+
     #[test]
     fn test_handle_nodes_with_manually_chanied_handlesr() {
         let mut handler = NodesCounter {
@@ -241,7 +254,7 @@ mod tests {
                     next: Box::new(NodesCounter {
                         count: 0,
                         count_type: CountType::ACCEPTED,
-                        next: Box::new(BboxCollector::new(Box::new(Terminator::new())))
+                        next: Box::new(BboxCollector::new(Box::new(Terminator::new()))),
                     }),
                 }),
             }),
