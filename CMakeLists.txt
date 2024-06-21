@@ -18,6 +18,7 @@ find_package(Boost REQUIRED regex program_options)
 find_package(GDAL REQUIRED)
 find_package(ZLIB REQUIRED)
 find_package(CURL REQUIRED)
+find_package(minizip REQUIRED)
 
 include_directories(${PROJECT_BINARY_DIR}/src)
 
@@ -28,7 +29,7 @@ set(SOURCE_FILES
 )
 
 add_subdirectory(src)
-target_link_libraries(${PROJECT_NAME} PRIVATE z minizip bz2 expat GDAL::GDAL Boost::regex Boost::program_options CURL::libcurl)
+target_link_libraries(${PROJECT_NAME} PRIVATE z minizip::minizip bz2 expat GDAL::GDAL Boost::regex Boost::program_options CURL::libcurl)
 
 if (BUILD_TESTING)
     enable_testing()
