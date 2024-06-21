@@ -52,7 +52,9 @@ void LocationAreaService::load(const std::string &path) {
                     std::cout << "WARNING: processed area mapping file is corrupted!" << std::endl;
                     continue;
                 }
-                mapping_area_.insert({std::stoi(row[0]), AreaIntersect{static_cast<area_id_t>(std::stoi(row[1])), poGeom}});
+                auto *poBBox = new OGREnvelope();
+                poGeom->getEnvelope(poBBox);
+                mapping_area_.insert({std::stoi(row[0]), AreaIntersect{static_cast<area_id_t>(std::stoi(row[1])), poGeom, poBBox}});
             }
             area_file.close();
         }
@@ -176,12 +178,12 @@ void LocationAreaService::output_mapping() {
 }
 
 void LocationAreaService::add_area_to_mapping_index(area_id_t id, const std::string &geometry) {
-    OGRGeometry *poGeom;
+    OGRGeometry *countryGeom;
     OGRErr eErr = OGRERR_NONE;
     if (geo_type_ == "wkt") {
-        eErr = OGRGeometryFactory::createFromWkt(geometry.c_str(), nullptr, &poGeom);
+        eErr = OGRGeometryFactory::createFromWkt(geometry.c_str(), nullptr, &countryGeom);
     } else if (geo_type_ == "geojson") {
-        poGeom = OGRGeometryFactory::createFromGeoJson(geometry.c_str());
+        countryGeom = OGRGeometryFactory::createFromGeoJson(geometry.c_str());
     } else {
     }
     if (eErr != OGRERR_NONE) {
@@ -203,30 +205,37 @@ void LocationAreaService::add_area_to_mapping_index(area_id_t id, const std::str
         return;
     }
     if (debug_mode_) {
-        std::cout << "Processing area " << id << ", valid: " << poGeom->IsValid();
+        std::cout << "Processing area " << id << ", valid: " << countryGeom->IsValid();
     }
     std::uint32_t intersecting_grid_tiles = 0;
     std::uint32_t contained_grid_tiles = 0;
+    OGREnvelope countryBBox, e;
+    countryGeom->getEnvelope(&countryBBox);
     for (grid_id_t i = 0; i < grid_size_; i++) {
-        OGRPolygon e = grid_[i];
-        if (e.Intersects(poGeom)) {
+        OGRPolygon g = grid_[i];
+        g.getEnvelope(&e);
+        if (e.Intersects(countryBBox) && g.Intersects(countryGeom)) {
             intersecting_grid_tiles++;
-            if (poGeom->Contains(&e)) {
+            if (countryGeom->Contains(&g)) {
                 contained_grid_tiles++;
                 mapping_index_[i] = id;
             } else {
                 mapping_index_[i] = area_id_multiple_;
-                mapping_area_.insert({i, AreaIntersect{id, poGeom->Intersection(&e)}});
+                OGRGeometry *poGeom = countryGeom->Intersection(&g);
+                auto *poBBox = new OGREnvelope();
+                poGeom->getEnvelope(poBBox);
+                mapping_area_.insert({i, AreaIntersect{id, poGeom, poBBox}});
             }
         }
     }
     if (debug_mode_) {
         std::cout << " => intersecting grid tiles: " << intersecting_grid_tiles << ", contained grid tiles: " << contained_grid_tiles << std::endl;
     }
-    OGRGeometryFactory::destroyGeometry(poGeom);
+    OGRGeometryFactory::destroyGeometry(countryGeom);
 }
 
 std::vector<std::string> LocationAreaService::get_area(osmium::Location l) {
+    areaCheckCounter++;
     std::vector<std::string> areas;
     if (!initialized_) {
         return areas;
@@ -245,8 +254,16 @@ std::vector<std::string> LocationAreaService::get_area(osmium::Location l) {
         case area_id_multiple_:// multiple areas
             auto range = mapping_area_.equal_range(grid_index);
             for (auto i = range.first; i != range.second; ++i) {
-                if (i->second.geo->Contains(&point)) {
-                    areas.push_back(mapping_id_[i->second.id]);
+                bBoxCheckCounter++;
+                OGREnvelope *env = i->second.env;
+                if (env->MinX <= point.getX() &&
+                    env->MinY <= point.getY() &&
+                    env->MaxX >= point.getX() &&
+                    env->MaxY >= point.getY()) {
+                    geomCheckCounter++;
+                    if (i->second.geo->Contains(&point)) {
+                        areas.push_back(mapping_id_[i->second.id]);
+                    }
                 }
             }
             break;
@@ -259,6 +276,14 @@ std::vector<std::string> LocationAreaService::get_area(osmium::Location l) {
         std::cout << std::endl;
     }
     return areas;
+}
+
+void LocationAreaService::printAreaMappingStats() const {
+    std::cout << "Area mapping stats ";
+    std::cout << "[ areaChecks: " << areaCheckCounter;
+    std::cout << ", bBoxChecks: " << bBoxCheckCounter;
+    std::cout << ", geomChecks: " << geomCheckCounter;
+    std::cout << "]" << std::endl << std::flush;
 }
 
 LocationAreaService::LocationAreaService(bool debug_mode, std::uint16_t id_col, std::uint16_t geo_col, std::string &geo_type, bool file_has_header, std::string &processed_file_prefix) : debug_mode_(debug_mode), id_col_(id_col), geo_col_(geo_col), geo_type_(geo_type), file_has_header_(file_has_header), processed_file_prefix_(processed_file_prefix) {

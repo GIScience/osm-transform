@@ -12,6 +12,7 @@ typedef std::uint16_t grid_id_t;
 struct AreaIntersect {
     area_id_t id;
     OGRGeometry *geo;
+    OGREnvelope *env;
 };
 
 class LocationAreaService {
@@ -35,6 +36,8 @@ private:
     bool debug_mode_ = false;
     bool initialized_ = false;
 
+    std::uint32_t areaCheckCounter = 0, geomCheckCounter = 0, bBoxCheckCounter = 0;
+
     void add_area_to_mapping_index(area_id_t id, const std::string& geometry);
 
     void output_mapping();
@@ -49,6 +52,8 @@ public:
     bool is_initialized() {
         return initialized_;
     }
+
+    void printAreaMappingStats() const;
 };
 
 
