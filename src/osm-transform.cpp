@@ -277,6 +277,7 @@ void second_pass(Config &config, boost::regex &remove_tag_regex,
         std::cout << "About " << mem << " KBytes used for node location index (in main memory or on disk).\n";
     }
 
+    location_area_service.printAreaMappingStats();
     handler.printCountryStats();
 
     const auto end = chrono::steady_clock::now();
