@@ -240,7 +240,7 @@ std::vector<std::string> LocationAreaService::get_area(osmium::Location l) {
     if (!initialized_) {
         return areas;
     }
-    grid_id_t grid_index = ((int) l.lat() + 90) * 360 + ((int) l.lon() + 180);
+    grid_id_t grid_index = ((int) (l.lat()*2) + 90*2) * 360*2 + ((int) (l.lon()*2) + 180*2);
     OGRPoint point(l.lon(), l.lat());
     if (debug_mode_) {
         std::cout << "Lookup point: (" << l.lon() << " " << l.lat() << ") grid index " << grid_index << " => " << mapping_index_[grid_index] << std::endl;
@@ -288,17 +288,18 @@ void LocationAreaService::printAreaMappingStats() const {
 
 LocationAreaService::LocationAreaService(bool debug_mode, std::uint16_t id_col, std::uint16_t geo_col, std::string &geo_type, bool file_has_header, std::string &processed_file_prefix) : debug_mode_(debug_mode), id_col_(id_col), geo_col_(geo_col), geo_type_(geo_type), file_has_header_(file_has_header), processed_file_prefix_(processed_file_prefix) {
     GDALAllRegister();
-    for (std::uint16_t grid_lat = 0; grid_lat < 180; grid_lat++) {
-        for (std::uint16_t grid_lon = 0; grid_lon < 360; grid_lon++) {
-            grid_id_t grid_index = grid_lat * 360 + grid_lon;
-            int box_lon = grid_lon - 180;
-            int box_lat = grid_lat - 90;
+    grid_ = new OGRPolygon[grid_size_];
+    for (area_id_t grid_lat = 0; grid_lat < 180*2; grid_lat++) {
+        for (area_id_t grid_lon = 0; grid_lon < 360*2; grid_lon++) {
+            grid_id_t grid_index = grid_lat * 360*2 + grid_lon;
+            double box_lon = (double) grid_lon / 2. - 180;
+            double box_lat = (double) grid_lat / 2. - 90;
             OGRLinearRing ring;
             OGRPolygon poly;
             ring.addPoint(box_lon, box_lat);
-            ring.addPoint(box_lon + 1, box_lat);
-            ring.addPoint(box_lon + 1, box_lat + 1);
-            ring.addPoint(box_lon, box_lat + 1);
+            ring.addPoint(box_lon + 0.5, box_lat);
+            ring.addPoint(box_lon + 0.5, box_lat + 0.5);
+            ring.addPoint(box_lon, box_lat + 0.5);
             ring.addPoint(box_lon, box_lat);
             ring.closeRings();
             poly.addRing(&ring);
