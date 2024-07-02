@@ -15,19 +15,19 @@ use osm_io::osm::pbf;
 use osm_io::osm::pbf::compression_type::CompressionType;
 use osm_io::osm::pbf::file_info::FileInfo;
 
-pub fn process_with_handler(config: Config, filter: &mut Filter) -> Result<(), anyhow::Error> {
+pub fn process_with_handler(config: Config, handler: &mut dyn Handler) -> Result<(), anyhow::Error> {
     SimpleLogger::new().init()?;
     log::info!("Started pbf io pipeline");
     let mut stopwatch = StopWatch::new();
     stopwatch.start();
-    let input_path = PathBuf::from("./chemindelagode.pbf");
+    let input_path = PathBuf::from("test/baarle_small.pbf");
     let reader = pbf::reader::Reader::new(&input_path)?;
 
     for element in reader.elements()? {
         match &element {
-            Element::Node { node } => filter.handle_node(node),
-            Element::Way { way } => filter.handle_way(way),
-            Element::Relation { relation } => filter.handle_relation(relation),
+            Element::Node { node } => handler.handle_node(node),
+            Element::Way { way } => handler.handle_way(way),
+            Element::Relation { relation } => handler.handle_relation(relation),
             _ => (),
         }
     }
@@ -41,8 +41,8 @@ pub fn process_file() -> Result<(), anyhow::Error> {
     log::info!("Started pbf io pipeline");
     let mut stopwatch = StopWatch::new();
     stopwatch.start();
-    let input_path = PathBuf::from("./chemindelagode.pbf");
-    let output_path = PathBuf::from("./chemindelagode-mod.pbf");
+    let input_path = PathBuf::from("test/baarle_small.pbf");
+    let output_path = PathBuf::from("test/baarle_small-mod.pbf");
     let reader = pbf::reader::Reader::new(&input_path)?;
     let mut file_info = FileInfo::default();
     file_info.with_writingprogram_str("pbf-io-example");
@@ -105,7 +105,7 @@ mod tests {
 
     #[test]
     fn process_files_verify_node_added() {
-        let output_path = PathBuf::from("./chemindelagode-mod.pbf");
+        let output_path = PathBuf::from("test/baarle_small-mod.pbf");
         let reader = Reader::new(&output_path).expect("output file not found");
         let mut found = false;
         for element in reader.elements().expect("corrupted file") {
@@ -132,7 +132,7 @@ mod tests {
         // let mut filter = Filter{next: into_next(bbox_collector), node_ids: Vec::new(), way_ids: Vec::new()};
         let mut bbox_collector = BboxCollector::default();
         let mut filter = Filter::new(bbox_collector);
-        process_with_handler(config, &mut filter);
+        let _ = process_with_handler(config, &mut filter);
         let mut results = HandlerResult::default();
         filter.get_results(&mut results);
         assert!(filter.node_ids.len() > 0);

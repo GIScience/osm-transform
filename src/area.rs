@@ -6,7 +6,7 @@ use std::path::Path;
 use std::str::FromStr;
 
 use csv::{ReaderBuilder, Writer};
-use geo::{Contains, Coord, Coordinate, Intersects, LineString, MultiPolygon, Polygon};
+use geo::{Contains, Coord, Intersects, LineString, MultiPolygon, Polygon};
 use geo::BooleanOps;
 use log::debug;
 use multimap::MultiMap;
@@ -158,8 +158,10 @@ impl AreaHandler {
         wtr.flush().expect("failed to flush");
         let index_file = name.to_string() + "_index.csv";
         let mut wtr = Writer::from_path(index_file).expect("failed to open writer");
-        for id in mapping.index.iter() {
-            wtr.write_record(&[id.to_string(), mapping.index[*id as usize].to_string()]).expect("failed to write");
+        for id in 0..GRID_SIZE {
+            if mapping.index[id] > 0 {
+                wtr.write_record(&[id.to_string(), mapping.index[id].to_string()]).expect("failed to write");
+            }
         }
         wtr.flush().expect("failed to flush");
         let area_file = name.to_string() + "_area.csv";
@@ -174,13 +176,10 @@ impl AreaHandler {
 impl Handler for AreaHandler {
     fn handle_node(&mut self, node: &Node) {
         let mut result: Vec<String> = Vec::new();
-        let grid_index = (node.coordinate().lat() as i16 + 90) * 360 + (node.coordinate().lon() as i16 + 180);
+        let grid_index = (node.coordinate().lat() as i32 + 90) * 360 + (node.coordinate().lon() as i32 + 180);
         let coord = Coord {x: node.coordinate().lon(), y: node.coordinate().lat()};
         match self.mapping.index[grid_index as usize] {
             0 => { // no area
-            }
-            x => { // single area
-                result.push(self.mapping.id[&x].to_string())
             }
             AREA_ID_MULTIPLE => { // multiple areas
                 for area in self.mapping.area.get_vec(&(grid_index as u16)).unwrap() {
@@ -188,6 +187,10 @@ impl Handler for AreaHandler {
                         result.push(self.mapping.id[&area.id].to_string())
                     }
                 }
+            }
+            x => { // single area
+                debug!("index: {x}");
+                result.push(self.mapping.id[&x].to_string())
             }
         }
         debug!("Area IDs for {}: {:?}", node.id(), result);
@@ -206,11 +209,11 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_area_load() {
+    fn test_area_handler() {
         let config = Config::default();
         let mut handler_chain = AreaHandler::default();
         handler_chain.load(&config).expect("Area handler failed to load CSV file");
-        process_with_handler(config, &mut handler_chain).expect("Area handler failed");
+        let _ = process_with_handler(config, &mut handler_chain).expect("Area handler failed");
         println!("Loaded: {}", handler_chain.mapping.id.len())
     }
 

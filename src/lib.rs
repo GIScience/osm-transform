@@ -53,7 +53,9 @@ pub struct HandlerResult {
 
 trait Handler {
     fn handle_node(&mut self, node: &Node) {
-        self.handle_node_next(node);
+        if let Some(next) = &mut self.get_next() {
+            next.handle_node(node);
+        }
     }
 
     fn handle_node_next(&mut self, node: &Node) {
@@ -61,8 +63,11 @@ trait Handler {
             next.handle_node(node);
         }
     }
+
     fn handle_way(&mut self, way: &Way) {
-        self.handle_way_next(way);
+        if let Some(next) = &mut self.get_next() {
+            next.handle_way(way);
+        }
     }
 
     fn handle_way_next(&mut self, way: &Way) {
@@ -70,6 +75,7 @@ trait Handler {
             next.handle_way(way);
         }
     }
+
     fn handle_relation(&mut self, relation: &Relation) {
         self.handle_relation_next(relation)
     }
@@ -92,8 +98,6 @@ trait Handler {
         }
     }
 }
-
-
 
 pub fn into_next(handler: impl Handler + Sized + 'static) -> Option<Box<dyn Handler>> {
     Some(Box::new(handler))
@@ -204,10 +208,8 @@ impl Handler for BboxCollector {
 
 #[cfg(test)]
 mod tests {
-    use std::os::unix::raw::uid_t;
     use super::*;
 
     #[test]
     fn test_hello() {}
-
 }
