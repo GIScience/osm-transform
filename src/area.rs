@@ -189,6 +189,7 @@ impl Handler for AreaHandler {
             }
         }
         node.tags_mut().push(Tag::new("country".to_string(), result.join(",")));
+        eprintln!("{} {}", node.id, result.join(","));
         true
     }
 
