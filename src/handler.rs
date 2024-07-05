@@ -17,29 +17,29 @@ pub struct HandlerResult {
 pub trait Handler {
     fn process_node(&mut self, node: &mut MutableNode) -> bool {true}
 
-    fn handle_node(&mut self, node: &mut MutableNode) {
+    fn handle_node_chained(&mut self, node: &mut MutableNode) {
         if self.process_node(node) {
             if let Some(next) = &mut self.get_next() {
-                next.handle_node(node);
+                next.handle_node_chained(node);
             }
         }
     }
 
     fn process_way(&mut self, way: &mut Way) -> bool {true}
 
-    fn handle_way(&mut self, way: &mut Way) {
+    fn handle_way_chained(&mut self, way: &mut Way) {
         if self.process_way(way) {
             if let Some(next) = &mut self.get_next() {
-                next.handle_way(way);
+                next.handle_way_chained(way);
             }
         }
     }
     fn process_relation(&mut self, relation: &mut Relation) -> bool {true}
 
-    fn handle_relation(&mut self, relation: &mut Relation) {
+    fn handle_relation_chained(&mut self, relation: &mut Relation) {
         if self.process_relation(relation) {
             if let Some(next) = &mut self.get_next() {
-                next.handle_relation(relation);
+                next.handle_relation_chained(relation);
             }
         }
     }
@@ -48,10 +48,10 @@ pub trait Handler {
 
     fn process_results(&mut self, res: &mut HandlerResult) {}
 
-    fn get_results(&mut self, res: &mut HandlerResult) {
+    fn get_results_chained(&mut self, res: &mut HandlerResult) {
         self.process_results(res);
         if let Some(next) = &mut self.get_next() {
-            next.get_results(res);
+            next.get_results_chained(res);
         }
     }
 }
@@ -104,6 +104,7 @@ impl Handler for NodeIdCollector {
     }
 
     fn process_results(&mut self, res: &mut HandlerResult) {
+        res.node_ids = self.node_ids.clone();//todo optimize
     }
 }
 
@@ -155,34 +156,41 @@ impl TagBasedNodesFilter {
     fn new(tag: String, regex: Regex, filter_type: FilterType, next: impl Handler + 'static) -> Self {
         Self {
             next: into_next(next),
-            tag,
-            regex,
-            filter_type
+            tag: tag,
+            regex: regex,
+            filter_type: filter_type
         }
     }
 }
 impl Handler for TagBasedNodesFilter {
-    fn process_node(&mut self, node: &mut MutableNode) -> bool {
+    fn handle_node_chained(&mut self, node: &mut MutableNode) {
+        let mut accept = false;
+
         match self.filter_type {
             FilterType::AcceptMatching => {
+                accept = false;
                 for tag in node.tags() {
                     if self.tag.eq(tag.k()) && self.regex.is_match(tag.v()) {
-                        return true;
+                        accept = true;
+                        break
                     }
                 }
             }
             FilterType::RemoveMatching => {
-                let mut found_match = false;
                 for tag in node.tags() {
+                    accept = true;
                     if self.tag.eq(tag.k()) && self.regex.is_match(tag.v()) {
-                        found_match = true;
+                        accept = false;
                         break;
                     }
                 }
-                return !found_match;
             }
         }
-        false
+        if accept {
+            if let Some(next_handler) = self.get_next() {
+                next_handler.handle_node_chained(node)
+            }
+        }
     }
 
     fn get_next(&mut self) -> &mut Option<Box<dyn Handler>> {
@@ -256,6 +264,7 @@ mod tests {
     use regex::Regex;
     use simple_logger::SimpleLogger;
     use crate::handler::{BboxCollector, CountType, FilterType, Handler, HandlerResult, NodesCounter, TagBasedNodesFilter, FinalHandler, NodeIdCollector};
+    use crate::osm_model::MutableNode;
 
     const EXISTING_TAG: &str = "EXISTING_TAG";
     const MISSING_TAG: &str = "MISSING_TAG";
@@ -293,13 +302,13 @@ mod tests {
     }
 
     fn handle_test_nodes_and_verify_result(handler: &mut dyn Handler) {
-        handler.handle_node_next(&Node::new(1, 1, Coordinate::new(1.0f64, 1.1f64), 1, 1, 1, "a".to_string(), true, vec![Tag::new(existing_tag(), "kasper".to_string())]));
-        handler.handle_node_next(&Node::new(2, 1, Coordinate::new(2.0f64, 1.2f64), 1, 1, 1, "a".to_string(), true, vec![Tag::new(existing_tag(), "seppl".to_string())]));
-        handler.handle_node_next(&Node::new(3, 1, Coordinate::new(3.0f64, 1.3f64), 1, 1, 1, "a".to_string(), true, vec![Tag::new(existing_tag(), "hotzenplotz".to_string())]));
-        handler.handle_node_next(&Node::new(4, 1, Coordinate::new(4.0f64, 1.4f64), 1, 1, 1, "a".to_string(), true, vec![Tag::new(existing_tag(), "großmutter".to_string())]));
+        handler.handle_node_chained(&mut MutableNode::new(&mut Node::new(1, 1, Coordinate::new(1.0f64, 1.1f64), 1, 1, 1, "a".to_string(), true, vec![Tag::new(existing_tag(), "kasper".to_string())])));
+        handler.handle_node_chained(&mut MutableNode::new(&mut Node::new(2, 1, Coordinate::new(2.0f64, 1.2f64), 1, 1, 1, "a".to_string(), true, vec![Tag::new(existing_tag(), "seppl".to_string())])));
+        handler.handle_node_chained(&mut MutableNode::new(&mut Node::new(3, 1, Coordinate::new(3.0f64, 1.3f64), 1, 1, 1, "a".to_string(), true, vec![Tag::new(existing_tag(), "hotzenplotz".to_string())])));
+        handler.handle_node_chained(&mut MutableNode::new(&mut Node::new(4, 1, Coordinate::new(4.0f64, 1.4f64), 1, 1, 1, "a".to_string(), true, vec![Tag::new(existing_tag(), "großmutter".to_string())])));
 
         let mut result = HandlerResult::default();
-        handler.get_results_next(&mut result);
+        handler.get_results_chained(&mut result);
         dbg!(&result);
 
         assert_eq!(result.count_all_nodes, 4);

@@ -218,7 +218,7 @@ mod tests {
         // println!("Loaded: {}", area_handler.mapping.id.len());
 
         let mut result = HandlerResult::default();
-        initial_handler.get_results(&mut result);
+        initial_handler.get_results_chained(&mut result);
         println!("result: {:?}", result )
     }
 

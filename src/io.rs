@@ -25,19 +25,19 @@ pub fn process_with_handler(config: &Config, handler: &mut dyn Handler) -> Resul
         match element {
             Element::Node { mut node } => {
                 let mut mut_node = MutableNode::new(&mut node);
-                handler.handle_node(&mut mut_node)
+                handler.handle_node_chained(&mut mut_node)
             },
             Element::Way { mut way } => {
-                handler.handle_way(&mut way)
+                handler.handle_way_chained(&mut way)
             },
             Element::Relation { mut relation } => {
-                handler.handle_relation(&mut relation)
+                handler.handle_relation_chained(&mut relation)
             },
             _ => (),
         }
     }
     let mut handler_result = HandlerResult::default();
-    handler.get_results(&mut handler_result);
+    handler.get_results_chained(&mut handler_result);
     log::info!("Result: {}, {}, {}, {}", handler_result.bbox_min_lat, handler_result.bbox_max_lat, handler_result.bbox_min_lon, handler_result.bbox_max_lon);
     log::info!("Finished pbf io pipeline, time: {}", stopwatch);
     Ok(())
@@ -136,7 +136,7 @@ mod tests {
         let mut filter = NodeIdCollector::new(bbox_collector);
         let _ = process_with_handler(&config, &mut filter);
         let mut results = HandlerResult::default();
-        filter.get_results(&mut results);
+        filter.get_results_chained(&mut results);
         assert!(filter.node_ids.len() > 0);
 
         // ownership of bbox_collector
