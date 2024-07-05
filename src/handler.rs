@@ -1,4 +1,5 @@
 use osm_io::osm::model::relation::Relation;
+use osm_io::osm::model::tag::Tag;
 use osm_io::osm::model::way::Way;
 use regex::Regex;
 use crate::osm_model::MutableNode;
@@ -146,23 +147,23 @@ enum FilterType {
     RemoveMatching,
 }
 
-struct TagBasedNodesFilter {
+struct TagValueBasedNodesFilter {
     pub tag: String,
-    pub regex: Regex,
+    pub value_regex: Regex,
     pub filter_type: FilterType,
     pub next: Option<Box<dyn Handler>>,
 }
-impl TagBasedNodesFilter {
+impl TagValueBasedNodesFilter {
     fn new(tag: String, regex: Regex, filter_type: FilterType, next: impl Handler + 'static) -> Self {
         Self {
             next: into_next(next),
             tag: tag,
-            regex: regex,
+            value_regex: regex,
             filter_type: filter_type
         }
     }
 }
-impl Handler for TagBasedNodesFilter {
+impl Handler for TagValueBasedNodesFilter {
     fn handle_node_chained(&mut self, node: &mut MutableNode) {
         let mut accept = false;
 
@@ -170,7 +171,7 @@ impl Handler for TagBasedNodesFilter {
             FilterType::AcceptMatching => {
                 accept = false;
                 for tag in node.tags() {
-                    if self.tag.eq(tag.k()) && self.regex.is_match(tag.v()) {
+                    if self.tag.eq(tag.k()) && self.value_regex.is_match(tag.v()) {
                         accept = true;
                         break
                     }
@@ -179,7 +180,7 @@ impl Handler for TagBasedNodesFilter {
             FilterType::RemoveMatching => {
                 for tag in node.tags() {
                     accept = true;
-                    if self.tag.eq(tag.k()) && self.regex.is_match(tag.v()) {
+                    if self.tag.eq(tag.k()) && self.value_regex.is_match(tag.v()) {
                         accept = false;
                         break;
                     }
@@ -197,6 +198,60 @@ impl Handler for TagBasedNodesFilter {
         return &mut self.next;
     }
 }
+
+struct PbfTypeSwitch {
+    pub node: bool,
+    pub way: bool,
+    pub relation: bool,
+}
+struct TagFilterByKey {
+    pub handle_types: PbfTypeSwitch,
+    pub key_regex: Regex,
+    pub filter_type: FilterType,
+    pub next: Option<Box<dyn Handler>>,
+}
+impl TagFilterByKey {
+    fn new(handle_types: PbfTypeSwitch, key_regex: Regex, filter_type: FilterType, next: impl Handler + 'static) -> Self {
+        Self {
+            handle_types,
+            key_regex,
+            filter_type,
+            next: into_next(next),
+        }
+    }
+
+    fn filter_tags(&mut self, tags: &Vec<Tag>) -> Vec<Tag> {
+        let mut new_tags = vec![];
+        for tag in tags {
+            match self.filter_type {
+                FilterType::AcceptMatching => {
+                    if self.key_regex.is_match(tag.k()) {
+                        new_tags.push(tag.clone());
+                    }
+                }
+                FilterType::RemoveMatching => {
+                    if !self.key_regex.is_match(tag.k()) {
+                        new_tags.push(tag.clone());
+                    }
+                }
+            }
+        }
+        new_tags
+    }
+}
+impl Handler for TagFilterByKey {
+    fn process_node(&mut self, node: &mut MutableNode) -> bool {
+        if self.handle_types.node  {
+            node.tags = self.filter_tags(&node.tags());
+        }
+        true
+    }
+    fn get_next(&mut self) -> &mut Option<Box<dyn Handler>> {
+        return &mut self.next;
+    }
+}
+
+
 
 #[derive(Default)]
 pub(crate) struct BboxCollector {
@@ -263,7 +318,7 @@ mod tests {
     use osm_io::osm::model::tag::Tag;
     use regex::Regex;
     use simple_logger::SimpleLogger;
-    use crate::handler::{BboxCollector, CountType, FilterType, Handler, HandlerResult, NodesCounter, TagBasedNodesFilter, FinalHandler, NodeIdCollector};
+    use crate::handler::{BboxCollector, CountType, FilterType, Handler, HandlerResult, NodesCounter, TagValueBasedNodesFilter, FinalHandler, NodeIdCollector, TagFilterByKey, PbfTypeSwitch};
     use crate::osm_model::MutableNode;
 
     const EXISTING_TAG: &str = "EXISTING_TAG";
@@ -279,11 +334,11 @@ mod tests {
         let mut handler =
             NodesCounter::new(
                 CountType::ALL,
-                TagBasedNodesFilter::new(
+                TagValueBasedNodesFilter::new(
                     existing_tag(),
                     Regex::new(".*p.*").unwrap(),
                     FilterType::AcceptMatching,
-                    TagBasedNodesFilter::new(
+                    TagValueBasedNodesFilter::new(
                         existing_tag(),
                         Regex::new(".*z.*").unwrap(),
                         FilterType::RemoveMatching,
@@ -319,5 +374,104 @@ mod tests {
         assert_eq!(result.bbox_min_lon, 1.1f64);
         assert_eq!(result.bbox_max_lat, 2.0f64);
         assert_eq!(result.bbox_max_lon, 1.2f64);
+    }
+    pub(crate) struct FinalCaptor {
+        pub nodes: Vec<MutableNode>,
+        pub next: Option<Box<dyn Handler>>,
+    }
+    impl FinalCaptor {
+        pub(crate) fn new() -> Self {
+            FinalCaptor { next: None, nodes: vec![] }
+        }
+    }
+    impl Handler for FinalCaptor {
+        fn process_node(&mut self, node: &mut MutableNode) -> bool {
+            self.nodes.push(node.clone());
+            true
+        }
+        fn get_next(&mut self) -> &mut Option<Box<dyn Handler>> {
+            &mut self.next
+        }
+    }
+
+    #[test]
+    fn test_tag_filter_by_key__remove_matching() {
+        let mut tag_filter = TagFilterByKey::new(
+            PbfTypeSwitch{node:true, way:false, relation:false},
+            Regex::new(".*bad.*").unwrap(),
+            FilterType::RemoveMatching,
+            FinalHandler::new());
+
+        let mut node = MutableNode::new(&mut Node::new(1, 1, Coordinate::new(1.0f64, 1.1f64), 1, 1, 1, "a".to_string(), true,
+                                                       vec![
+                                                           Tag::new("bad".to_string(), "hotzenplotz".to_string()),
+                                                           Tag::new("good".to_string(), "kasper".to_string()),
+                                                           Tag::new("more-bad".to_string(), "vader".to_string()),
+                                                           Tag::new("more-good".to_string(), "grandma".to_string()),
+                                                           Tag::new("badest".to_string(), "voldemort".to_string()),
+                                                       ]));
+        tag_filter.process_node(&mut node);
+        assert_eq!(node.tags().len(), 2);
+        assert_eq!(node.tags()[0].k(), &"good");
+        assert_eq!(node.tags()[0].v(), &"kasper");
+        assert_eq!(node.tags()[1].k(), &"more-good");
+        assert_eq!(node.tags()[1].v(), &"grandma");
+    }
+    #[test]
+    fn test_tag_filter_by_key__keep_matching() {
+        let mut tag_filter = TagFilterByKey::new(
+            PbfTypeSwitch{node:true, way:false, relation:false},
+            Regex::new(".*good.*").unwrap(),
+            FilterType::AcceptMatching,
+            FinalHandler::new());
+
+        let mut node = MutableNode::new(&mut Node::new(1, 1, Coordinate::new(1.0f64, 1.1f64), 1, 1, 1, "a".to_string(), true,
+                                                       vec![
+                                                           Tag::new("bad".to_string(), "hotzenplotz".to_string()),
+                                                           Tag::new("good".to_string(), "kasper".to_string()),
+                                                           Tag::new("more-bad".to_string(), "vader".to_string()),
+                                                           Tag::new("more-good".to_string(), "grandma".to_string()),
+                                                           Tag::new("badest".to_string(), "voldemort".to_string()),
+                                                       ]));
+        tag_filter.process_node(&mut node);
+        assert_eq!(node.tags().len(), 2);
+        assert_eq!(node.tags()[0].k(), &"good");
+        assert_eq!(node.tags()[0].v(), &"kasper");
+        assert_eq!(node.tags()[1].k(), &"more-good");
+        assert_eq!(node.tags()[1].v(), &"grandma");
+    }
+    #[test]
+    fn test_tag_filter_by_key__node_not_handled() {
+        let mut tag_filter = TagFilterByKey::new(
+            PbfTypeSwitch{node:false, way:true, relation:true},
+            Regex::new(".*").unwrap(),
+            FilterType::RemoveMatching,
+            FinalHandler::new());
+
+        let mut node = MutableNode::new(&mut Node::new(1, 1, Coordinate::new(1.0f64, 1.1f64), 1, 1, 1, "a".to_string(), true,
+                                                       vec![
+                                                           Tag::new("a".to_string(), "1".to_string()),
+                                                           Tag::new("b".to_string(), "2".to_string()),
+                                                           Tag::new("c".to_string(), "3".to_string()),
+                                                       ]));
+        tag_filter.process_node(&mut node);
+        assert_eq!(node.tags().len(), 3);
+    }
+    #[test]
+    fn test_tag_filter_by_key__node_handled() {
+        let mut tag_filter = TagFilterByKey::new(
+            PbfTypeSwitch{node:true, way:true, relation:true},
+            Regex::new(".*").unwrap(),
+            FilterType::RemoveMatching,
+            FinalHandler::new());
+
+        let mut node = MutableNode::new(&mut Node::new(1, 1, Coordinate::new(1.0f64, 1.1f64), 1, 1, 1, "a".to_string(), true,
+                                                       vec![
+                                                           Tag::new("a".to_string(), "1".to_string()),
+                                                           Tag::new("b".to_string(), "2".to_string()),
+                                                           Tag::new("c".to_string(), "3".to_string()),
+                                                       ]));
+        tag_filter.process_node(&mut node);
+        assert_eq!(node.tags().len(), 0);
     }
 }

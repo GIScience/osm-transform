@@ -4,15 +4,15 @@ use osm_io::osm::model::tag::Tag;
 
 #[derive(Debug, Clone)]
 pub struct MutableNode {
-    id: i64,
-    version: i32,
-    coordinate: Coordinate,
-    timestamp: i64,
-    changeset: i64,
-    uid: i32,
-    user: String,
-    visible: bool,
-    tags: Vec<Tag>,
+    pub(crate) id: i64,
+    pub(crate) version: i32,
+    pub(crate) coordinate: Coordinate,
+    pub(crate) timestamp: i64,
+    pub(crate) changeset: i64,
+    pub(crate) uid: i32,
+    pub(crate) user: String,
+    pub(crate) visible: bool,
+    pub(crate) tags: Vec<Tag>,
 }
 
 impl MutableNode {
