@@ -1,16 +1,17 @@
 use std::string::String;
-use std::collections::HashMap;
+use std::collections::{BTreeMap};
 use std::error::Error;
 use std::fs::File;
 use std::path::Path;
 use std::str::FromStr;
 
-use csv::{ReaderBuilder, Writer};
-use geo::{Contains, Coord, Intersects, LineString, MultiPolygon, Polygon};
+use csv::{ReaderBuilder, WriterBuilder};
+use geo::{BoundingRect, Contains, Coord, Intersects, LineString, MultiPolygon, Polygon};
 use geo::BooleanOps;
-use log::debug;
-use multimap::MultiMap;
+use btreemultimap::BTreeMultiMap;
+use osm_io::osm::model::coordinate::Coordinate;
 use osm_io::osm::model::node::Node;
+use osm_io::osm::model::tag::Tag;
 use serde::Deserialize;
 use wkt::{Geometry, ToWkt};
 use wkt::Wkt;
@@ -30,18 +31,18 @@ pub struct AreaHandler {
 
 pub struct Mapping {
     pub index: [u16; GRID_SIZE],
-    pub area: MultiMap<u16, AreaIntersect>,
-    pub id: HashMap<u16, String>,
-    pub name: HashMap<u16, String>,
+    pub area: BTreeMultiMap<u16, AreaIntersect>,
+    pub id: BTreeMap<u16, String>,
+    pub name: BTreeMap<u16, String>,
 }
 
 impl Default for Mapping {
     fn default() -> Self {
         Self {
             index: [0; GRID_SIZE],
-            area: MultiMap::new(),
-            id: HashMap::new(),
-            name: HashMap::new(),
+            area: BTreeMultiMap::new(),
+            id: BTreeMap::new(),
+            name: BTreeMap::new(),
         }
     }
 }
@@ -121,19 +122,19 @@ impl AreaHandler {
         Ok(())
     }
 
-    fn add_area(&mut self, index: u16, id: &String, name: &String, geo: MultiPolygon) {
+    fn add_area(&mut self, index: u16, id: &String, name: &String, area_geometry: MultiPolygon) {
         self.mapping.id.insert(index, id.to_string());
         self.mapping.name.insert(index, name.to_string());
         let mut intersecting_grid_tiles = 0;
         for i in 0..GRID_SIZE {
-            let poly = &self.grid[i];
-            if poly.intersects(&geo) {
+            let grid_polygon = &self.grid[i];
+            if grid_polygon.intersects(&area_geometry) {
                 intersecting_grid_tiles += 1;
-                if geo.contains(poly) {
+                if area_geometry.contains(grid_polygon) {
                     self.mapping.index[i] = index;
                 } else {
                     self.mapping.index[i] = AREA_ID_MULTIPLE;
-                    self.mapping.area.insert(i as u16, AreaIntersect{id: index, geo: poly.intersection(&geo)});
+                    self.mapping.area.insert(i as u16, AreaIntersect{id: index, geo: grid_polygon.intersection(&area_geometry)});
                 }
             }
         }
@@ -144,30 +145,26 @@ impl AreaHandler {
     }
 
     fn save_area_records(name: &str, mapping: &Mapping) {
-        let id_file = name.to_string() + "_id.csv";
-        let mut wtr = Writer::from_path(id_file).expect("failed to open writer");
+        let mut wtr = WriterBuilder::new().delimiter(b';').from_path(name.to_string() + "_id.csv").expect("failed to open writer");
         for (key, value) in mapping.id.iter() {
             wtr.write_record(&[key.to_string(), value.to_string()]).expect("failed to write");
         }
         wtr.flush().expect("failed to flush");
-        let name_file = name.to_string() + "_name.csv";
-        let mut wtr = Writer::from_path(name_file).expect("failed to open writer");
+        let mut wtr = WriterBuilder::new().delimiter(b';').from_path(name.to_string() + "_name.csv").expect("failed to open writer");
         for (key, value) in mapping.name.iter() {
             wtr.write_record(&[key.to_string(), value.to_string()]).expect("failed to write");
         }
         wtr.flush().expect("failed to flush");
-        let index_file = name.to_string() + "_index.csv";
-        let mut wtr = Writer::from_path(index_file).expect("failed to open writer");
+        let mut wtr = WriterBuilder::new().delimiter(b';').from_path(name.to_string() + "_index.csv").expect("failed to open writer");
         for id in 0..GRID_SIZE {
             if mapping.index[id] > 0 {
                 wtr.write_record(&[id.to_string(), mapping.index[id].to_string()]).expect("failed to write");
             }
         }
         wtr.flush().expect("failed to flush");
-        let area_file = name.to_string() + "_area.csv";
-        let mut wtr = Writer::from_path(area_file).expect("failed to open writer");
-        for (key, value) in mapping.area.iter() {
-            wtr.write_record(&[key.to_string(), value.id.to_string(), value.geo.wkt_string()]).expect("failed to write");
+        let mut wtr = WriterBuilder::new().delimiter(b';').from_path(name.to_string() + "_area.csv").expect("failed to open writer");
+        for (key, values) in mapping.area.iter() {
+            wtr.write_record(&[key.to_string(), values.id.to_string(), values.geo.wkt_string()]).expect("failed to write");
         }
         wtr.flush().expect("failed to flush");
     }
@@ -189,12 +186,25 @@ impl Handler for AreaHandler {
                 }
             }
             x => { // single area
-                debug!("index: {x}");
+                // debug!("index: {x}");
                 result.push(self.mapping.id[&x].to_string())
             }
         }
-        debug!("Area IDs for {}: {:?}", node.id(), result);
-        self.handle_node_next(node);
+        let mut tags = node.tags().to_vec();
+        tags.push(Tag::new("country".to_string(), result.join(",")));
+        let new_node = Node::new(
+            node.id(),
+            node.version(),
+            Coordinate::new(node.coordinate().lat(), node.coordinate().lon()),
+            node.timestamp(),
+            node.changeset(),
+            node.uid(),
+            node.user().to_string(),
+            node.visible(),
+            tags,
+        );
+        // debug!("Area IDs for {}: {:?}", node.id(), result);
+        self.handle_node_next(&new_node);
     }
 
     fn get_next(&mut self) -> &mut Option<Box<dyn Handler>> {
@@ -213,7 +223,7 @@ mod tests {
         let config = Config::default();
         let mut handler_chain = AreaHandler::default();
         handler_chain.load(&config).expect("Area handler failed to load CSV file");
-        let _ = process_with_handler(config, &mut handler_chain).expect("Area handler failed");
+        let _ = process_with_handler(&config, &mut handler_chain).expect("Area handler failed");
         println!("Loaded: {}", handler_chain.mapping.id.len())
     }
 

@@ -2,7 +2,11 @@ pub mod conf;
 pub mod io;
 pub mod area;
 pub mod handler;
+pub mod output;
 
+use std::process::exit;
+use benchmark_rs::stopwatch::StopWatch;
+use log::LevelFilter;
 use crate::io::process_with_handler;
 use conf::Config;
 use area::AreaHandler;
@@ -10,9 +14,25 @@ use io::process_file;
 use osm_io::osm::model::node::Node;
 use osm_io::osm::model::relation::Relation;
 use osm_io::osm::model::way::Way;
+use crate::output::OutputHandler;
 
-pub fn run(config: Config) {
-    dbg!(config);
+pub fn run(config: &Config) {
+
+    let mut output_handler = OutputHandler::new(config);
+    output_handler.init();
+    let mut handler_chain = AreaHandler::new(output_handler);
+    log::info!("Reading area mapping CSV");
+    let mut stopwatch = StopWatch::new();
+    stopwatch.start();
+    handler_chain.load(&config).expect("Area handler failed to load CSV file");
+    log::info!("Loaded: {} areas", handler_chain.mapping.id.len());
+    log::info!("Finished reading area mapping, time: {}", stopwatch);
+    stopwatch.reset();
+    stopwatch.start();
+    log::info!("Mapping nodes in PBF file");
+    let _ = process_with_handler(config, &mut handler_chain).expect("Area handler failed");
+    log::info!("Finished mapping, time: {}", stopwatch);
+
     // process_file().expect("did not work");
 
     // read pbf, filter node ids belonging to ways -> node_ids, extract bbox, maxId (gefilterte)
@@ -53,26 +73,22 @@ pub struct HandlerResult {
 
 trait Handler {
     fn handle_node(&mut self, node: &Node) {
-        if let Some(next) = &mut self.get_next() {
-            next.handle_node(node);
-        }
+        self.handle_node_next(node)
     }
 
     fn handle_node_next(&mut self, node: &Node) {
         if let Some(next) = &mut self.get_next() {
-            next.handle_node(node);
+            next.handle_node(node)
         }
     }
 
     fn handle_way(&mut self, way: &Way) {
-        if let Some(next) = &mut self.get_next() {
-            next.handle_way(way);
-        }
+        self.handle_way_next(way)
     }
 
     fn handle_way_next(&mut self, way: &Way) {
         if let Some(next) = &mut self.get_next() {
-            next.handle_way(way);
+            next.handle_way(way)
         }
     }
 
@@ -82,7 +98,7 @@ trait Handler {
 
     fn handle_relation_next(&mut self, relation: &Relation) {
         if let Some(next) = &mut self.get_next() {
-            next.handle_relation(relation);
+            next.handle_relation(relation)
         }
     }
 

@@ -10,17 +10,16 @@ use osm_io::osm::model::node::Node;
 use osm_io::osm::model::tag::Tag;
 
 use crate::conf::Config;
-use crate::{Filter, Handler};
+use crate::{Filter, Handler, HandlerResult};
 use osm_io::osm::pbf;
 use osm_io::osm::pbf::compression_type::CompressionType;
 use osm_io::osm::pbf::file_info::FileInfo;
 
-pub fn process_with_handler(config: Config, handler: &mut dyn Handler) -> Result<(), anyhow::Error> {
-    SimpleLogger::new().init()?;
+pub fn process_with_handler(config: &Config, handler: &mut dyn Handler) -> Result<(), anyhow::Error> {
     log::info!("Started pbf io pipeline");
     let mut stopwatch = StopWatch::new();
     stopwatch.start();
-    let input_path = PathBuf::from("test/baarle_small.pbf");
+    let input_path = PathBuf::from(config.input_path.to_string());
     let reader = pbf::reader::Reader::new(&input_path)?;
 
     for element in reader.elements()? {
@@ -31,13 +30,14 @@ pub fn process_with_handler(config: Config, handler: &mut dyn Handler) -> Result
             _ => (),
         }
     }
-
+    let mut handler_result = HandlerResult::default();
+    handler.get_results(&mut handler_result);
+    log::info!("Result: {}, {}, {}, {}", handler_result.bbox_min_lat, handler_result.bbox_max_lat, handler_result.bbox_min_lon, handler_result.bbox_max_lon);
     log::info!("Finished pbf io pipeline, time: {}", stopwatch);
     Ok(())
 }
 
 pub fn process_file() -> Result<(), anyhow::Error> {
-    SimpleLogger::new().init()?;
     log::info!("Started pbf io pipeline");
     let mut stopwatch = StopWatch::new();
     stopwatch.start();
