@@ -9,6 +9,7 @@ use csv::{ReaderBuilder, WriterBuilder};
 use geo::{Contains, Coord, Intersects, LineString, MultiPolygon, Polygon};
 use geo::BooleanOps;
 use btreemultimap::BTreeMultiMap;
+use osm_io::osm::model::node::Node;
 use osm_io::osm::model::tag::Tag;
 use serde::Deserialize;
 use wkt::{Geometry, ToWkt};
@@ -16,7 +17,6 @@ use wkt::Wkt;
 
 use crate::handler::{Handler, into_next};
 use crate::conf::Config;
-use crate::osm_model::MutableNode;
 
 const GRID_SIZE: usize = 64800;
 const AREA_ID_MULTIPLE: u16 = u16::MAX;
@@ -169,7 +169,7 @@ impl AreaHandler {
 }
 
 impl Handler for AreaHandler {
-    fn process_node(&mut self, node: &mut MutableNode) -> bool {
+    fn process_node(&mut self, node: &mut Node) -> bool {
         let mut result: Vec<String> = Vec::new();
         let grid_index = (node.coordinate().lat() as i32 + 90) * 360 + (node.coordinate().lon() as i32 + 180);
         let coord = Coord {x: node.coordinate().lon(), y: node.coordinate().lat()};

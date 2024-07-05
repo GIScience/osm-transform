@@ -3,12 +3,12 @@ use std::string::ToString;
 use osm_io::osm::model::element::Element;
 use osm_io::osm::model::relation::Relation;
 use osm_io::osm::model::way::Way;
+use osm_io::osm::model::node::Node;
 use osm_io::osm::pbf;
 use osm_io::osm::pbf::compression_type::CompressionType;
 use osm_io::osm::pbf::file_info::FileInfo;
 use crate::handler::{Handler, HandlerResult};
 use crate::conf::Config;
-use crate::osm_model::MutableNode;
 
 pub struct OutputHandler {
     pub writer: pbf::writer::Writer,
@@ -36,9 +36,9 @@ impl OutputHandler {
 }
 
 impl Handler for OutputHandler {
-    fn process_node(&mut self, node: &mut MutableNode) -> bool {
+    fn process_node(&mut self, node: &mut Node) -> bool {
         log::debug!("Writing node: {:?}", node);
-        self.writer.write_element(Element::Node { node: node.make_node() }).expect("Failed to write node");
+        self.writer.write_element(Element::Node { node: node.to_owned() }).expect("Failed to write node");
         false
     }
 
