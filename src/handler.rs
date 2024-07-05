@@ -150,13 +150,13 @@ enum FilterType {
     RemoveMatching,
 }
 
-struct NodesFilterForTagValueMatch {
+struct TagBasedNodesFilter {
     pub tag: String,
     pub regex: Regex,
     pub filter_type: FilterType,
     pub next: Option<Box<dyn Handler>>,
 }
-impl NodesFilterForTagValueMatch {
+impl TagBasedNodesFilter {
     fn new(tag: String, regex: Regex, filter_type: FilterType, next: impl Handler + 'static) -> Self {
         Self {
             next: into_next(next),
@@ -166,7 +166,7 @@ impl NodesFilterForTagValueMatch {
         }
     }
 }
-impl Handler for NodesFilterForTagValueMatch {
+impl Handler for TagBasedNodesFilter {
     fn handle_node_next(&mut self, node: &Node) {
         match self.filter_type {
             FilterType::AcceptMatching => {
@@ -269,7 +269,7 @@ mod tests {
     use osm_io::osm::model::tag::Tag;
     use regex::Regex;
     use simple_logger::SimpleLogger;
-    use crate::handler::{BboxCollector, CountType, FilterType, Handler, HandlerResult, NodesCounter, NodesFilterForTagValueMatch, FinalHandler, NodeIdCollector};
+    use crate::handler::{BboxCollector, CountType, FilterType, Handler, HandlerResult, NodesCounter, TagBasedNodesFilter, FinalHandler, NodeIdCollector};
 
     const EXISTING_TAG: &str = "EXISTING_TAG";
     const MISSING_TAG: &str = "MISSING_TAG";
@@ -284,11 +284,11 @@ mod tests {
         let mut handler =
             NodesCounter::new(
                 CountType::ALL,
-                NodesFilterForTagValueMatch::new(
+                TagBasedNodesFilter::new(
                     existing_tag(),
                     Regex::new(".*p.*").unwrap(),
                     FilterType::AcceptMatching,
-                    NodesFilterForTagValueMatch::new(
+                    TagBasedNodesFilter::new(
                         existing_tag(),
                         Regex::new(".*z.*").unwrap(),
                         FilterType::RemoveMatching,
