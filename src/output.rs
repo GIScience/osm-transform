@@ -1,15 +1,14 @@
 use std::path::PathBuf;
 use std::string::ToString;
-use osm_io::osm::model::coordinate::Coordinate;
 use osm_io::osm::model::element::Element;
-use osm_io::osm::model::node::Node;
 use osm_io::osm::model::relation::Relation;
 use osm_io::osm::model::way::Way;
 use osm_io::osm::pbf;
 use osm_io::osm::pbf::compression_type::CompressionType;
 use osm_io::osm::pbf::file_info::FileInfo;
-use crate::{Handler, HandlerResult};
+use crate::handler::{Handler, HandlerResult};
 use crate::conf::Config;
+use crate::osm_model::MutableNode;
 
 pub struct OutputHandler {
     pub writer: pbf::writer::Writer,
@@ -37,24 +36,27 @@ impl OutputHandler {
 }
 
 impl Handler for OutputHandler {
-    fn handle_node(&mut self, node: &Node) {
+    fn process_node(&mut self, node: &mut MutableNode) -> bool {
         log::debug!("Writing node: {:?}", node);
-        self.writer.write_element(Element::Node { node: node.clone() }).expect("Failed to write node");
+        self.writer.write_element(Element::Node { node: node.make_node() }).expect("Failed to write node");
+        false
     }
 
-    fn handle_way(&mut self, way: &Way) {
+    fn process_way(&mut self, way: &mut Way) -> bool {
         self.writer.write_element(Element::Way { way: way.clone() }).expect("Failed to write way");
+        false
     }
 
-    fn handle_relation(&mut self, relation: &Relation) {
+    fn process_relation(&mut self, relation: &mut Relation) -> bool {
         self.writer.write_element(Element::Relation { relation: relation.clone() }).expect("Failed to write relation");
+        false
     }
 
     fn get_next(&mut self) -> &mut Option<Box<dyn Handler>> {
         return &mut self.next;
     }
 
-    fn get_results(&mut self, res: &mut HandlerResult) {
+    fn process_results(&mut self, res: &mut HandlerResult) {
         self.close()
     }
 }

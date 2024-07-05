@@ -6,11 +6,9 @@ use std::path::Path;
 use std::str::FromStr;
 
 use csv::{ReaderBuilder, WriterBuilder};
-use geo::{BoundingRect, Contains, Coord, Intersects, LineString, MultiPolygon, Polygon};
+use geo::{Contains, Coord, Intersects, LineString, MultiPolygon, Polygon};
 use geo::BooleanOps;
 use btreemultimap::BTreeMultiMap;
-use osm_io::osm::model::coordinate::Coordinate;
-use osm_io::osm::model::node::Node;
 use osm_io::osm::model::tag::Tag;
 use serde::Deserialize;
 use wkt::{Geometry, ToWkt};
@@ -18,7 +16,7 @@ use wkt::Wkt;
 
 use crate::handler::{Handler, into_next};
 use crate::conf::Config;
-use crate::io::{process_file, process_with_handler};
+use crate::osm_model::MutableNode;
 
 const GRID_SIZE: usize = 64800;
 const AREA_ID_MULTIPLE: u16 = u16::MAX;
@@ -171,7 +169,7 @@ impl AreaHandler {
 }
 
 impl Handler for AreaHandler {
-    fn handle_node(&mut self, node: &Node) {
+    fn process_node(&mut self, node: &mut MutableNode) -> bool {
         let mut result: Vec<String> = Vec::new();
         let grid_index = (node.coordinate().lat() as i32 + 90) * 360 + (node.coordinate().lon() as i32 + 180);
         let coord = Coord {x: node.coordinate().lon(), y: node.coordinate().lat()};
@@ -190,20 +188,8 @@ impl Handler for AreaHandler {
                 result.push(self.mapping.id[&x].to_string())
             }
         }
-        let mut tags = node.tags().to_vec();
-        tags.push(Tag::new("country".to_string(), result.join(",")));
-        let new_node = Node::new(
-            node.id(),
-            node.version(),
-            Coordinate::new(node.coordinate().lat(), node.coordinate().lon()),
-            node.timestamp(),
-            node.changeset(),
-            node.uid(),
-            node.user().to_string(),
-            node.visible(),
-            tags,
-        );
-        // debug!("Area IDs for {}: {:?}", node.id(), result);
+        node.tags_mut().push(Tag::new("country".to_string(), result.join(",")));
+        true
     }
 
     fn get_next(&mut self) -> &mut Option<Box<dyn Handler>> {
@@ -215,6 +201,7 @@ impl Handler for AreaHandler {
 mod tests {
     use crate::area::AreaHandler;
     use crate::handler::{BboxCollector, CountType, HandlerResult, NodesCounter, FinalHandler};
+    use crate::io::{process_file, process_with_handler};
     use super::*;
 
     #[test]
@@ -227,11 +214,11 @@ mod tests {
         let mut initial_handler = NodesCounter::new(CountType::ALL,area_handler);
         // let mut filter = Filter::new(area_handler);
 
-        let _ = process_with_handler(config, &mut initial_handler).expect("process_with_handler failed");
+        let _ = process_with_handler(&config, &mut initial_handler).expect("process_with_handler failed");
         // println!("Loaded: {}", area_handler.mapping.id.len());
 
         let mut result = HandlerResult::default();
-        initial_handler.get_results_next(&mut result);
+        initial_handler.get_results(&mut result);
         println!("result: {:?}", result )
     }
 

@@ -1,7 +1,7 @@
-use osm_io::osm::model::node::Node;
 use osm_io::osm::model::relation::Relation;
 use osm_io::osm::model::way::Way;
 use regex::Regex;
+use crate::osm_model::MutableNode;
 
 #[derive(Default,Debug)]
 pub struct HandlerResult {
@@ -15,41 +15,43 @@ pub struct HandlerResult {
 }
 
 pub trait Handler {
-    fn handle_node(&mut self, node: &Node) {//TODO why not node: &mut Node?
+    fn process_node(&mut self, node: &mut MutableNode) -> bool {true}
 
-    }
-
-    fn handle_node_next(&mut self, node: &Node) {
-        self.handle_node(node);
-        if let Some(next) = &mut self.get_next() {
-            next.handle_node_next(node);
+    fn handle_node(&mut self, node: &mut MutableNode) {
+        if self.process_node(node) {
+            if let Some(next) = &mut self.get_next() {
+                next.handle_node(node);
+            }
         }
     }
-    fn handle_way(&mut self, way: &Way) {
-        return;
-    }
-    fn handle_way_next(&mut self, way: &Way) {
-        self.handle_way(way);
-        if let Some(next) = &mut self.get_next() {
-            next.handle_way_next(way);
+
+    fn process_way(&mut self, way: &mut Way) -> bool {true}
+
+    fn handle_way(&mut self, way: &mut Way) {
+        if self.process_way(way) {
+            if let Some(next) = &mut self.get_next() {
+                next.handle_way(way);
+            }
         }
     }
-    fn handle_relation(&mut self, relation: &Relation) {}
-    fn handle_relation_next(&mut self, relation: &Relation) {
-        self.handle_relation(relation);
-        if let Some(next) = &mut self.get_next() {
-            next.handle_relation_next(relation);
+    fn process_relation(&mut self, relation: &mut Relation) -> bool {true}
+
+    fn handle_relation(&mut self, relation: &mut Relation) {
+        if self.process_relation(relation) {
+            if let Some(next) = &mut self.get_next() {
+                next.handle_relation(relation);
+            }
         }
     }
 
     fn get_next(&mut self) -> &mut Option<Box<dyn Handler>>;
 
-    fn get_results(&mut self, res: &mut HandlerResult) {}
+    fn process_results(&mut self, res: &mut HandlerResult) {}
 
-    fn get_results_next(&mut self, res: &mut HandlerResult) {
-        self.get_results(res);
+    fn get_results(&mut self, res: &mut HandlerResult) {
+        self.process_results(res);
         if let Some(next) = &mut self.get_next() {
-            next.get_results_next(res);
+            next.get_results(res);
         }
     }
 }
@@ -67,16 +69,8 @@ impl FinalHandler {
     }
 }
 impl Handler for FinalHandler {
-    fn handle_node(&mut self, node: &Node) {
-        // dbg!(node);
-    }
-
     fn get_next(&mut self) -> &mut Option<Box<dyn Handler>> {
         &mut self.next
-    }
-
-    fn get_results(&mut self, result: &mut HandlerResult) {
-        // dbg!("FinalHandler get_results was called");
     }
 }
 
@@ -100,16 +94,16 @@ impl NodeIdCollector {
     }
 }
 impl Handler for NodeIdCollector {
-    fn handle_node(&mut self, node: &Node) {
+    fn process_node(&mut self, node: &mut MutableNode) -> bool {
         self.node_ids.push(node.id());
+        true
     }
 
     fn get_next(&mut self) -> &mut Option<Box<dyn Handler>> {
         return &mut self.next;
     }
 
-    fn get_results(&mut self, res: &mut HandlerResult) {
-        res.node_ids = self.node_ids.clone();//TODO remove, this is just an experiment
+    fn process_results(&mut self, res: &mut HandlerResult) {
     }
 }
 
@@ -129,14 +123,15 @@ impl NodesCounter {
 
 }
 impl Handler for NodesCounter {
-    fn handle_node(&mut self, node: &Node) {
-        self.count += 1
+    fn process_node(&mut self, node: &mut MutableNode) -> bool {
+        self.count += 1;
+        true
     }
 
     fn get_next(&mut self) -> &mut Option<Box<dyn Handler>> {
         return &mut self.next;
     }
-    fn get_results(&mut self, mut result: &mut HandlerResult) {
+    fn process_results(&mut self, mut result: &mut HandlerResult) {
         match self.count_type {
             CountType::ALL => { result.count_all_nodes = self.count }
             CountType::ACCEPTED => { result.count_accepted_nodes = self.count }
@@ -160,21 +155,19 @@ impl TagBasedNodesFilter {
     fn new(tag: String, regex: Regex, filter_type: FilterType, next: impl Handler + 'static) -> Self {
         Self {
             next: into_next(next),
-            tag: tag,
-            regex: regex,
-            filter_type: filter_type
+            tag,
+            regex,
+            filter_type
         }
     }
 }
 impl Handler for TagBasedNodesFilter {
-    fn handle_node_next(&mut self, node: &Node) {
+    fn process_node(&mut self, node: &mut MutableNode) -> bool {
         match self.filter_type {
             FilterType::AcceptMatching => {
                 for tag in node.tags() {
                     if self.tag.eq(tag.k()) && self.regex.is_match(tag.v()) {
-                        if let Some(next_handler) = self.get_next() {
-                            next_handler.handle_node_next(node)
-                        }
+                        return true;
                     }
                 }
             }
@@ -186,22 +179,14 @@ impl Handler for TagBasedNodesFilter {
                         break;
                     }
                 }
-                if !found_match {
-                    if let Some(next_handler) = self.get_next() {
-                        next_handler.handle_node_next(node)
-                    }
-                }
+                return !found_match;
             }
         }
+        false
     }
-
 
     fn get_next(&mut self) -> &mut Option<Box<dyn Handler>> {
         return &mut self.next;
-    }
-
-    fn get_results(&mut self, result: &mut HandlerResult) {
-
     }
 }
 
@@ -227,7 +212,7 @@ impl BboxCollector {
 }
 
 impl Handler for BboxCollector {
-    fn handle_node(&mut self, node: &Node) {
+    fn process_node(&mut self, node: &mut MutableNode) -> bool {
         if &self.min_lat == &0.0 {
             // self.set_min_lat(node.coordinate().lat());
             self.min_lat = node.coordinate().lat();
@@ -250,15 +235,16 @@ impl Handler for BboxCollector {
         if node.coordinate().lon() > self.max_lon {
             self.max_lon = node.coordinate().lon()
         }
+        true
     }
-    fn get_results(&mut self, res: &mut HandlerResult) {
+    fn get_next(&mut self) -> &mut Option<Box<dyn Handler>> {
+        return &mut self.next;
+    }
+    fn process_results(&mut self, res: &mut HandlerResult) {
         res.bbox_max_lon = self.max_lon;
         res.bbox_min_lon = self.min_lon;
         res.bbox_max_lat = self.max_lat;
         res.bbox_min_lat = self.min_lat;
-    }
-    fn get_next(&mut self) -> &mut Option<Box<dyn Handler>> {
-        return &mut self.next;
     }
 }
 

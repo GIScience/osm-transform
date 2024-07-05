@@ -2,19 +2,17 @@ use std::path::PathBuf;
 
 use anyhow;
 use benchmark_rs::stopwatch::StopWatch;
-use simple_logger::SimpleLogger;
-
 use osm_io::osm::model::coordinate::Coordinate;
 use osm_io::osm::model::element::Element;
 use osm_io::osm::model::node::Node;
 use osm_io::osm::model::tag::Tag;
 
 use crate::conf::Config;
-use crate::{Filter, Handler, HandlerResult};
-use crate::handler::{NodeIdCollector, Handler};
+use crate::handler::{Handler, HandlerResult};
 use osm_io::osm::pbf;
 use osm_io::osm::pbf::compression_type::CompressionType;
 use osm_io::osm::pbf::file_info::FileInfo;
+use crate::osm_model::MutableNode;
 
 pub fn process_with_handler(config: &Config, handler: &mut dyn Handler) -> Result<(), anyhow::Error> {
     log::info!("Started pbf io pipeline");
@@ -24,10 +22,17 @@ pub fn process_with_handler(config: &Config, handler: &mut dyn Handler) -> Resul
     let reader = pbf::reader::Reader::new(&input_path)?;
 
     for element in reader.elements()? {
-        match &element {
-            Element::Node { node } => handler.handle_node_next(node),
-            Element::Way { way } => handler.handle_way_next(way),
-            Element::Relation { relation } => handler.handle_relation_next(relation),
+        match element {
+            Element::Node { mut node } => {
+                let mut mut_node = MutableNode::new(&mut node);
+                handler.handle_node(&mut mut_node)
+            },
+            Element::Way { mut way } => {
+                handler.handle_way(&mut way)
+            },
+            Element::Relation { mut relation } => {
+                handler.handle_relation(&mut relation)
+            },
             _ => (),
         }
     }
@@ -101,7 +106,7 @@ pub fn process_file() -> Result<(), anyhow::Error> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::handler::{BboxCollector, HandlerResult};
+    use crate::handler::{BboxCollector, HandlerResult, NodeIdCollector};
     use pbf::reader::Reader;
 
     #[test]
@@ -129,7 +134,7 @@ mod tests {
         // let mut filter = Filter{next: into_next(bbox_collector), node_ids: Vec::new(), way_ids: Vec::new()};
         let mut bbox_collector = BboxCollector::new(crate::handler::FinalHandler::new());
         let mut filter = NodeIdCollector::new(bbox_collector);
-        let _ = process_with_handler(config, &mut filter);
+        let _ = process_with_handler(&config, &mut filter);
         let mut results = HandlerResult::default();
         filter.get_results(&mut results);
         assert!(filter.node_ids.len() > 0);

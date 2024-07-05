@@ -3,6 +3,7 @@ pub mod io;
 pub mod area;
 pub mod handler;
 pub mod output;
+pub mod osm_model;
 
 use std::process::exit;
 use benchmark_rs::stopwatch::StopWatch;
