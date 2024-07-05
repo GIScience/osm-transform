@@ -16,7 +16,7 @@ use serde::Deserialize;
 use wkt::{Geometry, ToWkt};
 use wkt::Wkt;
 
-use crate::{Handler, into_next};
+use crate::handler::{Handler, into_next};
 use crate::conf::Config;
 use crate::io::{process_file, process_with_handler};
 
@@ -204,7 +204,6 @@ impl Handler for AreaHandler {
             tags,
         );
         // debug!("Area IDs for {}: {:?}", node.id(), result);
-        self.handle_node_next(&new_node);
     }
 
     fn get_next(&mut self) -> &mut Option<Box<dyn Handler>> {
@@ -215,16 +214,25 @@ impl Handler for AreaHandler {
 #[cfg(test)]
 mod tests {
     use crate::area::AreaHandler;
-
+    use crate::handler::{BboxCollector, CountType, HandlerResult, NodesCounter, FinalHandler};
     use super::*;
 
     #[test]
     fn test_area_handler() {
         let config = Config::default();
-        let mut handler_chain = AreaHandler::default();
-        handler_chain.load(&config).expect("Area handler failed to load CSV file");
-        let _ = process_with_handler(&config, &mut handler_chain).expect("Area handler failed");
-        println!("Loaded: {}", handler_chain.mapping.id.len())
+        let mut final_counter = NodesCounter::new(CountType::ACCEPTED, FinalHandler::new());
+        let mut bbox_collector = BboxCollector::new(final_counter);
+        let mut area_handler = AreaHandler::new(bbox_collector);
+        area_handler.load(&config).expect("Area handler failed to load CSV file");
+        let mut initial_handler = NodesCounter::new(CountType::ALL,area_handler);
+        // let mut filter = Filter::new(area_handler);
+
+        let _ = process_with_handler(config, &mut initial_handler).expect("process_with_handler failed");
+        // println!("Loaded: {}", area_handler.mapping.id.len());
+
+        let mut result = HandlerResult::default();
+        initial_handler.get_results_next(&mut result);
+        println!("result: {:?}", result )
     }
 
     #[test]

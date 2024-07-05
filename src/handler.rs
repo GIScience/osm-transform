@@ -1,74 +1,146 @@
 use osm_io::osm::model::node::Node;
+use osm_io::osm::model::relation::Relation;
+use osm_io::osm::model::way::Way;
 use regex::Regex;
 
-struct HandlerResult {
+#[derive(Default,Debug)]
+pub struct HandlerResult {
     pub count_all_nodes: i32,
     pub count_accepted_nodes: i32,
+    pub node_ids: Vec<i64>,
     pub bbox_max_lon: f64,
     pub bbox_min_lon: f64,
     pub bbox_max_lat: f64,
     pub bbox_min_lat: f64,
 }
 
-impl HandlerResult {
-    pub fn new() -> Self {
-        Self {
-            count_all_nodes: 0,
-            count_accepted_nodes: 0,
-            bbox_min_lat: f64::MAX,
-            bbox_min_lon: f64::MAX,
-            bbox_max_lat: f64::MIN,
-            bbox_max_lon: f64::MIN,
+pub trait Handler {
+    fn handle_node(&mut self, node: &Node) {//TODO why not node: &mut Node?
+
+    }
+
+    fn handle_node_next(&mut self, node: &Node) {
+        self.handle_node(node);
+        if let Some(next) = &mut self.get_next() {
+            next.handle_node_next(node);
+        }
+    }
+    fn handle_way(&mut self, way: &Way) {
+        return;
+    }
+    fn handle_way_next(&mut self, way: &Way) {
+        self.handle_way(way);
+        if let Some(next) = &mut self.get_next() {
+            next.handle_way_next(way);
+        }
+    }
+    fn handle_relation(&mut self, relation: &Relation) {}
+    fn handle_relation_next(&mut self, relation: &Relation) {
+        self.handle_relation(relation);
+        if let Some(next) = &mut self.get_next() {
+            next.handle_relation_next(relation);
+        }
+    }
+
+    fn get_next(&mut self) -> &mut Option<Box<dyn Handler>>;
+
+    fn get_results(&mut self, res: &mut HandlerResult) {}
+
+    fn get_results_next(&mut self, res: &mut HandlerResult) {
+        self.get_results(res);
+        if let Some(next) = &mut self.get_next() {
+            next.get_results_next(res);
         }
     }
 }
 
-
-trait Handler {
-    fn handle_node(&mut self, node: &Node);
-    fn get_result(&mut self, result: HandlerResult) -> HandlerResult;
+pub fn into_next(handler: impl Handler + Sized + 'static) -> Option<Box<dyn Handler>> {
+    Some(Box::new(handler))
 }
 
-struct Terminator;
-
-impl Terminator {
-    pub fn new() -> Self {
-        Self {}
+pub(crate) struct FinalHandler {
+    next: Option<Box<dyn Handler>>,
+}
+impl FinalHandler {
+    pub(crate) fn new() -> Self {
+        FinalHandler { next: None }
     }
 }
-
-impl Handler for Terminator {
+impl Handler for FinalHandler {
     fn handle_node(&mut self, node: &Node) {
-        println!("terminator received {:?}", node)
+        // dbg!(node);
     }
-    fn get_result(&mut self, result: HandlerResult) -> HandlerResult {
-        result
+
+    fn get_next(&mut self) -> &mut Option<Box<dyn Handler>> {
+        &mut self.next
+    }
+
+    fn get_results(&mut self, result: &mut HandlerResult) {
+        // dbg!("FinalHandler get_results was called");
     }
 }
 
 #[derive(Debug)]
-enum CountType {
+pub(crate) enum CountType {
     ALL,
     ACCEPTED,
 }
 
-struct NodesCounter {
-    pub count: i32,
-    pub count_type: CountType,
-    pub next: Box<dyn Handler + 'static>,
+#[derive(Default)]
+pub(crate) struct NodeIdCollector {
+    pub next: Option<Box<dyn Handler>>,
+    pub node_ids: Vec<i64>,
+}
+impl NodeIdCollector {
+    pub(crate) fn new(next: impl Handler + 'static) -> Self {
+        Self {
+            next: into_next(next),
+            node_ids: Vec::new(),
+        }
+    }
+}
+impl Handler for NodeIdCollector {
+    fn handle_node(&mut self, node: &Node) {
+        self.node_ids.push(node.id());
+    }
+
+    fn get_next(&mut self) -> &mut Option<Box<dyn Handler>> {
+        return &mut self.next;
+    }
+
+    fn get_results(&mut self, res: &mut HandlerResult) {
+        res.node_ids = self.node_ids.clone();//TODO remove, this is just an experiment
+    }
 }
 
+pub(crate) struct NodesCounter {
+    pub count: i32,
+    pub count_type: CountType,
+    pub next: Option<Box<dyn Handler>>,
+}
+impl NodesCounter {
+    pub fn new(count_type: CountType, next: impl Handler + 'static) -> Self {
+        Self {
+            next: into_next(next),
+            count: 0,
+            count_type,
+        }
+    }
+
+}
 impl Handler for NodesCounter {
     fn handle_node(&mut self, node: &Node) {
-        self.count += 1;
-        self.next.handle_node(node)
+        self.count += 1
     }
-    fn get_result(&mut self, mut result: HandlerResult) -> HandlerResult {
+
+    fn get_next(&mut self) -> &mut Option<Box<dyn Handler>> {
+        return &mut self.next;
+    }
+    fn get_results(&mut self, mut result: &mut HandlerResult) {
         match self.count_type {
             CountType::ALL => { result.count_all_nodes = self.count }
             CountType::ACCEPTED => { result.count_accepted_nodes = self.count }
         }
-        return self.next.get_result(result);
     }
 }
 
@@ -78,60 +150,31 @@ enum FilterType {
     RemoveMatching,
 }
 
-struct NodesFilterForTagValueMatch {
+struct TagBasedNodesFilter {
     pub tag: String,
     pub regex: Regex,
     pub filter_type: FilterType,
-    pub next: Box<dyn Handler + 'static>,
+    pub next: Option<Box<dyn Handler>>,
 }
-
-#[derive(Debug)]
-enum HandlerDef {
-    NodesFilterDef(NodesFilterDef),
-    NodesCounterDef(NodesCounterDef),
-    BBoxCollectorDef,
-}
-
-#[derive(Debug)]
-struct NodesFilterDef {
-    tag: String,
-    regex: Regex,
-    filter_type: FilterType,
-}
-
-#[derive(Debug)]
-struct NodesCounterDef {
-    count_type: CountType,
-}
-
-fn as_chain(mut defs: Vec<HandlerDef>) -> Box<dyn Handler> {
-    defs.reverse();
-    let mut previous: Box<dyn Handler> = Box::new(Terminator::new());
-    for hander_def in defs {
-        match hander_def {
-            HandlerDef::NodesFilterDef(def) => {
-                // println!("regex: {:?}, filter_type: {:?}", &def.regex, &def.filter_type);
-                previous = Box::new(NodesFilterForTagValueMatch { tag: def.tag, filter_type: def.filter_type, regex: def.regex, next: previous });
-            }
-            HandlerDef::NodesCounterDef(def) => {
-                // println!("count_type: {:?}", &def.count_type);
-                previous = Box::new(NodesCounter { count: 0, count_type: def.count_type, next: previous });
-            }
-            HandlerDef::BBoxCollectorDef => {
-                previous = Box::new(BboxCollector::new(previous));
-            }
+impl TagBasedNodesFilter {
+    fn new(tag: String, regex: Regex, filter_type: FilterType, next: impl Handler + 'static) -> Self {
+        Self {
+            next: into_next(next),
+            tag: tag,
+            regex: regex,
+            filter_type: filter_type
         }
     }
-    previous
 }
-
-impl Handler for NodesFilterForTagValueMatch {
-    fn handle_node(&mut self, node: &Node) {
+impl Handler for TagBasedNodesFilter {
+    fn handle_node_next(&mut self, node: &Node) {
         match self.filter_type {
             FilterType::AcceptMatching => {
                 for tag in node.tags() {
                     if self.tag.eq(tag.k()) && self.regex.is_match(tag.v()) {
-                        self.next.handle_node(node)
+                        if let Some(next_handler) = self.get_next() {
+                            next_handler.handle_node_next(node)
+                        }
                     }
                 }
             }
@@ -144,19 +187,27 @@ impl Handler for NodesFilterForTagValueMatch {
                     }
                 }
                 if !found_match {
-                    self.next.handle_node(node)
+                    if let Some(next_handler) = self.get_next() {
+                        next_handler.handle_node_next(node)
+                    }
                 }
             }
         }
     }
-    fn get_result(&mut self, result: HandlerResult) -> HandlerResult {
-        return self.next.get_result(result);
+
+
+    fn get_next(&mut self) -> &mut Option<Box<dyn Handler>> {
+        return &mut self.next;
+    }
+
+    fn get_results(&mut self, result: &mut HandlerResult) {
+
     }
 }
 
-
-struct BboxCollector {
-    pub next: Box<dyn Handler>,
+#[derive(Default)]
+pub(crate) struct BboxCollector {
+    pub next: Option<Box<dyn Handler>>,
     pub min_lat: f64,
     pub min_lon: f64,
     pub max_lat: f64,
@@ -164,13 +215,13 @@ struct BboxCollector {
 }
 
 impl BboxCollector {
-    pub fn new(next: Box<dyn Handler>) -> Self {
+    pub(crate) fn new(next: impl Handler + 'static) -> Self {
         Self {
+            next: into_next(next),
             min_lat: f64::MAX,
             min_lon: f64::MAX,
             max_lat: f64::MIN,
             max_lon: f64::MIN,
-            next: next,
         }
     }
 }
@@ -178,6 +229,7 @@ impl BboxCollector {
 impl Handler for BboxCollector {
     fn handle_node(&mut self, node: &Node) {
         if &self.min_lat == &0.0 {
+            // self.set_min_lat(node.coordinate().lat());
             self.min_lat = node.coordinate().lat();
         }
         if &self.min_lon == &0.0 {
@@ -185,6 +237,7 @@ impl Handler for BboxCollector {
         }
 
         if node.coordinate().lat() < self.min_lat {
+            // self.set_min_lat(node.coordinate().lat());
             self.min_lat = node.coordinate().lat();
         }
         if node.coordinate().lon() < self.min_lon {
@@ -197,18 +250,17 @@ impl Handler for BboxCollector {
         if node.coordinate().lon() > self.max_lon {
             self.max_lon = node.coordinate().lon()
         }
-        self.next.handle_node(node);
     }
-
-    fn get_result(&mut self, mut result: HandlerResult) -> HandlerResult {
-        result.bbox_min_lat = self.min_lat;
-        result.bbox_min_lon = self.min_lon;
-        result.bbox_max_lat = self.max_lat;
-        result.bbox_max_lon = self.max_lon;
-        return self.next.get_result(result);
+    fn get_results(&mut self, res: &mut HandlerResult) {
+        res.bbox_max_lon = self.max_lon;
+        res.bbox_min_lon = self.min_lon;
+        res.bbox_max_lat = self.max_lat;
+        res.bbox_min_lat = self.min_lat;
+    }
+    fn get_next(&mut self) -> &mut Option<Box<dyn Handler>> {
+        return &mut self.next;
     }
 }
-
 
 #[cfg(test)]
 mod tests {
@@ -216,7 +268,8 @@ mod tests {
     use osm_io::osm::model::node::Node;
     use osm_io::osm::model::tag::Tag;
     use regex::Regex;
-    use crate::handler::{as_chain, CountType, FilterType, Handler, HandlerDef, HandlerResult, NodesCounter, NodesCounterDef, NodesFilterForTagValueMatch, NodesFilterDef, Terminator, BboxCollector};
+    use simple_logger::SimpleLogger;
+    use crate::handler::{BboxCollector, CountType, FilterType, Handler, HandlerResult, NodesCounter, TagBasedNodesFilter, FinalHandler, NodeIdCollector};
 
     const EXISTING_TAG: &str = "EXISTING_TAG";
     const MISSING_TAG: &str = "MISSING_TAG";
@@ -226,50 +279,46 @@ mod tests {
     fn missing_tag() -> String { "MISSING_TAG".to_string() }
 
     #[test]
-    fn test_handle_nodes_with_as_chain() {
-        let handlers = vec![
-            HandlerDef::NodesCounterDef(NodesCounterDef { count_type: CountType::ALL }),
-            HandlerDef::NodesFilterDef(NodesFilterDef { tag: existing_tag(), regex: Regex::new(".*p.*").unwrap(), filter_type: FilterType::AcceptMatching }),
-            HandlerDef::NodesFilterDef(NodesFilterDef { tag: existing_tag(), regex: Regex::new(".*z.*").unwrap(), filter_type: FilterType::RemoveMatching }),
-            HandlerDef::BBoxCollectorDef,
-            HandlerDef::NodesCounterDef(NodesCounterDef { count_type: CountType::ACCEPTED }),
-        ];
-        let mut handler = as_chain(handlers);
-        handle_test_nodes_and_verify_result(&mut *handler);
-    }
-
-    #[test]
-    fn test_handle_nodes_with_manually_chanied_handlesr() {
-        let mut handler = NodesCounter {
-            count: 0,
-            count_type: CountType::ALL,
-            next: Box::new(NodesFilterForTagValueMatch {
-                tag: existing_tag(),
-                filter_type: FilterType::AcceptMatching,
-                regex: Regex::new(".*p.*").unwrap(),
-                next: Box::new(NodesFilterForTagValueMatch {
-                    tag: existing_tag(),
-                    filter_type: FilterType::RemoveMatching,
-                    regex: Regex::new(".*z.*").unwrap(),
-                    next: Box::new(NodesCounter {
-                        count: 0,
-                        count_type: CountType::ACCEPTED,
-                        next: Box::new(BboxCollector::new(Box::new(Terminator::new()))),
-                    }),
-                }),
-            }),
-        };
+    fn test_handle_nodes_with_manually_chanied_handlers() {
+        SimpleLogger::new().init();
+        let mut handler =
+            NodesCounter::new(
+                CountType::ALL,
+                TagBasedNodesFilter::new(
+                    existing_tag(),
+                    Regex::new(".*p.*").unwrap(),
+                    FilterType::AcceptMatching,
+                    TagBasedNodesFilter::new(
+                        existing_tag(),
+                        Regex::new(".*z.*").unwrap(),
+                        FilterType::RemoveMatching,
+                        BboxCollector::new(
+                            NodesCounter::new(
+                                CountType::ACCEPTED,
+                                NodeIdCollector::new(
+                                    FinalHandler::new()
+                                )
+                            )
+                        )
+                    )
+                )
+            );
         handle_test_nodes_and_verify_result(&mut handler);
     }
 
     fn handle_test_nodes_and_verify_result(handler: &mut dyn Handler) {
-        handler.handle_node(&Node::new(1, 1, Coordinate::new(1.0f64, 1.1f64), 1, 1, 1, "a".to_string(), true, vec![Tag::new(existing_tag(), "kasper".to_string())]));
-        handler.handle_node(&Node::new(2, 1, Coordinate::new(2.0f64, 1.2f64), 1, 1, 1, "a".to_string(), true, vec![Tag::new(existing_tag(), "seppl".to_string())]));
-        handler.handle_node(&Node::new(3, 1, Coordinate::new(3.0f64, 1.3f64), 1, 1, 1, "a".to_string(), true, vec![Tag::new(existing_tag(), "hotzenplotz".to_string())]));
-        handler.handle_node(&Node::new(4, 1, Coordinate::new(4.0f64, 1.4f64), 1, 1, 1, "a".to_string(), true, vec![Tag::new(existing_tag(), "großmutter".to_string())]));
-        let result = handler.get_result(HandlerResult::new());
+        handler.handle_node_next(&Node::new(1, 1, Coordinate::new(1.0f64, 1.1f64), 1, 1, 1, "a".to_string(), true, vec![Tag::new(existing_tag(), "kasper".to_string())]));
+        handler.handle_node_next(&Node::new(2, 1, Coordinate::new(2.0f64, 1.2f64), 1, 1, 1, "a".to_string(), true, vec![Tag::new(existing_tag(), "seppl".to_string())]));
+        handler.handle_node_next(&Node::new(3, 1, Coordinate::new(3.0f64, 1.3f64), 1, 1, 1, "a".to_string(), true, vec![Tag::new(existing_tag(), "hotzenplotz".to_string())]));
+        handler.handle_node_next(&Node::new(4, 1, Coordinate::new(4.0f64, 1.4f64), 1, 1, 1, "a".to_string(), true, vec![Tag::new(existing_tag(), "großmutter".to_string())]));
+
+        let mut result = HandlerResult::default();
+        handler.get_results_next(&mut result);
+        dbg!(&result);
+
         assert_eq!(result.count_all_nodes, 4);
         assert_eq!(result.count_accepted_nodes, 2);
+        assert_eq!(result.node_ids, vec![1,2]);
         //BBox based on only filtered (accepted) nodes!
         assert_eq!(result.bbox_min_lat, 1.0f64);
         assert_eq!(result.bbox_min_lon, 1.1f64);
