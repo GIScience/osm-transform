@@ -10,7 +10,7 @@ use osm_io::osm::model::node::Node;
 use osm_io::osm::model::tag::Tag;
 
 use crate::conf::Config;
-use crate::{Filter, Handler};
+use crate::handler::{NodeIdCollector, Handler};
 use osm_io::osm::pbf;
 use osm_io::osm::pbf::compression_type::CompressionType;
 use osm_io::osm::pbf::file_info::FileInfo;
@@ -25,9 +25,9 @@ pub fn process_with_handler(config: Config, handler: &mut dyn Handler) -> Result
 
     for element in reader.elements()? {
         match &element {
-            Element::Node { node } => handler.handle_node(node),
-            Element::Way { way } => handler.handle_way(way),
-            Element::Relation { relation } => handler.handle_relation(relation),
+            Element::Node { node } => handler.handle_node_next(node),
+            Element::Way { way } => handler.handle_way_next(way),
+            Element::Relation { relation } => handler.handle_relation_next(relation),
             _ => (),
         }
     }
@@ -100,7 +100,7 @@ pub fn process_file() -> Result<(), anyhow::Error> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{BboxCollector, HandlerResult};
+    use crate::handler::{BboxCollector, HandlerResult};
     use pbf::reader::Reader;
 
     #[test]
@@ -121,17 +121,13 @@ mod tests {
         assert!(found);
     }
 
-    pub fn into_next(handler: impl Handler + Sized + 'static) -> Option<Box<dyn Handler>> {
-        Some(Box::new(handler))
-    }
-
     #[test]
     fn process_() {
         let config = Config::default();
         // let mut bbox_collector = BboxCollector{next: None, min_lat: 0f64, min_lon: 0f64, max_lat: 0f64, max_lon: 0f64};
         // let mut filter = Filter{next: into_next(bbox_collector), node_ids: Vec::new(), way_ids: Vec::new()};
-        let mut bbox_collector = BboxCollector::default();
-        let mut filter = Filter::new(bbox_collector);
+        let mut bbox_collector = BboxCollector::new(crate::handler::FinalHandler::new());
+        let mut filter = NodeIdCollector::new(bbox_collector);
         let _ = process_with_handler(config, &mut filter);
         let mut results = HandlerResult::default();
         filter.get_results(&mut results);
