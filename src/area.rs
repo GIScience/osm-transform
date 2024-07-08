@@ -171,6 +171,9 @@ impl AreaHandler {
 impl Handler for AreaHandler {
     fn process_node(&mut self, node: &mut MutableNode) -> bool {
         let mut result: Vec<String> = Vec::new();
+        if node.coordinate().lat() >= 90.0 || node.coordinate().lat() <= -90.0 {
+            return true;
+        }
         let grid_index = (node.coordinate().lat() as i32 + 90) * 360 + (node.coordinate().lon() as i32 + 180);
         let coord = Coord {x: node.coordinate().lon(), y: node.coordinate().lat()};
         match self.mapping.index[grid_index as usize] {
