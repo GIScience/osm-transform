@@ -22,6 +22,9 @@ pub fn run(config: &Config) {
     let mut output_handler = OutputHandler::new(config);
     output_handler.init();
     let mut handler_chain = AreaHandler::new(output_handler);
+
+
+
     log::info!("Reading area mapping CSV");
     let mut stopwatch = StopWatch::new();
     stopwatch.start();

@@ -12,7 +12,7 @@ use crate::handler::{Handler, HandlerResult};
 use osm_io::osm::pbf;
 use osm_io::osm::pbf::compression_type::CompressionType;
 use osm_io::osm::pbf::file_info::FileInfo;
-use crate::osm_model::MutableNode;
+use crate::osm_model::{MutableNode, MutableWay};
 
 pub fn process_with_handler(config: &Config, handler: &mut dyn Handler) -> Result<(), anyhow::Error> {
     log::info!("Started pbf io pipeline");
@@ -28,7 +28,7 @@ pub fn process_with_handler(config: &Config, handler: &mut dyn Handler) -> Resul
                 handler.handle_node_chained(&mut mut_node)
             },
             Element::Way { mut way } => {
-                handler.handle_way_chained(&mut way)
+                handler.handle_way_chained(&mut MutableWay::new(&way))
             },
             Element::Relation { mut relation } => {
                 handler.handle_relation_chained(&mut relation)

@@ -1,8 +1,7 @@
 use osm_io::osm::model::relation::Relation;
 use osm_io::osm::model::tag::Tag;
-use osm_io::osm::model::way::Way;
 use regex::Regex;
-use crate::osm_model::MutableNode;
+use crate::osm_model::{MutableNode, MutableWay};
 
 #[derive(Default,Debug)]
 pub struct HandlerResult {
@@ -26,9 +25,9 @@ pub trait Handler {
         }
     }
 
-    fn process_way(&mut self, way: &mut Way) -> bool {true}
+    fn process_way(&mut self, way: &mut MutableWay) -> bool {true}
 
-    fn handle_way_chained(&mut self, way: &mut Way) {
+    fn handle_way_chained(&mut self, way: &mut MutableWay) {
         if self.process_way(way) {
             if let Some(next) = &mut self.get_next() {
                 next.handle_way_chained(way);
@@ -109,34 +108,54 @@ impl Handler for NodeIdCollector {
     }
 }
 
-pub(crate) struct NodesCounter {
-    pub count: i32,
-    pub count_type: CountType,
+pub(crate) struct ElementCounter {
     pub next: Option<Box<dyn Handler>>,
+    pub nodes_count: i32,
+    pub ways_count: i32,
+    pub relations_count: i32,
+    pub handle_types: PbfTypeSwitch,
+    pub count_type: CountType,
 }
-impl NodesCounter {
-    pub fn new(count_type: CountType, next: impl Handler + 'static) -> Self {
+impl ElementCounter {
+    pub fn new(handle_types: PbfTypeSwitch, count_type: CountType, next: impl Handler + 'static) -> Self {
         Self {
             next: into_next(next),
-            count: 0,
+            nodes_count: 0,
+            ways_count: 0,
+            relations_count: 0,
+            handle_types,
             count_type,
         }
     }
 
 }
-impl Handler for NodesCounter {
+impl Handler for ElementCounter {
     fn process_node(&mut self, node: &mut MutableNode) -> bool {
-        self.count += 1;
+        if self.handle_types.node {
+            self.nodes_count += 1;
+        }
         true
     }
+    fn process_way(&mut self, way: &mut MutableWay) -> bool {
+        if self.handle_types.way {
+            self.ways_count += 1;
+        }
+        true
+    }
+    // fn process_relation(&mut self, relation: &mut MutableRelation) -> bool {
+    //     if self.handle_types.relation {
+    //         self.relations_count += 1;
+    //     }
+    //     true
+    // }
 
     fn get_next(&mut self) -> &mut Option<Box<dyn Handler>> {
         return &mut self.next;
     }
     fn process_results(&mut self, mut result: &mut HandlerResult) {
         match self.count_type {
-            CountType::ALL => { result.count_all_nodes = self.count }
-            CountType::ACCEPTED => { result.count_accepted_nodes = self.count }
+            CountType::ALL => { result.count_all_nodes = self.nodes_count }
+            CountType::ACCEPTED => { result.count_accepted_nodes = self.nodes_count }
         }
     }
 }
@@ -199,7 +218,7 @@ impl Handler for TagValueBasedNodesFilter {
     }
 }
 
-struct PbfTypeSwitch {
+pub(crate) struct PbfTypeSwitch {
     pub node: bool,
     pub way: bool,
     pub relation: bool,
@@ -318,7 +337,7 @@ mod tests {
     use osm_io::osm::model::tag::Tag;
     use regex::Regex;
     use simple_logger::SimpleLogger;
-    use crate::handler::{BboxCollector, CountType, FilterType, Handler, HandlerResult, NodesCounter, TagValueBasedNodesFilter, FinalHandler, NodeIdCollector, TagFilterByKey, PbfTypeSwitch};
+    use crate::handler::{BboxCollector, CountType, FilterType, Handler, HandlerResult, ElementCounter, TagValueBasedNodesFilter, FinalHandler, NodeIdCollector, TagFilterByKey, PbfTypeSwitch};
     use crate::osm_model::MutableNode;
 
     const EXISTING_TAG: &str = "EXISTING_TAG";
@@ -332,7 +351,8 @@ mod tests {
     fn test_handle_nodes_with_manually_chanied_handlers() {
         SimpleLogger::new().init();
         let mut handler =
-            NodesCounter::new(
+            ElementCounter::new(
+                PbfTypeSwitch{node:true, way:false, relation:false},
                 CountType::ALL,
                 TagValueBasedNodesFilter::new(
                     existing_tag(),
@@ -343,7 +363,8 @@ mod tests {
                         Regex::new(".*z.*").unwrap(),
                         FilterType::RemoveMatching,
                         BboxCollector::new(
-                            NodesCounter::new(
+                            ElementCounter::new(
+                                PbfTypeSwitch{node:true, way:false, relation:false},
                                 CountType::ACCEPTED,
                                 NodeIdCollector::new(
                                     FinalHandler::new()

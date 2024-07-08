@@ -8,7 +8,7 @@ use osm_io::osm::pbf::compression_type::CompressionType;
 use osm_io::osm::pbf::file_info::FileInfo;
 use crate::handler::{Handler, HandlerResult};
 use crate::conf::Config;
-use crate::osm_model::MutableNode;
+use crate::osm_model::{MutableNode, MutableWay};
 
 pub struct OutputHandler {
     pub writer: pbf::writer::Writer,
@@ -42,8 +42,8 @@ impl Handler for OutputHandler {
         false
     }
 
-    fn process_way(&mut self, way: &mut Way) -> bool {
-        self.writer.write_element(Element::Way { way: way.clone() }).expect("Failed to write way");
+    fn process_way(&mut self, way: &mut MutableWay) -> bool {
+        self.writer.write_element(Element::Way { way: <MutableWay<'_> as Clone>::clone(&way).build() }).expect("Failed to write way");
         false
     }
 
