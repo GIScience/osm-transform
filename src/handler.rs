@@ -461,6 +461,37 @@ mod tests {
         assert_eq!(node.tags()[1].k(), &"more-good");
         assert_eq!(node.tags()[1].v(), &"grandma");
     }
+
+    #[test]
+    fn test_tag_filter_by_key__remove_matching_complex_regex() {
+        let mut tag_filter = TagFilterByKey::new(
+            OsmElementTypeSelection::node_only(),
+            Regex::new("(.*:)?source(:.*)?|(.*:)?note(:.*)?|url|created_by|fixme|wikipedia").unwrap(),
+            FilterType::RemoveMatching,
+            FinalHandler::new());
+
+        let mut node = Node::new(1, 1, Coordinate::new(1.0f64, 1.1f64), 1, 1, 1, "a".to_string(), true,
+                                                       vec![
+                                                           Tag::new("closed:source".to_string(), "bad".to_string()),
+                                                           Tag::new("source".to_string(), "bad".to_string()),
+                                                           Tag::new("source:x".to_string(), "bad".to_string()),
+                                                           Tag::new("x:source:y".to_string(), "bad".to_string()),
+                                                           Tag::new("opensource".to_string(), "bad".to_string()), //really?
+                                                           Tag::new("note".to_string(), "bad".to_string()),
+                                                           Tag::new("url".to_string(), "bad".to_string()),
+                                                           Tag::new("created_by".to_string(), "bad".to_string()),
+                                                           Tag::new("fixme".to_string(), "bad".to_string()),
+                                                           Tag::new("wikipedia".to_string(), "bad".to_string()),
+                                                           Tag::new("wikimedia".to_string(), "good".to_string()),
+                                                       ]);
+        tag_filter.process_node(&mut node);
+        dbg!(&node);
+        assert_eq!(node.tags().len(), 1);
+        for tag in node.tags() {
+            assert_eq!(tag.v(), "good")
+        }
+    }
+
     #[test]
     fn test_tag_filter_by_key__keep_matching() {
         let mut tag_filter = TagFilterByKey::new(
