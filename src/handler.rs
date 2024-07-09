@@ -167,45 +167,54 @@ enum FilterType {
     RemoveMatching,
 }
 
-struct TagValueBasedNodesFilter {
-    pub tag: String,
-    pub value_regex: Regex,
+struct TagValueBasedOsmElementsFilter {
+    pub handle_types: PbfTypeSwitch,
+    pub tag_key: String,
+    pub tag_value_regex: Regex,
     pub filter_type: FilterType,
     pub next: Option<Box<dyn Handler>>,
 }
-impl TagValueBasedNodesFilter {
-    fn new(tag: String, regex: Regex, filter_type: FilterType, next: impl Handler + 'static) -> Self {
+impl TagValueBasedOsmElementsFilter {
+    fn new(handle_types: PbfTypeSwitch, tag_key: String, tag_value_regex: Regex, filter_type: FilterType, next: impl Handler + 'static) -> Self {
         Self {
+            handle_types,
+            tag_key,
+            tag_value_regex,
+            filter_type,
             next: into_next(next),
-            tag: tag,
-            value_regex: regex,
-            filter_type: filter_type
         }
     }
-}
-impl Handler for TagValueBasedNodesFilter {
-    fn handle_node_chained(&mut self, node: &mut Node) {
-        let mut accept = false;
 
+    fn accept_by_tags(&mut self, tags: &Vec<Tag>) -> bool {
+        let mut accept = false;
         match self.filter_type {
             FilterType::AcceptMatching => {
                 accept = false;
-                for tag in node.tags() {
-                    if self.tag.eq(tag.k()) && self.value_regex.is_match(tag.v()) {
+                for tag in tags {
+                    if self.tag_key.eq(tag.k()) && self.tag_value_regex.is_match(tag.v()) {
                         accept = true;
                         break
                     }
                 }
             }
             FilterType::RemoveMatching => {
-                for tag in node.tags() {
+                for tag in tags {
                     accept = true;
-                    if self.tag.eq(tag.k()) && self.value_regex.is_match(tag.v()) {
+                    if self.tag_key.eq(tag.k()) && self.tag_value_regex.is_match(tag.v()) {
                         accept = false;
                         break;
                     }
                 }
             }
+        }
+        accept
+    }
+}
+impl Handler for TagValueBasedOsmElementsFilter {
+    fn handle_node_chained(&mut self, node: &mut Node) {
+        let mut accept = true;
+        if self.handle_types.node  {
+            accept = self.accept_by_tags(&node.tags())
         }
         if accept {
             if let Some(next_handler) = self.get_next() {
@@ -219,11 +228,19 @@ impl Handler for TagValueBasedNodesFilter {
     }
 }
 
-pub(crate) struct PbfTypeSwitch {
+pub(crate) struct PbfTypeSwitch {//todo rename to OsmElementTypeSelection ?
     pub node: bool,
     pub way: bool,
     pub relation: bool,
 }
+impl PbfTypeSwitch {
+    fn all() -> Self { Self { node: true, way: true, relation: true } }
+    fn none() -> Self { Self { node: false, way: false, relation: false } }
+    fn node_only() -> Self { Self { node: true, way: false, relation: false } }
+    fn way_only() -> Self { Self { node: false, way: true, relation: false } }
+    fn relation_only() -> Self { Self { node: false, way: false, relation: true } }
+}
+
 struct TagFilterByKey {
     pub handle_types: PbfTypeSwitch,
     pub key_regex: Regex,
@@ -255,6 +272,18 @@ impl Handler for TagFilterByKey {
     fn process_node(&mut self, node: &mut Node) -> bool {
         if self.handle_types.node  {
             self.filter_tags(&mut node.tags_mut());
+        }
+        true
+    }
+    fn process_relation(&mut self, relation: &mut Relation) -> bool {
+        if self.handle_types.relation  {
+            self.filter_tags(&mut relation.tags_mut());
+        }
+        true
+    }
+    fn process_way(&mut self, way: &mut Way) -> bool {
+        if self.handle_types.way  {
+            self.filter_tags(&mut way.tags_mut());
         }
         true
     }
@@ -330,7 +359,7 @@ mod tests {
     use osm_io::osm::model::tag::Tag;
     use regex::Regex;
     use simple_logger::SimpleLogger;
-    use crate::handler::{BboxCollector, CountType, FilterType, Handler, HandlerResult, ElementCounter, TagValueBasedNodesFilter, FinalHandler, NodeIdCollector, TagFilterByKey, PbfTypeSwitch};
+    use crate::handler::{BboxCollector, CountType, FilterType, Handler, HandlerResult, ElementCounter, TagValueBasedOsmElementsFilter, FinalHandler, NodeIdCollector, TagFilterByKey, PbfTypeSwitch};
 
     const EXISTING_TAG: &str = "EXISTING_TAG";
     const MISSING_TAG: &str = "MISSING_TAG";
@@ -346,11 +375,13 @@ mod tests {
             ElementCounter::new(
                 PbfTypeSwitch{node:true, way:false, relation:false},
                 CountType::ALL,
-                TagValueBasedNodesFilter::new(
+                TagValueBasedOsmElementsFilter::new(
+                    PbfTypeSwitch::node_only(),
                     existing_tag(),
                     Regex::new(".*p.*").unwrap(),
                     FilterType::AcceptMatching,
-                    TagValueBasedNodesFilter::new(
+                    TagValueBasedOsmElementsFilter::new(
+                        PbfTypeSwitch::node_only(),
                         existing_tag(),
                         Regex::new(".*z.*").unwrap(),
                         FilterType::RemoveMatching,
