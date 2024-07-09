@@ -9,6 +9,7 @@ use csv::{ReaderBuilder, WriterBuilder};
 use geo::{Contains, Coord, Intersects, LineString, MultiPolygon, Polygon};
 use geo::BooleanOps;
 use btreemultimap::BTreeMultiMap;
+use osm_io::osm::model::node::Node;
 use osm_io::osm::model::tag::Tag;
 use serde::Deserialize;
 use wkt::{Geometry, ToWkt};
@@ -16,7 +17,6 @@ use wkt::Wkt;
 
 use crate::handler::{Handler, into_next};
 use crate::conf::Config;
-use crate::osm_model::MutableNode;
 
 const GRID_SIZE: usize = 64800;
 const AREA_ID_MULTIPLE: u16 = u16::MAX;
@@ -169,7 +169,7 @@ impl AreaHandler {
 }
 
 impl Handler for AreaHandler {
-    fn process_node(&mut self, node: &mut MutableNode) -> bool {
+    fn process_node(&mut self, node: &mut Node) -> bool {
         let mut result: Vec<String> = Vec::new();
         if node.coordinate().lat() >= 90.0 || node.coordinate().lat() <= -90.0 {
             return true;
@@ -209,7 +209,12 @@ mod tests {
 
     #[test]
     fn test_area_handler() {
-        let config = Config::default();
+        let config = Config {
+            param: 0,
+            country_path: "test/mapping_test.csv".to_string(),
+            input_path:  "test/baarle_small.pbf".to_string(),
+            output_path:  "output.pbf".to_string(),
+        };
         let mut final_counter = ElementCounter::new(PbfTypeSwitch {node:true, way:false, relation:false}, CountType::ACCEPTED, FinalHandler::new());
         let mut bbox_collector = BboxCollector::new(final_counter);
         let mut area_handler = AreaHandler::new(bbox_collector);

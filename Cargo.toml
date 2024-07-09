@@ -10,7 +10,8 @@ opt-level = 3
 overflow-checks = true
 
 [dependencies]
-osm-io = "0.1.4"
+# osm-io = "0.1.4"
+osm-io = { git = "https://github.com/takb/osm-io.git", branch = "mutable-model" }
 anyhow = "1.0.82"
 benchmark-rs = "0.1.1"
 simple_logger = "4.3.3"

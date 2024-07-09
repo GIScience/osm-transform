@@ -1,7 +1,7 @@
+use osm_io::osm::model::node::Node;
+use osm_io::osm::model::way::Way;
 use osm_io::osm::model::relation::Relation;
-use osm_io::osm::model::tag::Tag;
 use regex::Regex;
-use crate::osm_model::{MutableNode, MutableWay};
 
 #[derive(Default,Debug)]
 pub struct HandlerResult {
@@ -15,9 +15,9 @@ pub struct HandlerResult {
 }
 
 pub trait Handler {
-    fn process_node(&mut self, node: &mut MutableNode) -> bool {true}
+    fn process_node(&mut self, node: &mut Node) -> bool {true}
 
-    fn handle_node_chained(&mut self, node: &mut MutableNode) {
+    fn handle_node_chained(&mut self, node: &mut Node) {
         if self.process_node(node) {
             if let Some(next) = &mut self.get_next() {
                 next.handle_node_chained(node);
@@ -25,9 +25,9 @@ pub trait Handler {
         }
     }
 
-    fn process_way(&mut self, way: &mut MutableWay) -> bool {true}
+    fn process_way(&mut self, way: &mut Way) -> bool {true}
 
-    fn handle_way_chained(&mut self, way: &mut MutableWay) {
+    fn handle_way_chained(&mut self, way: &mut Way) {
         if self.process_way(way) {
             if let Some(next) = &mut self.get_next() {
                 next.handle_way_chained(way);
@@ -94,7 +94,7 @@ impl NodeIdCollector {
     }
 }
 impl Handler for NodeIdCollector {
-    fn process_node(&mut self, node: &mut MutableNode) -> bool {
+    fn process_node(&mut self, node: &mut Node) -> bool {
         self.node_ids.push(node.id());
         true
     }
@@ -130,24 +130,24 @@ impl ElementCounter {
 
 }
 impl Handler for ElementCounter {
-    fn process_node(&mut self, node: &mut MutableNode) -> bool {
+    fn process_node(&mut self, node: &mut Node) -> bool {
         if self.handle_types.node {
             self.nodes_count += 1;
         }
         true
     }
-    fn process_way(&mut self, way: &mut MutableWay) -> bool {
+    fn process_way(&mut self, way: &mut Way) -> bool {
         if self.handle_types.way {
             self.ways_count += 1;
         }
         true
     }
-    // fn process_relation(&mut self, relation: &mut MutableRelation) -> bool {
-    //     if self.handle_types.relation {
-    //         self.relations_count += 1;
-    //     }
-    //     true
-    // }
+    fn process_relation(&mut self, relation: &mut Relation) -> bool {
+        if self.handle_types.relation {
+            self.relations_count += 1;
+        }
+        true
+    }
 
     fn get_next(&mut self) -> &mut Option<Box<dyn Handler>> {
         return &mut self.next;
@@ -183,7 +183,7 @@ impl TagValueBasedNodesFilter {
     }
 }
 impl Handler for TagValueBasedNodesFilter {
-    fn handle_node_chained(&mut self, node: &mut MutableNode) {
+    fn handle_node_chained(&mut self, node: &mut Node) {
         let mut accept = false;
 
         match self.filter_type {
@@ -259,7 +259,7 @@ impl TagFilterByKey {
     }
 }
 impl Handler for TagFilterByKey {
-    fn process_node(&mut self, node: &mut MutableNode) -> bool {
+    fn process_node(&mut self, node: &mut Node) -> bool {
         if self.handle_types.node  {
             node.tags = self.filter_tags(&node.tags());
         }
@@ -294,7 +294,7 @@ impl BboxCollector {
 }
 
 impl Handler for BboxCollector {
-    fn process_node(&mut self, node: &mut MutableNode) -> bool {
+    fn process_node(&mut self, node: &mut Node) -> bool {
         if &self.min_lat == &0.0 {
             // self.set_min_lat(node.coordinate().lat());
             self.min_lat = node.coordinate().lat();
@@ -378,10 +378,10 @@ mod tests {
     }
 
     fn handle_test_nodes_and_verify_result(handler: &mut dyn Handler) {
-        handler.handle_node_chained(&mut MutableNode::new(&mut Node::new(1, 1, Coordinate::new(1.0f64, 1.1f64), 1, 1, 1, "a".to_string(), true, vec![Tag::new(existing_tag(), "kasper".to_string())])));
-        handler.handle_node_chained(&mut MutableNode::new(&mut Node::new(2, 1, Coordinate::new(2.0f64, 1.2f64), 1, 1, 1, "a".to_string(), true, vec![Tag::new(existing_tag(), "seppl".to_string())])));
-        handler.handle_node_chained(&mut MutableNode::new(&mut Node::new(3, 1, Coordinate::new(3.0f64, 1.3f64), 1, 1, 1, "a".to_string(), true, vec![Tag::new(existing_tag(), "hotzenplotz".to_string())])));
-        handler.handle_node_chained(&mut MutableNode::new(&mut Node::new(4, 1, Coordinate::new(4.0f64, 1.4f64), 1, 1, 1, "a".to_string(), true, vec![Tag::new(existing_tag(), "großmutter".to_string())])));
+        handler.handle_node_chained(&mut Node::new(1, 1, Coordinate::new(1.0f64, 1.1f64), 1, 1, 1, "a".to_string(), true, vec![Tag::new(existing_tag(), "kasper".to_string())]));
+        handler.handle_node_chained(&mut Node::new(2, 1, Coordinate::new(2.0f64, 1.2f64), 1, 1, 1, "a".to_string(), true, vec![Tag::new(existing_tag(), "seppl".to_string())]));
+        handler.handle_node_chained(&mut Node::new(3, 1, Coordinate::new(3.0f64, 1.3f64), 1, 1, 1, "a".to_string(), true, vec![Tag::new(existing_tag(), "hotzenplotz".to_string())]));
+        handler.handle_node_chained(&mut Node::new(4, 1, Coordinate::new(4.0f64, 1.4f64), 1, 1, 1, "a".to_string(), true, vec![Tag::new(existing_tag(), "großmutter".to_string())]));
 
         let mut result = HandlerResult::default();
         handler.get_results_chained(&mut result);
@@ -397,7 +397,7 @@ mod tests {
         assert_eq!(result.bbox_max_lon, 1.2f64);
     }
     pub(crate) struct FinalCaptor {
-        pub nodes: Vec<MutableNode>,
+        pub nodes: Vec<Node>,
         pub next: Option<Box<dyn Handler>>,
     }
     impl FinalCaptor {
@@ -406,7 +406,7 @@ mod tests {
         }
     }
     impl Handler for FinalCaptor {
-        fn process_node(&mut self, node: &mut MutableNode) -> bool {
+        fn process_node(&mut self, node: &mut Node) -> bool {
             self.nodes.push(node.clone());
             true
         }
