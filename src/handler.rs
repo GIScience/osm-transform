@@ -235,7 +235,6 @@ pub(crate) struct OsmElementTypeSelection {
 }
 impl OsmElementTypeSelection {
     fn all() -> Self { Self { node: true, way: true, relation: true } }
-    fn none() -> Self { Self { node: false, way: false, relation: false } }
     fn node_only() -> Self { Self { node: true, way: false, relation: false } }
     fn way_only() -> Self { Self { node: false, way: true, relation: false } }
     fn relation_only() -> Self { Self { node: false, way: false, relation: true } }
@@ -489,7 +488,7 @@ mod tests {
     #[test]
     fn test_tag_filter_by_key__node_not_handled() {
         let mut tag_filter = TagFilterByKey::new(
-            OsmElementTypeSelection::none(),
+            OsmElementTypeSelection::way_only(),
             Regex::new(".*").unwrap(),
             FilterType::RemoveMatching,
             FinalHandler::new());
