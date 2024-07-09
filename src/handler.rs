@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use osm_io::osm::model::node::Node;
 use osm_io::osm::model::way::Way;
 use osm_io::osm::model::relation::Relation;
@@ -128,7 +129,6 @@ impl ElementCounter {
             count_type,
         }
     }
-
 }
 impl Handler for ElementCounter {
     fn process_node(&mut self, node: &mut Node) -> bool {
@@ -306,6 +306,47 @@ impl Handler for TagKeyBasedOsmElementsFilter {
 
 
 
+
+
+struct HasOneOfTagKeysPredicate {
+    pub keys: Vec<String>
+}
+impl HasOneOfTagKeysPredicate {
+    fn test(&mut self, tags: &Vec<Tag>) -> bool {
+        tags.iter().any(|tag| self.keys.contains(tag.k()))
+    }
+}
+
+
+struct HasTagKeyValuePredicate {
+    pub key_values: HashMap<String,String>
+}
+impl HasTagKeyValuePredicate {
+    fn test(&mut self, tags: &Vec<Tag>) -> bool {
+        for tag in tags {
+            if let Some(match_value) = self.key_values.get(tag.k()) {
+                if tag.v() == match_value {
+                    return true;
+                }
+            }
+        }
+        false
+    }
+}
+
+
+struct HasNoneOfTagKeysPredicate {
+    pub keys: Vec<String>
+}
+impl HasNoneOfTagKeysPredicate {
+    fn test(&mut self, tags: &Vec<Tag>) -> bool {
+        tags.iter().all(|tag| !self.keys.contains(tag.k()))
+    }
+}
+
+
+
+
 pub(crate) struct OsmElementTypeSelection {
     pub node: bool,
     pub way: bool,
@@ -431,12 +472,13 @@ impl Handler for BboxCollector {
 
 #[cfg(test)]
 mod tests {
+    use std::collections::HashMap;
     use osm_io::osm::model::coordinate::Coordinate;
     use osm_io::osm::model::node::Node;
     use osm_io::osm::model::tag::Tag;
     use regex::Regex;
     use simple_logger::SimpleLogger;
-    use crate::handler::{BboxCollector, CountType, FilterType, Handler, HandlerResult, ElementCounter, TagValueBasedOsmElementsFilter, FinalHandler, NodeIdCollector, TagFilterByKey, OsmElementTypeSelection, TagKeyBasedOsmElementsFilter};
+    use crate::handler::{BboxCollector, CountType, FilterType, Handler, HandlerResult, ElementCounter, TagValueBasedOsmElementsFilter, FinalHandler, NodeIdCollector, TagFilterByKey, OsmElementTypeSelection, TagKeyBasedOsmElementsFilter, HasOneOfTagKeysPredicate, HasNoneOfTagKeysPredicate, HasTagKeyValuePredicate};
 
     const EXISTING_TAG: &str = "EXISTING_TAG";
     const MISSING_TAG: &str = "MISSING_TAG";
@@ -464,7 +506,7 @@ mod tests {
                         FilterType::RemoveMatching,
                         BboxCollector::new(
                             ElementCounter::new(
-                                OsmElementTypeSelection {node:true, way:false, relation:false},
+                                OsmElementTypeSelection::node_only(),
                                 CountType::ACCEPTED,
                                 NodeIdCollector::new(
                                     FinalHandler::new()
@@ -489,7 +531,7 @@ mod tests {
 
         assert_eq!(result.count_all_nodes, 4);
         assert_eq!(result.count_accepted_nodes, 2);
-        assert_eq!(result.node_ids, vec![1,2]);
+        assert_eq!(result.node_ids, vec![1, 2]);
         //BBox based on only filtered (accepted) nodes!
         assert_eq!(result.bbox_min_lat, 1.0f64);
         assert_eq!(result.bbox_min_lon, 1.1f64);
@@ -524,13 +566,13 @@ mod tests {
             FinalHandler::new());
 
         let mut node = Node::new(1, 1, Coordinate::new(1.0f64, 1.1f64), 1, 1, 1, "a".to_string(), true,
-                                                       vec![
-                                                           Tag::new("bad".to_string(), "hotzenplotz".to_string()),
-                                                           Tag::new("good".to_string(), "kasper".to_string()),
-                                                           Tag::new("more-bad".to_string(), "vader".to_string()),
-                                                           Tag::new("more-good".to_string(), "grandma".to_string()),
-                                                           Tag::new("badest".to_string(), "voldemort".to_string()),
-                                                       ]);
+                                 vec![
+                                     Tag::new("bad".to_string(), "hotzenplotz".to_string()),
+                                     Tag::new("good".to_string(), "kasper".to_string()),
+                                     Tag::new("more-bad".to_string(), "vader".to_string()),
+                                     Tag::new("more-good".to_string(), "grandma".to_string()),
+                                     Tag::new("badest".to_string(), "voldemort".to_string()),
+                                 ]);
         tag_filter.process_node(&mut node);
         dbg!(&node);
         assert_eq!(node.tags().len(), 2);
@@ -549,19 +591,19 @@ mod tests {
             FinalHandler::new());
 
         let mut node = Node::new(1, 1, Coordinate::new(1.0f64, 1.1f64), 1, 1, 1, "a".to_string(), true,
-                                                       vec![
-                                                           Tag::new("closed:source".to_string(), "bad".to_string()),
-                                                           Tag::new("source".to_string(), "bad".to_string()),
-                                                           Tag::new("source:x".to_string(), "bad".to_string()),
-                                                           Tag::new("x:source:y".to_string(), "bad".to_string()),
-                                                           Tag::new("opensource".to_string(), "bad".to_string()), //really?
-                                                           Tag::new("note".to_string(), "bad".to_string()),
-                                                           Tag::new("url".to_string(), "bad".to_string()),
-                                                           Tag::new("created_by".to_string(), "bad".to_string()),
-                                                           Tag::new("fixme".to_string(), "bad".to_string()),
-                                                           Tag::new("wikipedia".to_string(), "bad".to_string()),
-                                                           Tag::new("wikimedia".to_string(), "good".to_string()),
-                                                       ]);
+                                 vec![
+                                     Tag::new("closed:source".to_string(), "bad".to_string()),
+                                     Tag::new("source".to_string(), "bad".to_string()),
+                                     Tag::new("source:x".to_string(), "bad".to_string()),
+                                     Tag::new("x:source:y".to_string(), "bad".to_string()),
+                                     Tag::new("opensource".to_string(), "bad".to_string()), //really?
+                                     Tag::new("note".to_string(), "bad".to_string()),
+                                     Tag::new("url".to_string(), "bad".to_string()),
+                                     Tag::new("created_by".to_string(), "bad".to_string()),
+                                     Tag::new("fixme".to_string(), "bad".to_string()),
+                                     Tag::new("wikipedia".to_string(), "bad".to_string()),
+                                     Tag::new("wikimedia".to_string(), "good".to_string()),
+                                 ]);
         tag_filter.process_node(&mut node);
         dbg!(&node);
         assert_eq!(node.tags().len(), 1);
@@ -579,13 +621,13 @@ mod tests {
             FinalHandler::new());
 
         let mut node = Node::new(1, 1, Coordinate::new(1.0f64, 1.1f64), 1, 1, 1, "a".to_string(), true,
-                                                       vec![
-                                                           Tag::new("bad".to_string(), "hotzenplotz".to_string()),
-                                                           Tag::new("good".to_string(), "kasper".to_string()),
-                                                           Tag::new("more-bad".to_string(), "vader".to_string()),
-                                                           Tag::new("more-good".to_string(), "grandma".to_string()),
-                                                           Tag::new("badest".to_string(), "voldemort".to_string()),
-                                                       ]);
+                                 vec![
+                                     Tag::new("bad".to_string(), "hotzenplotz".to_string()),
+                                     Tag::new("good".to_string(), "kasper".to_string()),
+                                     Tag::new("more-bad".to_string(), "vader".to_string()),
+                                     Tag::new("more-good".to_string(), "grandma".to_string()),
+                                     Tag::new("badest".to_string(), "voldemort".to_string()),
+                                 ]);
         tag_filter.process_node(&mut node);
         dbg!(&node);
         assert_eq!(node.tags().len(), 2);
@@ -603,11 +645,11 @@ mod tests {
             FinalHandler::new());
 
         let mut node = Node::new(1, 1, Coordinate::new(1.0f64, 1.1f64), 1, 1, 1, "a".to_string(), true,
-                                                       vec![
-                                                           Tag::new("a".to_string(), "1".to_string()),
-                                                           Tag::new("b".to_string(), "2".to_string()),
-                                                           Tag::new("c".to_string(), "3".to_string()),
-                                                       ]);
+                                 vec![
+                                     Tag::new("a".to_string(), "1".to_string()),
+                                     Tag::new("b".to_string(), "2".to_string()),
+                                     Tag::new("c".to_string(), "3".to_string()),
+                                 ]);
         tag_filter.process_node(&mut node);
         assert_eq!(node.tags().len(), 3);
     }
@@ -620,11 +662,11 @@ mod tests {
             FinalHandler::new());
 
         let mut node = Node::new(1, 1, Coordinate::new(1.0f64, 1.1f64), 1, 1, 1, "a".to_string(), true,
-                                                       vec![
-                                                           Tag::new("a".to_string(), "1".to_string()),
-                                                           Tag::new("b".to_string(), "2".to_string()),
-                                                           Tag::new("c".to_string(), "3".to_string()),
-                                                       ]);
+                                 vec![
+                                     Tag::new("a".to_string(), "1".to_string()),
+                                     Tag::new("b".to_string(), "2".to_string()),
+                                     Tag::new("c".to_string(), "3".to_string()),
+                                 ]);
         tag_filter.process_node(&mut node);
         dbg!(&node);
         assert_eq!(node.tags().len(), 0);
@@ -643,20 +685,20 @@ mod tests {
         );
 
         filter.handle_node_chained(&mut Node::new(1, 1, Coordinate::new(1.0f64, 1.1f64), 1, 1, 1, "a".to_string(), true,
-                                           vec![
-                                     Tag::new("good".to_string(), "1".to_string()),
-                                     Tag::new("bad".to_string(), "2".to_string()),
-                                 ]));
+                                                  vec![
+                                                      Tag::new("good".to_string(), "1".to_string()),
+                                                      Tag::new("bad".to_string(), "2".to_string()),
+                                                  ]));
         filter.handle_node_chained(&mut Node::new(1, 1, Coordinate::new(1.0f64, 1.1f64), 1, 1, 1, "a".to_string(), true,
-                                           vec![
-                                     Tag::new("good".to_string(), "1".to_string()),
-                                     Tag::new("nice".to_string(), "2".to_string()),
-                                 ]));
+                                                  vec![
+                                                      Tag::new("good".to_string(), "1".to_string()),
+                                                      Tag::new("nice".to_string(), "2".to_string()),
+                                                  ]));
         filter.handle_node_chained(&mut Node::new(1, 1, Coordinate::new(1.0f64, 1.1f64), 1, 1, 1, "a".to_string(), true,
-                                           vec![
-                                     Tag::new("ugly".to_string(), "1".to_string()),
-                                     Tag::new("bad".to_string(), "2".to_string()),
-                                 ]));
+                                                  vec![
+                                                      Tag::new("ugly".to_string(), "1".to_string()),
+                                                      Tag::new("bad".to_string(), "2".to_string()),
+                                                  ]));
         let mut result = HandlerResult::default();
         filter.get_results_chained(&mut result);
         dbg!(&result);
@@ -677,24 +719,148 @@ mod tests {
         );
 
         filter.handle_node_chained(&mut Node::new(1, 1, Coordinate::new(1.0f64, 1.1f64), 1, 1, 1, "a".to_string(), true,
-                                           vec![
-                                     Tag::new("good".to_string(), "1".to_string()),
-                                     Tag::new("bad".to_string(), "2".to_string()),
-                                 ]));
+                                                  vec![
+                                                      Tag::new("good".to_string(), "1".to_string()),
+                                                      Tag::new("bad".to_string(), "2".to_string()),
+                                                  ]));
         filter.handle_node_chained(&mut Node::new(1, 1, Coordinate::new(1.0f64, 1.1f64), 1, 1, 1, "a".to_string(), true,
-                                           vec![
-                                     Tag::new("good".to_string(), "1".to_string()),
-                                     Tag::new("nice".to_string(), "2".to_string()),
-                                 ]));
+                                                  vec![
+                                                      Tag::new("good".to_string(), "1".to_string()),
+                                                      Tag::new("nice".to_string(), "2".to_string()),
+                                                  ]));
         filter.handle_node_chained(&mut Node::new(1, 1, Coordinate::new(1.0f64, 1.1f64), 1, 1, 1, "a".to_string(), true,
-                                           vec![
-                                     Tag::new("ugly".to_string(), "1".to_string()),
-                                     Tag::new("bad".to_string(), "2".to_string()),
-                                 ]));
+                                                  vec![
+                                                      Tag::new("ugly".to_string(), "1".to_string()),
+                                                      Tag::new("bad".to_string(), "2".to_string()),
+                                                  ]));
         let mut result = HandlerResult::default();
         filter.get_results_chained(&mut result);
         dbg!(&result);
 
         assert_eq!(result.count_all_nodes, 2);
+    }
+
+
+
+
+    #[test]
+    fn has_one_of_tag_keys_predicate__only_matching_tags() {
+        let mut predicate = HasOneOfTagKeysPredicate { keys: vec!["good".to_string(), "nice".to_string()] };
+        assert_eq!(true, predicate.test(&vec![
+            Tag::new("good".to_string(), "1".to_string()),
+        ]));
+    }
+    #[test]
+    fn has_one_of_tag_keys_predicate__only_all_matching_tags() {
+        let mut predicate = HasOneOfTagKeysPredicate { keys: vec!["good".to_string(), "nice".to_string()] };
+        assert_eq!(true, predicate.test(&vec![
+            Tag::new("good".to_string(), "1".to_string()),
+            Tag::new("nice".to_string(), "2".to_string()),
+        ]));
+    }
+    #[test]
+    fn has_one_of_tag_keys_predicate__also_matching_tags() {
+        let mut predicate = HasOneOfTagKeysPredicate { keys: vec!["good".to_string(), "nice".to_string()] };
+        assert_eq!(true, predicate.test(&vec![
+            Tag::new("good".to_string(), "1".to_string()),
+            Tag::new("bad".to_string(), "2".to_string()),
+        ]));
+    }
+    #[test]
+    fn has_one_of_tag_keys_predicate__no_matching_tags() {
+        let mut predicate = HasOneOfTagKeysPredicate { keys: vec!["good".to_string(), "nice".to_string()] };
+        assert_eq!(false, predicate.test(&vec![
+            Tag::new("ugly".to_string(), "1".to_string()),
+            Tag::new("bad".to_string(), "2".to_string()),
+        ]));
+    }
+
+
+
+
+
+
+
+
+    #[test]
+    fn has_tag_key_value_predicate__no_matching_tag() {
+        let mut key_values = HashMap::new();
+        key_values.insert("good".to_string(), "good".to_string());
+        key_values.insert("nice".to_string(), "nice".to_string());
+        let mut predicate = HasTagKeyValuePredicate { key_values: key_values };
+        assert_eq!(false, predicate.test(&vec![
+            Tag::new("bad".to_string(), "1".to_string()),
+            Tag::new("ugly".to_string(), "1".to_string()),
+        ]));
+    }
+    #[test]
+    fn has_tag_key_value_predicate__only_tag_with_wrong_value() {
+        let mut key_values = HashMap::new();
+        key_values.insert("good".to_string(), "good".to_string());
+        key_values.insert("nice".to_string(), "nice".to_string());
+        let mut predicate = HasTagKeyValuePredicate { key_values: key_values };
+        assert_eq!(false, predicate.test(&vec![
+            Tag::new("good".to_string(), "1".to_string()),
+        ]));
+    }
+    #[test]
+    fn has_tag_key_value_predicate__also_tag_with_wrong_value() {
+        let mut key_values = HashMap::new();
+        key_values.insert("good".to_string(), "good".to_string());
+        key_values.insert("nice".to_string(), "nice".to_string());
+        let mut predicate = HasTagKeyValuePredicate { key_values: key_values };
+        assert_eq!(false, predicate.test(&vec![
+            Tag::new("bad".to_string(), "1".to_string()),
+            Tag::new("good".to_string(), "1".to_string()),
+        ]));
+    }
+    #[test]
+    fn has_tag_key_value_predicate__only_tag_with_matching_value() {
+        let mut key_values = HashMap::new();
+        key_values.insert("good".to_string(), "good".to_string());
+        key_values.insert("nice".to_string(), "nice".to_string());
+        let mut predicate = HasTagKeyValuePredicate { key_values: key_values };
+        assert_eq!(true, predicate.test(&vec![
+            Tag::new("good".to_string(), "good".to_string()),
+        ]));
+    }
+    #[test]
+    fn has_tag_key_value_predicate__also_tag_with_matching_value() {
+        let mut key_values = HashMap::new();
+        key_values.insert("good".to_string(), "good".to_string());
+        key_values.insert("nice".to_string(), "nice".to_string());
+        let mut predicate = HasTagKeyValuePredicate { key_values: key_values };
+        assert_eq!(true, predicate.test(&vec![
+            Tag::new("bad".to_string(), "1".to_string()),
+            Tag::new("good".to_string(), "good".to_string()),
+        ]));
+    }
+
+
+
+
+
+    #[test]
+    fn has_none_of_tag_keys_predicate__only_non_matching_tag() {
+        let mut predicate = HasNoneOfTagKeysPredicate { keys: vec!["bad".to_string(), "ugly".to_string()] };
+        assert_eq!(true, predicate.test(&vec![
+            Tag::new("good".to_string(), "1".to_string()),
+        ]));
+    }
+    #[test]
+    fn has_none_of_tag_keys_predicate_also_matching_tag() {
+        let mut predicate = HasNoneOfTagKeysPredicate { keys: vec!["bad".to_string(), "ugly".to_string()] };
+        assert_eq!(false, predicate.test(&vec![
+            Tag::new("good".to_string(), "1".to_string()),
+            Tag::new("bad".to_string(), "1".to_string()),
+        ]));
+    }
+    #[test]
+    fn has_none_of_tag_keys_predicate_only_matching_tags() {
+        let mut predicate = HasNoneOfTagKeysPredicate { keys: vec!["bad".to_string(), "ugly".to_string()] };
+        assert_eq!(false, predicate.test(&vec![
+            Tag::new("ugly".to_string(), "1".to_string()),
+            Tag::new("bad".to_string(), "1".to_string()),
+        ]));
     }
 }
