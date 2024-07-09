@@ -305,6 +305,72 @@ impl Handler for TagKeyBasedOsmElementsFilter {
 
 
 
+struct ComplexElementsFilter {
+    pub handle_types: OsmElementTypeSelection,
+    pub has_good_key_predicate: HasOneOfTagKeysPredicate,
+    pub has_good_key_value_predicate: HasTagKeyValuePredicate,
+    pub has_bad_key_predicate: HasNoneOfTagKeysPredicate,
+    pub next: Option<Box<dyn Handler>>,
+}
+impl ComplexElementsFilter {
+    fn new(handle_types: OsmElementTypeSelection,
+           has_good_key_predicate: HasOneOfTagKeysPredicate,
+           has_good_key_value_predicate: HasTagKeyValuePredicate,
+           has_bad_key_predicate: HasNoneOfTagKeysPredicate,
+           next: impl Handler + 'static) -> Self {
+        Self {
+            handle_types,
+            has_good_key_predicate,
+            has_good_key_value_predicate,
+            has_bad_key_predicate,
+            next: into_next(next),
+        }
+    }
+    fn accept_by_tags(&mut self, tags: &Vec<Tag>) -> bool {
+        ( self.has_good_key_predicate.test(tags) ||
+            self.has_good_key_value_predicate.test(tags) )||
+            self.has_bad_key_predicate.test(tags)
+    }
+}
+impl Handler for ComplexElementsFilter {
+    fn handle_node_chained(&mut self, node: &mut Node) {
+        let mut accept = true;
+        if self.handle_types.node  {
+            accept = self.accept_by_tags(&node.tags())
+        }
+        if accept {
+            if let Some(next_handler) = self.get_next() {
+                next_handler.handle_node_chained(node)
+            }
+        }
+    }
+    fn handle_way_chained(&mut self, way: &mut Way) {
+        let mut accept = true;
+        if self.handle_types.way  {
+            accept = self.accept_by_tags(&way.tags())
+        }
+        if accept {
+            if let Some(next_handler) = self.get_next() {
+                next_handler.handle_way_chained(way)
+            }
+        }
+    }
+    fn handle_relation_chained(&mut self, relation: &mut Relation) {
+        let mut accept = true;
+        if self.handle_types.relation  {
+            accept = self.accept_by_tags(&relation.tags())
+        }
+        if accept {
+            if let Some(next_handler) = self.get_next() {
+                next_handler.handle_relation_chained(relation)
+            }
+        }
+    }
+
+    fn get_next(&mut self) -> &mut Option<Box<dyn Handler>> {
+        return &mut self.next;
+    }
+}
 
 
 
@@ -478,7 +544,7 @@ mod tests {
     use osm_io::osm::model::tag::Tag;
     use regex::Regex;
     use simple_logger::SimpleLogger;
-    use crate::handler::{BboxCollector, CountType, FilterType, Handler, HandlerResult, ElementCounter, TagValueBasedOsmElementsFilter, FinalHandler, NodeIdCollector, TagFilterByKey, OsmElementTypeSelection, TagKeyBasedOsmElementsFilter, HasOneOfTagKeysPredicate, HasNoneOfTagKeysPredicate, HasTagKeyValuePredicate};
+    use crate::handler::{BboxCollector, CountType, FilterType, Handler, HandlerResult, ElementCounter, TagValueBasedOsmElementsFilter, FinalHandler, NodeIdCollector, TagFilterByKey, OsmElementTypeSelection, TagKeyBasedOsmElementsFilter, HasOneOfTagKeysPredicate, HasNoneOfTagKeysPredicate, HasTagKeyValuePredicate, ComplexElementsFilter};
 
     const EXISTING_TAG: &str = "EXISTING_TAG";
     const MISSING_TAG: &str = "MISSING_TAG";
@@ -741,8 +807,6 @@ mod tests {
     }
 
 
-
-
     #[test]
     fn has_one_of_tag_keys_predicate__only_matching_tags() {
         let mut predicate = HasOneOfTagKeysPredicate { keys: vec!["good".to_string(), "nice".to_string()] };
@@ -776,12 +840,6 @@ mod tests {
     }
 
 
-
-
-
-
-
-
     #[test]
     fn has_tag_key_value_predicate__no_matching_tag() {
         let mut key_values = HashMap::new();
@@ -809,9 +867,10 @@ mod tests {
         key_values.insert("good".to_string(), "good".to_string());
         key_values.insert("nice".to_string(), "nice".to_string());
         let mut predicate = HasTagKeyValuePredicate { key_values: key_values };
-        assert_eq!(false, predicate.test(&vec![
+        assert_eq!(true, predicate.test(&vec![
             Tag::new("bad".to_string(), "1".to_string()),
             Tag::new("good".to_string(), "1".to_string()),
+            Tag::new("nice".to_string(), "nice".to_string()),
         ]));
     }
     #[test]
@@ -837,9 +896,6 @@ mod tests {
     }
 
 
-
-
-
     #[test]
     fn has_none_of_tag_keys_predicate__only_non_matching_tag() {
         let mut predicate = HasNoneOfTagKeysPredicate { keys: vec!["bad".to_string(), "ugly".to_string()] };
@@ -862,5 +918,97 @@ mod tests {
             Tag::new("ugly".to_string(), "1".to_string()),
             Tag::new("bad".to_string(), "1".to_string()),
         ]));
+    }
+
+
+    #[test]
+    fn complex_filter() {
+        let mut key_values = HashMap::new();
+        key_values.insert("railway".to_string(), "platform".to_string());
+        key_values.insert("public_transport".to_string(), "platform".to_string());
+        key_values.insert("man_made".to_string(), "pier".to_string());
+
+        let mut filter = ElementCounter::new(
+            OsmElementTypeSelection::all(),
+            CountType::ALL,
+            ComplexElementsFilter::new(
+                OsmElementTypeSelection::all(),
+                HasOneOfTagKeysPredicate { keys: vec!["highway".to_string(), "route".to_string()] },
+                HasTagKeyValuePredicate { key_values: key_values },
+                HasNoneOfTagKeysPredicate { keys: vec![
+                    "building".to_string(),
+                    "landuse".to_string(),
+                    "boundary".to_string(),
+                    "natural".to_string(),
+                    "place".to_string(),
+                    "waterway".to_string(),
+                    "aeroway".to_string(),
+                    "aviation".to_string(),
+                    "military".to_string(),
+                    "power".to_string(),
+                    "communication".to_string(),
+                    "man_made".to_string()] },
+                NodeIdCollector::new(
+                    ElementCounter::new(
+                        OsmElementTypeSelection::all(),
+                        CountType::ACCEPTED,
+                        FinalHandler::new())
+                )));
+        // has key to keep and key-value to keep, bad key 'building' should not take effect => should be accepted
+        filter.handle_node_chained(&mut Node::new(1, 1, Coordinate::new(1.0f64, 1.1f64), 1, 1, 1, "a".to_string(), true,
+                                                  vec![
+                                                      Tag::new("route".to_string(), "xyz".to_string()),
+                                                      Tag::new("railway".to_string(), "platform".to_string()),
+                                                      Tag::new("building".to_string(), "x".to_string()),
+                                                  ]));
+
+        // has key to keep, bad key 'building' should not take effect => should be accepted
+        filter.handle_node_chained(&mut Node::new(2, 1, Coordinate::new(1.0f64, 1.1f64), 1, 1, 1, "a".to_string(), true,
+                                                  vec![
+                                                      Tag::new("route".to_string(), "xyz".to_string()),
+                                                      Tag::new("building".to_string(), "x".to_string()),
+                                                  ]));
+
+        // has key-value to keep, bad key 'building' should not take effect => should be accepted
+        filter.handle_node_chained(&mut Node::new(3, 1, Coordinate::new(1.0f64, 1.1f64), 1, 1, 1, "a".to_string(), true,
+                                                  vec![
+                                                      Tag::new("railway".to_string(), "platform".to_string()),
+                                                      Tag::new("building".to_string(), "x".to_string()),
+                                                  ]));
+
+        // has no key or key-value to keep, but also no bad key => should be accepted
+        filter.handle_node_chained(&mut Node::new(4, 1, Coordinate::new(1.0f64, 1.1f64), 1, 1, 1, "a".to_string(), true,
+                                                  vec![
+                                                      Tag::new("railway".to_string(), "wrong-value".to_string()),
+                                                      Tag::new("something".to_string(), "else".to_string()),
+                                                  ]));
+
+        // has no key or key-value to keep, some other key, but also one bad key => should be filtered
+        filter.handle_node_chained(&mut Node::new(5, 1, Coordinate::new(1.0f64, 1.1f64), 1, 1, 1, "a".to_string(), true,
+                                                  vec![
+                                                      Tag::new("railway".to_string(), "wrong-value".to_string()),
+                                                      Tag::new("something".to_string(), "else".to_string()),
+                                                      Tag::new("building".to_string(), "x".to_string()),
+                                                  ]));
+
+        // has only one bad key => should be filtered
+        filter.handle_node_chained(&mut Node::new(6, 1, Coordinate::new(1.0f64, 1.1f64), 1, 1, 1, "a".to_string(), true,
+                                                  vec![
+                                                      Tag::new("building".to_string(), "x".to_string()),
+                                                  ]));
+
+        // has only one other key => should be accepted
+        filter.handle_node_chained(&mut Node::new(7, 1, Coordinate::new(1.0f64, 1.1f64), 1, 1, 1, "a".to_string(), true,
+                                                  vec![
+                                                      Tag::new("something".to_string(), "x".to_string()),
+                                                  ]));
+
+        let mut result = HandlerResult::default();
+        filter.get_results_chained(&mut result);
+        dbg!(&result);
+
+        assert_eq!(result.count_all_nodes, 7);
+        assert_eq!(result.count_accepted_nodes, 5);
+        assert_eq!(result.node_ids, vec![1, 2, 3, 4, 7])
     }
 }
