@@ -206,7 +206,12 @@ mod tests {
 
     #[test]
     fn test_area_handler() {
-        let config = Config::default();
+        let config = Config {
+            param: 0,
+            country_path: "test/mapping_test.csv".to_string(),
+            input_path:  "test/baarle_small.pbf".to_string(),
+            output_path:  "output.pbf".to_string(),
+        };
         let mut final_counter = NodesCounter::new(CountType::ACCEPTED, FinalHandler::new());
         let mut bbox_collector = BboxCollector::new(final_counter);
         let mut area_handler = AreaHandler::new(bbox_collector);

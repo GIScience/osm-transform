@@ -273,51 +273,51 @@ mod tests {
 
     fn missing_tag() -> String { "MISSING_TAG".to_string() }
 
-    // #[test]
-    // fn test_handle_nodes_with_manually_chanied_handlers() {
-    //     SimpleLogger::new().init();
-    //     let mut handler =
-    //         NodesCounter::new(
-    //             CountType::ALL,
-    //             TagBasedNodesFilter::new(
-    //                 existing_tag(),
-    //                 Regex::new(".*p.*").unwrap(),
-    //                 FilterType::AcceptMatching,
-    //                 TagBasedNodesFilter::new(
-    //                     existing_tag(),
-    //                     Regex::new(".*z.*").unwrap(),
-    //                     FilterType::RemoveMatching,
-    //                     BboxCollector::new(
-    //                         NodesCounter::new(
-    //                             CountType::ACCEPTED,
-    //                             NodeIdCollector::new(
-    //                                 FinalHandler::new()
-    //                             )
-    //                         )
-    //                     )
-    //                 )
-    //             )
-    //         );
-    //     handle_test_nodes_and_verify_result(&mut handler);
-    // }
+    #[test]
+    fn test_handle_nodes_with_manually_chanied_handlers() {
+        SimpleLogger::new().init();
+        let mut handler =
+            NodesCounter::new(
+                CountType::ALL,
+                TagBasedNodesFilter::new(
+                    existing_tag(),
+                    Regex::new(".*p.*").unwrap(),
+                    FilterType::AcceptMatching,
+                    TagBasedNodesFilter::new(
+                        existing_tag(),
+                        Regex::new(".*z.*").unwrap(),
+                        FilterType::RemoveMatching,
+                        BboxCollector::new(
+                            NodesCounter::new(
+                                CountType::ACCEPTED,
+                                NodeIdCollector::new(
+                                    FinalHandler::new()
+                                )
+                            )
+                        )
+                    )
+                )
+            );
+        handle_test_nodes_and_verify_result(&mut handler);
+    }
 
-    // fn handle_test_nodes_and_verify_result(handler: &mut dyn Handler) {
-    //     handler.handle_node_chained(&mut MutableNode::new(&mut Node::new(1, 1, Coordinate::new(1.0f64, 1.1f64), 1, 1, 1, "a".to_string(), true, vec![Tag::new(existing_tag(), "kasper".to_string())])));
-    //     handler.handle_node_chained(&mut MutableNode::new(&mut Node::new(2, 1, Coordinate::new(2.0f64, 1.2f64), 1, 1, 1, "a".to_string(), true, vec![Tag::new(existing_tag(), "seppl".to_string())])));
-    //     handler.handle_node_chained(&mut MutableNode::new(&mut Node::new(3, 1, Coordinate::new(3.0f64, 1.3f64), 1, 1, 1, "a".to_string(), true, vec![Tag::new(existing_tag(), "hotzenplotz".to_string())])));
-    //     handler.handle_node_chained(&mut MutableNode::new(&mut Node::new(4, 1, Coordinate::new(4.0f64, 1.4f64), 1, 1, 1, "a".to_string(), true, vec![Tag::new(existing_tag(), "großmutter".to_string())])));
-    //
-    //     let mut result = HandlerResult::default();
-    //     handler.get_results_chained(&mut result);
-    //     dbg!(&result);
-    //
-    //     assert_eq!(result.count_all_nodes, 4);
-    //     assert_eq!(result.count_accepted_nodes, 2);
-    //     assert_eq!(result.node_ids, vec![1,2]);
-    //     //BBox based on only filtered (accepted) nodes!
-    //     assert_eq!(result.bbox_min_lat, 1.0f64);
-    //     assert_eq!(result.bbox_min_lon, 1.1f64);
-    //     assert_eq!(result.bbox_max_lat, 2.0f64);
-    //     assert_eq!(result.bbox_max_lon, 1.2f64);
-    // }
+    fn handle_test_nodes_and_verify_result(handler: &mut dyn Handler) {
+        handler.handle_node_chained(&mut Node::new(1, 1, Coordinate::new(1.0f64, 1.1f64), 1, 1, 1, "a".to_string(), true, vec![Tag::new(existing_tag(), "kasper".to_string())]));
+        handler.handle_node_chained(&mut Node::new(2, 1, Coordinate::new(2.0f64, 1.2f64), 1, 1, 1, "a".to_string(), true, vec![Tag::new(existing_tag(), "seppl".to_string())]));
+        handler.handle_node_chained(&mut Node::new(3, 1, Coordinate::new(3.0f64, 1.3f64), 1, 1, 1, "a".to_string(), true, vec![Tag::new(existing_tag(), "hotzenplotz".to_string())]));
+        handler.handle_node_chained(&mut Node::new(4, 1, Coordinate::new(4.0f64, 1.4f64), 1, 1, 1, "a".to_string(), true, vec![Tag::new(existing_tag(), "großmutter".to_string())]));
+
+        let mut result = HandlerResult::default();
+        handler.get_results_chained(&mut result);
+        dbg!(&result);
+
+        assert_eq!(result.count_all_nodes, 4);
+        assert_eq!(result.count_accepted_nodes, 2);
+        assert_eq!(result.node_ids, vec![1,2]);
+        //BBox based on only filtered (accepted) nodes!
+        assert_eq!(result.bbox_min_lat, 1.0f64);
+        assert_eq!(result.bbox_min_lon, 1.1f64);
+        assert_eq!(result.bbox_max_lat, 2.0f64);
+        assert_eq!(result.bbox_max_lon, 1.2f64);
+    }
 }
