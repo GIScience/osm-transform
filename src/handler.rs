@@ -1,6 +1,7 @@
 use osm_io::osm::model::node::Node;
 use osm_io::osm::model::way::Way;
 use osm_io::osm::model::relation::Relation;
+use osm_io::osm::model::tag::Tag;
 use regex::Regex;
 
 #[derive(Default,Debug)]
@@ -239,29 +240,21 @@ impl TagFilterByKey {
         }
     }
 
-    fn filter_tags(&mut self, tags: &Vec<Tag>) -> Vec<Tag> {
-        let mut new_tags = vec![];
-        for tag in tags {
-            match self.filter_type {
-                FilterType::AcceptMatching => {
-                    if self.key_regex.is_match(tag.k()) {
-                        new_tags.push(tag.clone());
-                    }
-                }
-                FilterType::RemoveMatching => {
-                    if !self.key_regex.is_match(tag.k()) {
-                        new_tags.push(tag.clone());
-                    }
-                }
+    fn filter_tags(&mut self, tags: &mut Vec<Tag>) {
+        match self.filter_type {
+            FilterType::AcceptMatching => {
+                tags.retain(|tag| self.key_regex.is_match(&tag.k()));
+            }
+            FilterType::RemoveMatching => {
+                tags.retain(|tag| !self.key_regex.is_match(&tag.k()));
             }
         }
-        new_tags
     }
 }
 impl Handler for TagFilterByKey {
     fn process_node(&mut self, node: &mut Node) -> bool {
         if self.handle_types.node  {
-            node.tags = self.filter_tags(&node.tags());
+            self.filter_tags(&mut node.tags_mut());
         }
         true
     }
@@ -338,7 +331,6 @@ mod tests {
     use regex::Regex;
     use simple_logger::SimpleLogger;
     use crate::handler::{BboxCollector, CountType, FilterType, Handler, HandlerResult, ElementCounter, TagValueBasedNodesFilter, FinalHandler, NodeIdCollector, TagFilterByKey, PbfTypeSwitch};
-    use crate::osm_model::MutableNode;
 
     const EXISTING_TAG: &str = "EXISTING_TAG";
     const MISSING_TAG: &str = "MISSING_TAG";
@@ -423,15 +415,16 @@ mod tests {
             FilterType::RemoveMatching,
             FinalHandler::new());
 
-        let mut node = MutableNode::new(&mut Node::new(1, 1, Coordinate::new(1.0f64, 1.1f64), 1, 1, 1, "a".to_string(), true,
+        let mut node = Node::new(1, 1, Coordinate::new(1.0f64, 1.1f64), 1, 1, 1, "a".to_string(), true,
                                                        vec![
                                                            Tag::new("bad".to_string(), "hotzenplotz".to_string()),
                                                            Tag::new("good".to_string(), "kasper".to_string()),
                                                            Tag::new("more-bad".to_string(), "vader".to_string()),
                                                            Tag::new("more-good".to_string(), "grandma".to_string()),
                                                            Tag::new("badest".to_string(), "voldemort".to_string()),
-                                                       ]));
+                                                       ]);
         tag_filter.process_node(&mut node);
+        dbg!(&node);
         assert_eq!(node.tags().len(), 2);
         assert_eq!(node.tags()[0].k(), &"good");
         assert_eq!(node.tags()[0].v(), &"kasper");
@@ -446,15 +439,16 @@ mod tests {
             FilterType::AcceptMatching,
             FinalHandler::new());
 
-        let mut node = MutableNode::new(&mut Node::new(1, 1, Coordinate::new(1.0f64, 1.1f64), 1, 1, 1, "a".to_string(), true,
+        let mut node = Node::new(1, 1, Coordinate::new(1.0f64, 1.1f64), 1, 1, 1, "a".to_string(), true,
                                                        vec![
                                                            Tag::new("bad".to_string(), "hotzenplotz".to_string()),
                                                            Tag::new("good".to_string(), "kasper".to_string()),
                                                            Tag::new("more-bad".to_string(), "vader".to_string()),
                                                            Tag::new("more-good".to_string(), "grandma".to_string()),
                                                            Tag::new("badest".to_string(), "voldemort".to_string()),
-                                                       ]));
+                                                       ]);
         tag_filter.process_node(&mut node);
+        dbg!(&node);
         assert_eq!(node.tags().len(), 2);
         assert_eq!(node.tags()[0].k(), &"good");
         assert_eq!(node.tags()[0].v(), &"kasper");
@@ -469,12 +463,12 @@ mod tests {
             FilterType::RemoveMatching,
             FinalHandler::new());
 
-        let mut node = MutableNode::new(&mut Node::new(1, 1, Coordinate::new(1.0f64, 1.1f64), 1, 1, 1, "a".to_string(), true,
+        let mut node = Node::new(1, 1, Coordinate::new(1.0f64, 1.1f64), 1, 1, 1, "a".to_string(), true,
                                                        vec![
                                                            Tag::new("a".to_string(), "1".to_string()),
                                                            Tag::new("b".to_string(), "2".to_string()),
                                                            Tag::new("c".to_string(), "3".to_string()),
-                                                       ]));
+                                                       ]);
         tag_filter.process_node(&mut node);
         assert_eq!(node.tags().len(), 3);
     }
@@ -486,13 +480,14 @@ mod tests {
             FilterType::RemoveMatching,
             FinalHandler::new());
 
-        let mut node = MutableNode::new(&mut Node::new(1, 1, Coordinate::new(1.0f64, 1.1f64), 1, 1, 1, "a".to_string(), true,
+        let mut node = Node::new(1, 1, Coordinate::new(1.0f64, 1.1f64), 1, 1, 1, "a".to_string(), true,
                                                        vec![
                                                            Tag::new("a".to_string(), "1".to_string()),
                                                            Tag::new("b".to_string(), "2".to_string()),
                                                            Tag::new("c".to_string(), "3".to_string()),
-                                                       ]));
+                                                       ]);
         tag_filter.process_node(&mut node);
+        dbg!(&node);
         assert_eq!(node.tags().len(), 0);
     }
 }
