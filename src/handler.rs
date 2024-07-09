@@ -222,11 +222,89 @@ impl Handler for TagValueBasedOsmElementsFilter {
             }
         }
     }
+    fn handle_way_chained(&mut self, way: &mut Way) {
+        let mut accept = true;
+        if self.handle_types.way  {
+            accept = self.accept_by_tags(&way.tags())
+        }
+        if accept {
+            if let Some(next_handler) = self.get_next() {
+                next_handler.handle_way_chained(way)
+            }
+        }
+    }
+    fn handle_relation_chained(&mut self, relation: &mut Relation) {
+        let mut accept = true;
+        if self.handle_types.relation  {
+            accept = self.accept_by_tags(&relation.tags())
+        }
+        if accept {
+            if let Some(next_handler) = self.get_next() {
+                next_handler.handle_relation_chained(relation)
+            }
+        }
+    }
 
     fn get_next(&mut self) -> &mut Option<Box<dyn Handler>> {
         return &mut self.next;
     }
 }
+
+
+
+
+
+
+struct TagKeyBasedOsmElementsFilter {
+    pub handle_types: OsmElementTypeSelection,
+    pub tag_keys: Vec<String>,
+    pub filter_type: FilterType,
+    pub next: Option<Box<dyn Handler>>,
+}
+impl TagKeyBasedOsmElementsFilter {
+    fn new(handle_types: OsmElementTypeSelection, tag_keys: Vec<String>, filter_type: FilterType, next: impl Handler + 'static) -> Self {
+        Self {
+            handle_types,
+            tag_keys,
+            filter_type,
+            next: into_next(next),
+        }
+    }
+    fn accept_by_tags(&mut self, tags: &Vec<Tag>) -> bool {
+        let contains_any_key = tags.iter().any(|tag| self.tag_keys.contains(tag.k()));
+        match self.filter_type {
+            FilterType::AcceptMatching => {
+                return contains_any_key
+            }
+            FilterType::RemoveMatching => {
+                return !contains_any_key
+            }
+        }
+    }
+}
+impl Handler for TagKeyBasedOsmElementsFilter {
+    fn handle_node_chained(&mut self, node: &mut Node) {
+        let mut accept = true;
+        if self.handle_types.node  {
+            accept = self.accept_by_tags(&node.tags())
+        }
+        if accept {
+            if let Some(next_handler) = self.get_next() {
+                next_handler.handle_node_chained(node)
+            }
+        }
+    }
+
+    fn get_next(&mut self) -> &mut Option<Box<dyn Handler>> {
+        return &mut self.next;
+    }
+}
+
+
+
+
+
+
 
 pub(crate) struct OsmElementTypeSelection {
     pub node: bool,
@@ -358,7 +436,7 @@ mod tests {
     use osm_io::osm::model::tag::Tag;
     use regex::Regex;
     use simple_logger::SimpleLogger;
-    use crate::handler::{BboxCollector, CountType, FilterType, Handler, HandlerResult, ElementCounter, TagValueBasedOsmElementsFilter, FinalHandler, NodeIdCollector, TagFilterByKey, OsmElementTypeSelection};
+    use crate::handler::{BboxCollector, CountType, FilterType, Handler, HandlerResult, ElementCounter, TagValueBasedOsmElementsFilter, FinalHandler, NodeIdCollector, TagFilterByKey, OsmElementTypeSelection, TagKeyBasedOsmElementsFilter};
 
     const EXISTING_TAG: &str = "EXISTING_TAG";
     const MISSING_TAG: &str = "MISSING_TAG";
@@ -550,5 +628,73 @@ mod tests {
         tag_filter.process_node(&mut node);
         dbg!(&node);
         assert_eq!(node.tags().len(), 0);
+    }
+    #[test]
+    fn filter_elements_remove_by_keys() {
+        let mut filter = TagKeyBasedOsmElementsFilter::new(
+            OsmElementTypeSelection::all(),
+            vec!["bad".to_string(), "ugly".to_string()],
+            FilterType::RemoveMatching,
+            ElementCounter::new(
+                OsmElementTypeSelection::all(),
+                CountType::ALL,
+                FinalHandler::new()
+            )
+        );
+
+        filter.handle_node_chained(&mut Node::new(1, 1, Coordinate::new(1.0f64, 1.1f64), 1, 1, 1, "a".to_string(), true,
+                                           vec![
+                                     Tag::new("good".to_string(), "1".to_string()),
+                                     Tag::new("bad".to_string(), "2".to_string()),
+                                 ]));
+        filter.handle_node_chained(&mut Node::new(1, 1, Coordinate::new(1.0f64, 1.1f64), 1, 1, 1, "a".to_string(), true,
+                                           vec![
+                                     Tag::new("good".to_string(), "1".to_string()),
+                                     Tag::new("nice".to_string(), "2".to_string()),
+                                 ]));
+        filter.handle_node_chained(&mut Node::new(1, 1, Coordinate::new(1.0f64, 1.1f64), 1, 1, 1, "a".to_string(), true,
+                                           vec![
+                                     Tag::new("ugly".to_string(), "1".to_string()),
+                                     Tag::new("bad".to_string(), "2".to_string()),
+                                 ]));
+        let mut result = HandlerResult::default();
+        filter.get_results_chained(&mut result);
+        dbg!(&result);
+
+        assert_eq!(result.count_all_nodes, 1);
+    }
+    #[test]
+    fn filter_elements_accept_by_keys() {
+        let mut filter = TagKeyBasedOsmElementsFilter::new(
+            OsmElementTypeSelection::all(),
+            vec!["bad".to_string(), "ugly".to_string()],
+            FilterType::AcceptMatching,
+            ElementCounter::new(
+                OsmElementTypeSelection::all(),
+                CountType::ALL,
+                FinalHandler::new()
+            )
+        );
+
+        filter.handle_node_chained(&mut Node::new(1, 1, Coordinate::new(1.0f64, 1.1f64), 1, 1, 1, "a".to_string(), true,
+                                           vec![
+                                     Tag::new("good".to_string(), "1".to_string()),
+                                     Tag::new("bad".to_string(), "2".to_string()),
+                                 ]));
+        filter.handle_node_chained(&mut Node::new(1, 1, Coordinate::new(1.0f64, 1.1f64), 1, 1, 1, "a".to_string(), true,
+                                           vec![
+                                     Tag::new("good".to_string(), "1".to_string()),
+                                     Tag::new("nice".to_string(), "2".to_string()),
+                                 ]));
+        filter.handle_node_chained(&mut Node::new(1, 1, Coordinate::new(1.0f64, 1.1f64), 1, 1, 1, "a".to_string(), true,
+                                           vec![
+                                     Tag::new("ugly".to_string(), "1".to_string()),
+                                     Tag::new("bad".to_string(), "2".to_string()),
+                                 ]));
+        let mut result = HandlerResult::default();
+        filter.get_results_chained(&mut result);
+        dbg!(&result);
+
+        assert_eq!(result.count_all_nodes, 2);
     }
 }
