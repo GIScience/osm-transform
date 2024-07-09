@@ -203,7 +203,7 @@ impl Handler for AreaHandler {
 #[cfg(test)]
 mod tests {
     use crate::area::AreaHandler;
-    use crate::handler::{BboxCollector, CountType, HandlerResult, ElementCounter, FinalHandler, PbfTypeSwitch};
+    use crate::handler::{BboxCollector, CountType, HandlerResult, ElementCounter, FinalHandler, OsmElementTypeSelection};
     use crate::io::{process_file, process_with_handler};
     use super::*;
 
@@ -215,11 +215,11 @@ mod tests {
             input_path:  "test/baarle_small.pbf".to_string(),
             output_path:  "output.pbf".to_string(),
         };
-        let mut final_counter = ElementCounter::new(PbfTypeSwitch {node:true, way:false, relation:false}, CountType::ACCEPTED, FinalHandler::new());
+        let mut final_counter = ElementCounter::new(OsmElementTypeSelection {node:true, way:false, relation:false}, CountType::ACCEPTED, FinalHandler::new());
         let mut bbox_collector = BboxCollector::new(final_counter);
         let mut area_handler = AreaHandler::new(bbox_collector);
         area_handler.load(&config).expect("Area handler failed to load CSV file");
-        let mut initial_handler = ElementCounter::new(PbfTypeSwitch {node:true, way:false, relation:false}, CountType::ALL, area_handler);
+        let mut initial_handler = ElementCounter::new(OsmElementTypeSelection {node:true, way:false, relation:false}, CountType::ALL, area_handler);
         // let mut filter = Filter::new(area_handler);
 
         let _ = process_with_handler(&config, &mut initial_handler).expect("process_with_handler failed");
