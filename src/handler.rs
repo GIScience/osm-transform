@@ -373,7 +373,7 @@ mod tests {
         SimpleLogger::new().init();
         let mut handler =
             ElementCounter::new(
-                PbfTypeSwitch{node:true, way:false, relation:false},
+                PbfTypeSwitch::node_only(),
                 CountType::ALL,
                 TagValueBasedOsmElementsFilter::new(
                     PbfTypeSwitch::node_only(),
@@ -441,7 +441,7 @@ mod tests {
     #[test]
     fn test_tag_filter_by_key__remove_matching() {
         let mut tag_filter = TagFilterByKey::new(
-            PbfTypeSwitch{node:true, way:false, relation:false},
+            PbfTypeSwitch::node_only(),
             Regex::new(".*bad.*").unwrap(),
             FilterType::RemoveMatching,
             FinalHandler::new());
@@ -465,7 +465,7 @@ mod tests {
     #[test]
     fn test_tag_filter_by_key__keep_matching() {
         let mut tag_filter = TagFilterByKey::new(
-            PbfTypeSwitch{node:true, way:false, relation:false},
+            PbfTypeSwitch::all(),
             Regex::new(".*good.*").unwrap(),
             FilterType::AcceptMatching,
             FinalHandler::new());
@@ -489,7 +489,7 @@ mod tests {
     #[test]
     fn test_tag_filter_by_key__node_not_handled() {
         let mut tag_filter = TagFilterByKey::new(
-            PbfTypeSwitch{node:false, way:true, relation:true},
+            PbfTypeSwitch::none(),
             Regex::new(".*").unwrap(),
             FilterType::RemoveMatching,
             FinalHandler::new());
@@ -506,7 +506,7 @@ mod tests {
     #[test]
     fn test_tag_filter_by_key__node_handled() {
         let mut tag_filter = TagFilterByKey::new(
-            PbfTypeSwitch{node:true, way:true, relation:true},
+            PbfTypeSwitch::all(),
             Regex::new(".*").unwrap(),
             FilterType::RemoveMatching,
             FinalHandler::new());
