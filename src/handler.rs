@@ -6,7 +6,7 @@ use osm_io::osm::model::tag::Tag;
 use regex::Regex;
 
 #[derive(Default,Debug)]
-pub struct HandlerResult {
+pub struct HandlerResult {//todo add HashMap to add results with configurable keys
     pub count_all_nodes: i32,
     pub count_accepted_nodes: i32,
     pub node_ids: Vec<i64>,
@@ -102,7 +102,7 @@ pub fn into_next(handler: impl Handler + Sized + 'static) -> Option<Box<dyn Hand
     Some(Box::new(handler))
 }
 
-pub(crate) struct FinalHandler {
+pub(crate) struct FinalHandler { //todo add node/way/relation ids and log/print those elements
     next: Option<Box<dyn Handler>>,
 }
 impl FinalHandler {
