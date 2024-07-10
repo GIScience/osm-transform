@@ -43,10 +43,10 @@ pub fn process_with_handler(config: &Config, handler: &mut dyn Handler) -> Resul
                     handler.handle_node_chained_owned(node)
                 },
                 Element::Way { mut way } => {
-                    handler.handle_way_chained(&mut way)
+                    handler.handle_way_chained_owned(way)
                 },
                 Element::Relation { mut relation } => {
-                    handler.handle_relation_chained(&mut relation)
+                    handler.handle_relation_chained_owned(relation)
                 },
                 _ => (),
             }

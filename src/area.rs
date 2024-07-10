@@ -241,6 +241,7 @@ mod tests {
             country_path: "test/mapping_test.csv".to_string(),
             input_path:  "test/baarle_small.pbf".to_string(),
             output_path:  "output.pbf".to_string(),
+            with_copy: false,
         };
         let mut final_counter = ElementCounter::new(OsmElementTypeSelection {node:true, way:false, relation:false}, CountType::ACCEPTED, FinalHandler::new());
         let mut bbox_collector = BboxCollector::new(final_counter);
