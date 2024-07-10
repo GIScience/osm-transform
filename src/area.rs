@@ -169,6 +169,33 @@ impl AreaHandler {
 }
 
 impl Handler for AreaHandler {
+    fn process_node_owned(&mut self, node: Node) -> Option<Node> {
+        let mut result: Vec<String> = Vec::new();
+        if node.coordinate().lat() >= 90.0 || node.coordinate().lat() <= -90.0 {
+            return None;
+        }
+        let grid_index = (node.coordinate().lat() as i32 + 90) * 360 + (node.coordinate().lon() as i32 + 180);
+        let coord = Coord {x: node.coordinate().lon(), y: node.coordinate().lat()};
+        match self.mapping.index[grid_index as usize] {
+            0 => { // no area
+            }
+            AREA_ID_MULTIPLE => { // multiple areas
+                for area in self.mapping.area.get_vec(&(grid_index as u16)).unwrap() {
+                    if area.geo.contains(&coord) {
+                        result.push(self.mapping.id[&area.id].to_string())
+                    }
+                }
+            }
+            x => { // single area
+                // debug!("index: {x}");
+                result.push(self.mapping.id[&x].to_string())
+            }
+        }
+        let mut node = node;
+        node.tags_mut().push(Tag::new("country".to_string(), result.join(",")));
+        Some(node)
+    }
+
     fn process_node(&mut self, node: &mut Node) -> bool {
         let mut result: Vec<String> = Vec::new();
         if node.coordinate().lat() >= 90.0 || node.coordinate().lat() <= -90.0 {

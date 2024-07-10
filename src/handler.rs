@@ -17,7 +17,21 @@ pub struct HandlerResult {
 }
 
 pub trait Handler {
+
+    fn process_node_owned(&mut self, node: Node) -> Option<Node> {
+        Some(node)
+    }
+
     fn process_node(&mut self, node: &mut Node) -> bool {true}
+
+    fn handle_node_chained_owned(&mut self, node: Node) {
+        let node = self.process_node_owned(node);
+        if node.is_some() {
+            if let Some(next) = &mut self.get_next() {
+                next.handle_node_chained_owned(node.unwrap());
+            }
+        }
+    }
 
     fn handle_node_chained(&mut self, node: &mut Node) {
         if self.process_node(node) {
@@ -131,6 +145,12 @@ impl ElementCounter {
     }
 }
 impl Handler for ElementCounter {
+    fn process_node_owned(&mut self, node: Node) -> Option<Node> {
+        if self.handle_types.node {
+            self.nodes_count += 1;
+        }
+        Some(node)
+    }
     fn process_node(&mut self, node: &mut Node) -> bool {
         if self.handle_types.node {
             self.nodes_count += 1;

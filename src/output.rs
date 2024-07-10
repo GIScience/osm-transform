@@ -36,6 +36,12 @@ impl OutputHandler {
 }
 
 impl Handler for OutputHandler {
+    fn process_node_owned(&mut self, node: Node) -> Option<Node> {
+        log::debug!("Writing node: {:?}", node);
+        self.writer.write_element(Element::Node { node: node }).expect("Failed to write node");
+        None
+    }
+
     fn process_node(&mut self, node: &mut Node) -> bool {
         log::debug!("Writing node: {:?}", node);
         self.writer.write_element(Element::Node { node: node.to_owned() }).expect("Failed to write node");

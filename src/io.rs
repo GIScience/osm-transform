@@ -23,7 +23,7 @@ pub fn process_with_handler(config: &Config, handler: &mut dyn Handler) -> Resul
     for element in reader.elements()? {
         match element {
             Element::Node { mut node } => {
-                handler.handle_node_chained(&mut node)
+                handler.handle_node_chained_owned(node)
             },
             Element::Way { mut way } => {
                 handler.handle_way_chained(&mut way)
