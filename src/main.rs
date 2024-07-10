@@ -1,6 +1,6 @@
 use std::env;
 use rusty_routes_transformer::conf::Config;
-use rusty_routes_transformer::{benchmark, run};
+use rusty_routes_transformer::{benchmark_io, run};
 use log4rs::append::console::ConsoleAppender;
 use log4rs::config::{Appender, Logger, Root};
 use log::LevelFilter;
