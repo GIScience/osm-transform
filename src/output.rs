@@ -37,8 +37,7 @@ impl OutputHandler {
 
 impl Handler for OutputHandler {
     fn process_node_owned(&mut self, node: Node) -> Option<Node> {
-        log::debug!("Writing node: {:?}", node);
-        self.writer.write_element(Element::Node { node: node }).expect("Failed to write node");
+        self.writer.write_element(Element::Node { node }).expect("Failed to write node");
         None
     }
 
@@ -48,9 +47,19 @@ impl Handler for OutputHandler {
         false
     }
 
+    fn process_way_owned(&mut self, way: Way) -> Option<Way> {
+        self.writer.write_element(Element::Way { way }).expect("Failed to write way");
+        None
+    }
+
     fn process_way(&mut self, way: &mut Way) -> bool {
         self.writer.write_element(Element::Way { way: way.clone() }).expect("Failed to write way");
         false
+    }
+
+    fn process_relation_owned(&mut self, relation: Relation) -> Option<Relation> {
+        self.writer.write_element(Element::Relation { relation }).expect("Failed to write relation");
+        None
     }
 
     fn process_relation(&mut self, relation: &mut Relation) -> bool {

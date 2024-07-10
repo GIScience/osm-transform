@@ -43,6 +43,19 @@ pub trait Handler {
 
     fn process_way(&mut self, way: &mut Way) -> bool {true}
 
+    fn process_way_owned(&mut self, way: Way) -> Option<Way> {
+        Some(way)
+    }
+
+    fn handle_way_chained_owned(&mut self, way: Way) {
+        let way = self.process_way_owned(way);
+        if way.is_some() {
+            if let Some(next) = &mut self.get_next() {
+                next.handle_way_chained_owned(way.unwrap());
+            }
+        }
+    }
+
     fn handle_way_chained(&mut self, way: &mut Way) {
         if self.process_way(way) {
             if let Some(next) = &mut self.get_next() {
@@ -51,6 +64,19 @@ pub trait Handler {
         }
     }
     fn process_relation(&mut self, relation: &mut Relation) -> bool {true}
+
+    fn process_relation_owned(&mut self, relation: Relation) -> Option<Relation> {
+        Some(relation)
+    }
+
+    fn handle_relation_chained_owned(&mut self, relation: Relation) {
+        let relation = self.process_relation_owned(relation);
+        if relation.is_some() {
+            if let Some(next) = &mut self.get_next() {
+                next.handle_relation_chained_owned(relation.unwrap());
+            }
+        }
+    }
 
     fn handle_relation_chained(&mut self, relation: &mut Relation) {
         if self.process_relation(relation) {
@@ -157,11 +183,23 @@ impl Handler for ElementCounter {
         }
         true
     }
+    fn process_way_owned(&mut self, way: Way) -> Option<Way> {
+        if self.handle_types.way {
+            self.ways_count += 1;
+        }
+        Some(way)
+    }
     fn process_way(&mut self, way: &mut Way) -> bool {
         if self.handle_types.way {
             self.ways_count += 1;
         }
         true
+    }
+    fn process_relation_owned(&mut self, relation: Relation) -> Option<Relation> {
+        if self.handle_types.relation {
+            self.relations_count += 1;
+        }
+        Some(relation)
     }
     fn process_relation(&mut self, relation: &mut Relation) -> bool {
         if self.handle_types.relation {
