@@ -19,47 +19,37 @@ pub fn process_with_handler(config: &Config, handler: &mut dyn Handler) -> Resul
     stopwatch.start();
     let input_path = PathBuf::from(config.input_path.to_string());
     let reader = pbf::reader::Reader::new(&input_path)?;
-
-    for element in reader.elements()? {
-        match element {
-            Element::Node { mut node } => {
-                handler.handle_node_chained(&mut node)
-            },
-            Element::Way { mut way } => {
-                handler.handle_way_chained(&mut way)
-            },
-            Element::Relation { mut relation } => {
-                handler.handle_relation_chained(&mut relation)
-            },
-            _ => (),
+    if config.with_copy {
+        log::info!("Running variant where objects are cloned...");
+        for element in reader.elements()? {
+            match element {
+                Element::Node { mut node } => {
+                    handler.handle_node_chained(&mut node)
+                },
+                Element::Way { mut way } => {
+                    handler.handle_way_chained(&mut way)
+                },
+                Element::Relation { mut relation } => {
+                    handler.handle_relation_chained(&mut relation)
+                },
+                _ => (),
+            }
         }
-    }
-    let mut handler_result = HandlerResult::default();
-    handler.get_results_chained(&mut handler_result);
-    log::info!("Result: {}, {}, {}, {}", handler_result.bbox_min_lat, handler_result.bbox_max_lat, handler_result.bbox_min_lon, handler_result.bbox_max_lon);
-    log::info!("Finished pbf io pipeline, time: {}", stopwatch);
-    Ok(())
-}
-
-pub fn process_with_handler_owned(config: &Config, handler: &mut dyn Handler) -> Result<(), anyhow::Error> {
-    log::info!("Started pbf io pipeline");
-    let mut stopwatch = StopWatch::new();
-    stopwatch.start();
-    let input_path = PathBuf::from(config.input_path.to_string());
-    let reader = pbf::reader::Reader::new(&input_path)?;
-
-    for element in reader.elements()? {
-        match element {
-            Element::Node { mut node } => {
-                handler.handle_node_chained_owned(node)
-            },
-            Element::Way { mut way } => {
-                handler.handle_way_chained_owned(way)
-            },
-            Element::Relation { mut relation } => {
-                handler.handle_relation_chained_owned(relation)
-            },
-            _ => (),
+    } else {
+        log::info!("Running variant where objects are not cloned...");
+        for element in reader.elements()? {
+            match element {
+                Element::Node { mut node } => {
+                    handler.handle_node_chained_owned(node)
+                },
+                Element::Way { mut way } => {
+                    handler.handle_way_chained(&mut way)
+                },
+                Element::Relation { mut relation } => {
+                    handler.handle_relation_chained(&mut relation)
+                },
+                _ => (),
+            }
         }
     }
     let mut handler_result = HandlerResult::default();
