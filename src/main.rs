@@ -1,6 +1,6 @@
 use std::env;
 use rusty_routes_transformer::conf::Config;
-use rusty_routes_transformer::run;
+use rusty_routes_transformer::{benchmark, run};
 use log4rs::append::console::ConsoleAppender;
 use log4rs::config::{Appender, Logger, Root};
 use log::LevelFilter;
@@ -17,17 +17,18 @@ fn main() {
 
     let mut config = read_conf_file();
     merge_args(&mut config);
-    run(&config);
+    benchmark_io(&config);
+    //run(&config);
 }
 
 fn merge_args(config: &mut Config) {
     config.param = 222;
     let args: Vec<String> = env::args().collect();
     if args.len() > 1usize {
-        config.country_path = args[1].to_string();
+        config.input_path = args[1].to_string();
     }
     if args.len() > 2usize {
-        config.input_path = args[2].to_string();
+        config.country_path = args[2].to_string();
     }
 }
 

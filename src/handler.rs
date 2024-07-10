@@ -216,6 +216,9 @@ impl Handler for ElementCounter {
             CountType::ALL => { result.count_all_nodes = self.nodes_count }
             CountType::ACCEPTED => { result.count_accepted_nodes = self.nodes_count }
         }
+        log::info!("Nodes: {}", self.nodes_count);
+        log::info!("Ways: {}", self.ways_count);
+        log::info!("Relations: {}", self.relations_count);
     }
 }
 

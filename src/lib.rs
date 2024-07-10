@@ -15,6 +15,7 @@ use io::process_file;
 use osm_io::osm::model::node::Node;
 use osm_io::osm::model::relation::Relation;
 use osm_io::osm::model::way::Way;
+use crate::handler::{CountType, ElementCounter, OsmElementTypeSelection};
 use crate::output::OutputHandler;
 
 pub fn run(config: &Config) {
@@ -67,6 +68,21 @@ pub fn run(config: &Config) {
     //  if interpolated : merge files
 }
 
+pub fn benchmark_io(config: &Config) {
+    let mut output_handler = OutputHandler::new(config);
+    output_handler.init();
+    let mut handler = ElementCounter::new(
+        OsmElementTypeSelection {node:true, way:true, relation:true},
+        CountType::ALL,
+        output_handler
+    );
+    let mut stopwatch = StopWatch::new();
+    stopwatch.start();
+
+    log::info!("Processing PBF file...");
+    let _ = process_with_handler(config, &mut handler).expect("Handler failed");
+    log::info!("Elapsed time: {}", stopwatch);
+}
 
 #[cfg(test)]
 mod tests {
