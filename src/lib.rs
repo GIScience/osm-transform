@@ -12,7 +12,6 @@ use log::LevelFilter;
 use crate::io::process_with_handler;
 use conf::Config;
 use area::AreaHandler;
-use io::process_file;
 use osm_io::osm::model::node::Node;
 use osm_io::osm::model::relation::Relation;
 use osm_io::osm::model::way::Way;

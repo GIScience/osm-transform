@@ -1,22 +1,22 @@
-use std::string::String;
-use std::collections::{BTreeMap};
+use std::collections::BTreeMap;
 use std::error::Error;
 use std::fs::File;
 use std::path::Path;
 use std::str::FromStr;
+use std::string::String;
 
+use btreemultimap::BTreeMultiMap;
 use csv::{ReaderBuilder, WriterBuilder};
 use geo::{Contains, Coord, Intersects, LineString, MultiPolygon, Polygon};
 use geo::BooleanOps;
-use btreemultimap::BTreeMultiMap;
 use osm_io::osm::model::node::Node;
 use osm_io::osm::model::tag::Tag;
 use serde::Deserialize;
 use wkt::{Geometry, ToWkt};
 use wkt::Wkt;
 
-use crate::handler::{Handler};
 use crate::conf::Config;
+use crate::handler::Handler;
 
 const GRID_SIZE: usize = 64800;
 const AREA_ID_MULTIPLE: u16 = u16::MAX;
@@ -195,8 +195,9 @@ impl Handler for AreaHandler {
 #[cfg(test)]
 mod tests {
     use crate::area::AreaHandler;
-    use crate::handler::{CountType, HandlerResult, ElementCounter, FinalHandler, OsmElementTypeSelection, HandlerChain};
-    use crate::io::{process_file, process_with_handler};
+    use crate::handler::{CountType, ElementCounter, HandlerChain, OsmElementTypeSelection};
+    use crate::io::process_with_handler;
+
     use super::*;
 
     #[test]
@@ -221,8 +222,4 @@ mod tests {
         println!("result: {:?}", result )
     }
 
-    #[test]
-    fn test_process() {
-        process_file().expect("ARGH")
-    }
 }
