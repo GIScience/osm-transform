@@ -1,11 +1,10 @@
-use std::env;
-use std::path::PathBuf;
 use clap::Parser;
-use rusty_routes_transformer::conf::Config;
-use rusty_routes_transformer::run;
 use log4rs::append::console::ConsoleAppender;
 use log4rs::config::{Appender, Logger, Root};
 use log::LevelFilter;
+
+use rusty_routes_transformer::conf::Config;
+use rusty_routes_transformer::run;
 
 fn main() {
     let args = Args::parse();
@@ -35,7 +34,7 @@ fn merge_args(config: &mut Config, args: &Args) {
 
     config.input_path = args.input_pbf.clone();
     config.output_path = args.output_pbf.clone();
-    config.country_path = args.borders.clone();
+    config.country_path = args.country_csv.clone();
 }
 
 fn read_conf_file() -> Config {
@@ -57,7 +56,7 @@ struct Args {
 
     /// CSV File with border geometries for country mapping
     #[arg(short, long, value_name = "FILE")]
-    borders: String, //Option<PathBuf>,
+    country_csv: String,
 
     /// Turn debugging information on
     #[arg(short, long, action = clap::ArgAction::Count)]
