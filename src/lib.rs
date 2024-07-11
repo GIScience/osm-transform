@@ -16,26 +16,26 @@ use io::process_file;
 use osm_io::osm::model::node::Node;
 use osm_io::osm::model::relation::Relation;
 use osm_io::osm::model::way::Way;
-use crate::handler::{CountType, ElementCounter, OsmElementTypeSelection};
+use crate::handler::{CountType, ElementCounter, HandlerChain, OsmElementTypeSelection};
 use crate::output::OutputHandler;
 
 pub fn run(config: &Config) {
 
+    log::info!("Initializing ouput handler");
     let mut output_handler = OutputHandler::new(config);
     output_handler.init();
-    let mut handler_chain = AreaHandler::new(output_handler);
-
-
 
     log::info!("Reading area mapping CSV");
+    let mut area_handler = AreaHandler::default();
     let mut stopwatch = StopWatch::new();
     stopwatch.start();
-    handler_chain.load(&config).expect("Area handler failed to load CSV file");
-    log::info!("Loaded: {} areas", handler_chain.mapping.id.len());
+    area_handler.load(&config).expect("Area handler failed to load CSV file");
+    log::info!("Loaded: {} areas", area_handler.mapping.id.len());
     log::info!("Finished reading area mapping, time: {}", stopwatch);
     stopwatch.reset();
     stopwatch.start();
-    log::info!("Mapping nodes in PBF file");
+
+    let mut handler_chain = HandlerChain::default().add_unboxed(area_handler).add_unboxed(output_handler);
     let _ = process_with_handler(config, &mut handler_chain).expect("Area handler failed");
     log::info!("Finished mapping, time: {}", stopwatch);
 
@@ -67,22 +67,6 @@ pub fn run(config: &Config) {
     //                  remove tags
     //                  write
     //  if interpolated : merge files
-}
-
-pub fn benchmark_io(config: &Config) {
-    let mut output_handler = OutputHandler::new(config);
-    output_handler.init();
-    let mut handler = ElementCounter::new(
-        OsmElementTypeSelection {node:true, way:true, relation:true},
-        CountType::ALL,
-        output_handler
-    );
-    let mut stopwatch = StopWatch::new();
-    stopwatch.start();
-
-    log::info!("Processing PBF file...");
-    let _ = process_with_handler(config, &mut handler).expect("Handler failed");
-    log::info!("Elapsed time: {}", stopwatch);
 }
 
 #[cfg(test)]

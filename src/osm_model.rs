@@ -1,8 +1,9 @@
-use osm_io::osm::model::node::Node;
 use osm_io::osm::model::coordinate::Coordinate;
+use osm_io::osm::model::node::Node;
 use osm_io::osm::model::tag::Tag;
 use osm_io::osm::model::way::Way;
-use crate::handler::{CountType, Handler, into_next, OsmElementTypeSelection};
+
+use crate::handler::Handler;
 
 #[derive(Debug, Clone)]
 pub struct MutableNode {
@@ -172,6 +173,7 @@ impl<'a> MutableWay<'a> {
 mod tests {
     use osm_io::osm::model::tag::Tag;
     use osm_io::osm::model::way::Way;
+
     use crate::osm_model::MutableWay;
 
     #[test]

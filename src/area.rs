@@ -15,14 +15,13 @@ use serde::Deserialize;
 use wkt::{Geometry, ToWkt};
 use wkt::Wkt;
 
-use crate::handler::{Handler, into_next};
+use crate::handler::{Handler};
 use crate::conf::Config;
 
 const GRID_SIZE: usize = 64800;
 const AREA_ID_MULTIPLE: u16 = u16::MAX;
 
 pub struct AreaHandler {
-    pub next: Option<Box<dyn Handler>>,
     pub mapping: Mapping,
     grid: Vec<MultiPolygon<f64>>,
 }
@@ -53,7 +52,6 @@ struct AreaIntersect {
 impl Default for AreaHandler {
     fn default() -> Self {
         Self {
-            next: None,
             mapping: Mapping::default(),
             grid: {
                 let mut grid: Vec<MultiPolygon<f64>> = Vec::new();
@@ -75,11 +73,8 @@ impl Default for AreaHandler {
 }
 
 impl AreaHandler {
-    pub fn new(next: impl Handler + 'static) -> Self {
-        Self {
-            next: into_next(next),
-            ..Self::default()
-        }
+    pub fn new() -> Self {
+        Self::default()
     }
 
     pub fn load(&mut self, config: &Config) -> Result<(), Box<dyn Error>> {
@@ -169,7 +164,7 @@ impl AreaHandler {
 }
 
 impl Handler for AreaHandler {
-    fn process_node_owned(&mut self, node: Node) -> Option<Node> {
+    fn handle_node(&mut self, node: Node) -> Option<Node> {
         let mut result: Vec<String> = Vec::new();
         if node.coordinate().lat() >= 90.0 || node.coordinate().lat() <= -90.0 {
             return None;
@@ -195,42 +190,12 @@ impl Handler for AreaHandler {
         node.tags_mut().push(Tag::new("country".to_string(), result.join(",")));
         Some(node)
     }
-
-    fn process_node(&mut self, node: &mut Node) -> bool {
-        let mut result: Vec<String> = Vec::new();
-        if node.coordinate().lat() >= 90.0 || node.coordinate().lat() <= -90.0 {
-            return true;
-        }
-        let grid_index = (node.coordinate().lat() as i32 + 90) * 360 + (node.coordinate().lon() as i32 + 180);
-        let coord = Coord {x: node.coordinate().lon(), y: node.coordinate().lat()};
-        match self.mapping.index[grid_index as usize] {
-            0 => { // no area
-            }
-            AREA_ID_MULTIPLE => { // multiple areas
-                for area in self.mapping.area.get_vec(&(grid_index as u16)).unwrap() {
-                    if area.geo.contains(&coord) {
-                        result.push(self.mapping.id[&area.id].to_string())
-                    }
-                }
-            }
-            x => { // single area
-                // debug!("index: {x}");
-                result.push(self.mapping.id[&x].to_string())
-            }
-        }
-        node.tags_mut().push(Tag::new("country".to_string(), result.join(",")));
-        true
-    }
-
-    fn get_next(&mut self) -> &mut Option<Box<dyn Handler>> {
-        return &mut self.next;
-    }
 }
 
 #[cfg(test)]
 mod tests {
     use crate::area::AreaHandler;
-    use crate::handler::{CountType, HandlerResult, ElementCounter, FinalHandler, OsmElementTypeSelection};
+    use crate::handler::{CountType, HandlerResult, ElementCounter, FinalHandler, OsmElementTypeSelection, HandlerChain};
     use crate::io::{process_file, process_with_handler};
     use super::*;
 
@@ -243,17 +208,17 @@ mod tests {
             output_path:  "output.pbf".to_string(),
             with_copy: false,
         };
-        let mut final_counter = ElementCounter::new(OsmElementTypeSelection {node:true, way:false, relation:false}, CountType::ACCEPTED, FinalHandler::new());
-        let mut area_handler = AreaHandler::new(final_counter);
+
+        let mut area_handler = AreaHandler::new();
         area_handler.load(&config).expect("Area handler failed to load CSV file");
-        let mut initial_handler = ElementCounter::new(OsmElementTypeSelection {node:true, way:false, relation:false}, CountType::ALL, area_handler);
-        // let mut filter = Filter::new(area_handler);
 
-        let _ = process_with_handler(&config, &mut initial_handler).expect("process_with_handler failed");
-        // println!("Loaded: {}", area_handler.mapping.id.len());
+        let mut handler_chain = HandlerChain::default()
+            .add_unboxed(ElementCounter::new(OsmElementTypeSelection {node:true, way:false, relation:false}, CountType::ALL))
+            .add_unboxed(area_handler)
+            .add_unboxed(ElementCounter::new(OsmElementTypeSelection {node:true, way:false, relation:false}, CountType::ACCEPTED));
 
-        let mut result = HandlerResult::default();
-        initial_handler.get_results_chained(&mut result);
+        let _ = process_with_handler(&config, &mut handler_chain).expect("process_with_handler failed");
+        let mut result = handler_chain.collect_result();
         println!("result: {:?}", result )
     }
 

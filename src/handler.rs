@@ -10,109 +10,87 @@ pub struct HandlerResult {//todo add HashMap to add results with configurable ke
     pub count_all_nodes: i32,
     pub count_accepted_nodes: i32,
     pub node_ids: Vec<i64>,
-    pub bbox_max_lon: f64,
-    pub bbox_min_lon: f64,
-    pub bbox_max_lat: f64,
-    pub bbox_min_lat: f64,
 }
 
 pub trait Handler {
 
-    fn process_node_owned(&mut self, node: Node) -> Option<Node> {
+    fn handle_node(&mut self, node: Node) -> Option<Node> {
         Some(node)
     }
 
-    fn process_node(&mut self, node: &mut Node) -> bool {true}
-
-    fn handle_node_chained_owned(&mut self, node: Node) {
-        let node = self.process_node_owned(node);
-        if node.is_some() {
-            if let Some(next) = &mut self.get_next() {
-                next.handle_node_chained_owned(node.unwrap());
-            }
-        }
-    }
-
-    fn handle_node_chained(&mut self, node: &mut Node) {
-        if self.process_node(node) {
-            if let Some(next) = &mut self.get_next() {
-                next.handle_node_chained(node);
-            }
-        }
-    }
-
-    fn process_way(&mut self, way: &mut Way) -> bool {true}
-
-    fn process_way_owned(&mut self, way: Way) -> Option<Way> {
+    fn handle_way(&mut self, way: Way) -> Option<Way> {
         Some(way)
     }
 
-    fn handle_way_chained_owned(&mut self, way: Way) {
-        let way = self.process_way_owned(way);
-        if way.is_some() {
-            if let Some(next) = &mut self.get_next() {
-                next.handle_way_chained_owned(way.unwrap());
-            }
-        }
-    }
-
-    fn handle_way_chained(&mut self, way: &mut Way) {
-        if self.process_way(way) {
-            if let Some(next) = &mut self.get_next() {
-                next.handle_way_chained(way);
-            }
-        }
-    }
-    fn process_relation(&mut self, relation: &mut Relation) -> bool {true}
-
-    fn process_relation_owned(&mut self, relation: Relation) -> Option<Relation> {
+    fn handle_relation(&mut self, relation: Relation) -> Option<Relation> {
         Some(relation)
     }
 
-    fn handle_relation_chained_owned(&mut self, relation: Relation) {
-        let relation = self.process_relation_owned(relation);
-        if relation.is_some() {
-            if let Some(next) = &mut self.get_next() {
-                next.handle_relation_chained_owned(relation.unwrap());
-            }
-        }
-    }
-
-    fn handle_relation_chained(&mut self, relation: &mut Relation) {
-        if self.process_relation(relation) {
-            if let Some(next) = &mut self.get_next() {
-                next.handle_relation_chained(relation);
-            }
-        }
-    }
-
-    fn get_next(&mut self) -> &mut Option<Box<dyn Handler>>;
-
-    fn process_results(&mut self, res: &mut HandlerResult) {}
-
-    fn get_results_chained(&mut self, res: &mut HandlerResult) {
-        self.process_results(res);
-        if let Some(next) = &mut self.get_next() {
-            next.get_results_chained(res);
-        }
+    fn add_result(&mut self, mut result: HandlerResult) -> HandlerResult {
+        result
     }
 }
 
-pub fn into_next(handler: impl Handler + Sized + 'static) -> Option<Box<dyn Handler>> {
-    Some(Box::new(handler))
+#[derive(Default)]
+pub(crate) struct HandlerChain {
+    pub handlers: Vec<Box<dyn Handler>>
 }
+impl HandlerChain {
+    pub(crate) fn process_node(&mut self, mut node: Node) {
+        for processor in &mut self.handlers {
+            let optional_node = processor.handle_node(node);
+            match optional_node {
+                None => { break }
+                Some(result) => { node = result }
+            }
+        }
+    }
+    pub(crate) fn process_way(&mut self, mut way: Way) {
+        for processor in &mut self.handlers {
+            let optional_way = processor.handle_way(way);
+            match optional_way {
+                None => { break }
+                Some(result) => { way = result }
+            }
+        }
+    }
+    pub(crate) fn process_relation(&mut self, mut relation: Relation) {
+        for processor in &mut self.handlers {
+            let optional_relation = processor.handle_relation(relation);
+            match optional_relation {
+                None => { break }
+                Some(result) => { relation = result }
+            }
+        }
+    }
+    pub(crate) fn collect_result(&mut self) -> HandlerResult{
+        let mut result = HandlerResult::default();
+        for processor in &mut self.handlers {
+            result = processor.add_result(result);
+        }
+        result
+    }
+    pub(crate) fn add(mut self, handler: Box<dyn Handler>) -> HandlerChain {
+        self.handlers.push(handler);
+        self
+    }
+    pub(crate) fn add_unboxed(mut self, handler: impl Handler + Sized + 'static) -> HandlerChain {
+        self.handlers.push(Box::new(handler));
+        self
+    }
+}
+
 
 pub(crate) struct FinalHandler { //todo add node/way/relation ids and log/print those elements
-    next: Option<Box<dyn Handler>>,
 }
 impl FinalHandler {
     pub(crate) fn new() -> Self {
-        FinalHandler { next: None }
+        FinalHandler { }
     }
 }
 impl Handler for FinalHandler {
-    fn get_next(&mut self) -> &mut Option<Box<dyn Handler>> {
-        &mut self.next
+    fn handle_node(&mut self, node: Node) -> Option<Node> {
+        None
     }
 }
 
@@ -124,34 +102,27 @@ pub(crate) enum CountType {
 
 #[derive(Default)]
 pub(crate) struct NodeIdCollector {
-    pub next: Option<Box<dyn Handler>>,
     pub node_ids: Vec<i64>,
 }
 impl NodeIdCollector {
-    pub(crate) fn new(next: impl Handler + 'static) -> Self {
+    pub(crate) fn new() -> Self {
         Self {
-            next: into_next(next),
             node_ids: Vec::new(),
         }
     }
 }
 impl Handler for NodeIdCollector {
-    fn process_node(&mut self, node: &mut Node) -> bool {
+    fn handle_node(&mut self, node: Node) -> Option<Node> {
         self.node_ids.push(node.id());
-        true
+        Some(node)
     }
-
-    fn get_next(&mut self) -> &mut Option<Box<dyn Handler>> {
-        return &mut self.next;
-    }
-
-    fn process_results(&mut self, res: &mut HandlerResult) {
-        res.node_ids = self.node_ids.clone();//todo optimize
+    fn add_result(&mut self, mut result: HandlerResult) -> HandlerResult {
+        result.node_ids = self.node_ids.clone();//todo optimize
+        result
     }
 }
 
 pub(crate) struct ElementCounter {
-    pub next: Option<Box<dyn Handler>>,
     pub nodes_count: i32,
     pub ways_count: i32,
     pub relations_count: i32,
@@ -159,9 +130,8 @@ pub(crate) struct ElementCounter {
     pub count_type: CountType,
 }
 impl ElementCounter {
-    pub fn new(handle_types: OsmElementTypeSelection, count_type: CountType, next: impl Handler + 'static) -> Self {
+    pub fn new(handle_types: OsmElementTypeSelection, count_type: CountType) -> Self {
         Self {
-            next: into_next(next),
             nodes_count: 0,
             ways_count: 0,
             relations_count: 0,
@@ -171,54 +141,31 @@ impl ElementCounter {
     }
 }
 impl Handler for ElementCounter {
-    fn process_node_owned(&mut self, node: Node) -> Option<Node> {
+    fn handle_node(&mut self, node: Node) -> Option<Node> {
         if self.handle_types.node {
             self.nodes_count += 1;
         }
         Some(node)
     }
-    fn process_node(&mut self, node: &mut Node) -> bool {
-        if self.handle_types.node {
-            self.nodes_count += 1;
-        }
-        true
-    }
-    fn process_way_owned(&mut self, way: Way) -> Option<Way> {
+    fn handle_way(&mut self, way: Way) -> Option<Way> {
         if self.handle_types.way {
             self.ways_count += 1;
         }
         Some(way)
     }
-    fn process_way(&mut self, way: &mut Way) -> bool {
-        if self.handle_types.way {
-            self.ways_count += 1;
-        }
-        true
-    }
-    fn process_relation_owned(&mut self, relation: Relation) -> Option<Relation> {
+    fn handle_relation(&mut self, relation: Relation) -> Option<Relation> {
         if self.handle_types.relation {
             self.relations_count += 1;
         }
         Some(relation)
     }
-    fn process_relation(&mut self, relation: &mut Relation) -> bool {
-        if self.handle_types.relation {
-            self.relations_count += 1;
-        }
-        true
-    }
 
-    fn get_next(&mut self) -> &mut Option<Box<dyn Handler>> {
-        return &mut self.next;
-    }
-    fn process_results(&mut self, mut result: &mut HandlerResult) {
+    fn add_result(&mut self, mut result: HandlerResult) -> HandlerResult {
         match self.count_type {
             CountType::ALL => { result.count_all_nodes = self.nodes_count }
             CountType::ACCEPTED => { result.count_accepted_nodes = self.nodes_count }
         }
-        log::info!("Nodes: {}", self.nodes_count);
-        log::info!("Ways: {}", self.ways_count);
-        log::info!("Relations: {}", self.relations_count);
+        result
     }
 }
 
@@ -233,16 +180,14 @@ struct TagValueBasedOsmElementsFilter {
     pub tag_key: String,
     pub tag_value_regex: Regex,
     pub filter_type: FilterType,
-    pub next: Option<Box<dyn Handler>>,
 }
 impl TagValueBasedOsmElementsFilter {
-    fn new(handle_types: OsmElementTypeSelection, tag_key: String, tag_value_regex: Regex, filter_type: FilterType, next: impl Handler + 'static) -> Self {
+    fn new(handle_types: OsmElementTypeSelection, tag_key: String, tag_value_regex: Regex, filter_type: FilterType) -> Self {
         Self {
             handle_types,
             tag_key,
             tag_value_regex,
             filter_type,
-            next: into_next(next),
         }
     }
 
@@ -272,42 +217,32 @@ impl TagValueBasedOsmElementsFilter {
     }
 }
 impl Handler for TagValueBasedOsmElementsFilter {
-    fn handle_node_chained(&mut self, node: &mut Node) {
-        let mut accept = true;
-        if self.handle_types.node  {
-            accept = self.accept_by_tags(&node.tags())
+    fn handle_node(&mut self, node: Node) -> Option<Node> {
+        if !self.handle_types.node  {
+            return Some(node)
         }
-        if accept {
-            if let Some(next_handler) = self.get_next() {
-                next_handler.handle_node_chained(node)
-            }
+        match self.accept_by_tags(&node.tags()) {
+            true => {Some(node)}
+            false => {None}
         }
     }
-    fn handle_way_chained(&mut self, way: &mut Way) {
-        let mut accept = true;
-        if self.handle_types.way  {
-            accept = self.accept_by_tags(&way.tags())
+    fn handle_way(&mut self, way: Way) -> Option<Way> {
+        if !self.handle_types.way  {
+            return Some(way)
         }
-        if accept {
-            if let Some(next_handler) = self.get_next() {
-                next_handler.handle_way_chained(way)
-            }
+        match self.accept_by_tags(&way.tags()) {
+            true => {Some(way)}
+            false => {None}
         }
     }
-    fn handle_relation_chained(&mut self, relation: &mut Relation) {
-        let mut accept = true;
-        if self.handle_types.relation  {
-            accept = self.accept_by_tags(&relation.tags())
+    fn handle_relation(&mut self, relation: Relation) -> Option<Relation> {
+        if !self.handle_types.relation  {
+            return Some(relation)
         }
-        if accept {
-            if let Some(next_handler) = self.get_next() {
-                next_handler.handle_relation_chained(relation)
-            }
+        match self.accept_by_tags(&relation.tags()) {
+            true => {Some(relation)}
+            false => {None}
         }
-    }
-
-    fn get_next(&mut self) -> &mut Option<Box<dyn Handler>> {
-        return &mut self.next;
     }
 }
 
@@ -320,15 +255,13 @@ struct TagKeyBasedOsmElementsFilter {
     pub handle_types: OsmElementTypeSelection,
     pub tag_keys: Vec<String>,
     pub filter_type: FilterType,
-    pub next: Option<Box<dyn Handler>>,
 }
 impl TagKeyBasedOsmElementsFilter {
-    fn new(handle_types: OsmElementTypeSelection, tag_keys: Vec<String>, filter_type: FilterType, next: impl Handler + 'static) -> Self {
+    fn new(handle_types: OsmElementTypeSelection, tag_keys: Vec<String>, filter_type: FilterType) -> Self {
         Self {
             handle_types,
             tag_keys,
             filter_type,
-            next: into_next(next),
         }
     }
     fn accept_by_tags(&mut self, tags: &Vec<Tag>) -> bool {
@@ -344,21 +277,34 @@ impl TagKeyBasedOsmElementsFilter {
     }
 }
 impl Handler for TagKeyBasedOsmElementsFilter {
-    fn handle_node_chained(&mut self, node: &mut Node) {
-        let mut accept = true;
-        if self.handle_types.node  {
-            accept = self.accept_by_tags(&node.tags())
+    fn handle_node(&mut self, node: Node) -> Option<Node> {
+        if ! self.handle_types.node {
+            return Some(node)
         }
-        if accept {
-            if let Some(next_handler) = self.get_next() {
-                next_handler.handle_node_chained(node)
-            }
+        match self.accept_by_tags(&node.tags()) {
+            true => {Some(node)}
+            false => {None}
+        }
+    }
+    fn handle_way(&mut self, way: Way) -> Option<Way> {
+        if !self.handle_types.way  {
+            return Some(way)
+        }
+        match self.accept_by_tags(&way.tags()) {
+            true => {Some(way)}
+            false => {None}
+        }
+    }
+    fn handle_relation(&mut self, relation: Relation) -> Option<Relation> {
+        if !self.handle_types.relation  {
+            return Some(relation)
+        }
+        match self.accept_by_tags(&relation.tags()) {
+            true => {Some(relation)}
+            false => {None}
         }
     }
 
-    fn get_next(&mut self) -> &mut Option<Box<dyn Handler>> {
-        return &mut self.next;
-    }
 }
 
 
@@ -371,20 +317,17 @@ struct ComplexElementsFilter {
     pub has_good_key_predicate: HasOneOfTagKeysPredicate,
     pub has_good_key_value_predicate: HasTagKeyValuePredicate,
     pub has_bad_key_predicate: HasNoneOfTagKeysPredicate,
-    pub next: Option<Box<dyn Handler>>,
 }
 impl ComplexElementsFilter {
     fn new(handle_types: OsmElementTypeSelection,
            has_good_key_predicate: HasOneOfTagKeysPredicate,
            has_good_key_value_predicate: HasTagKeyValuePredicate,
-           has_bad_key_predicate: HasNoneOfTagKeysPredicate,
-           next: impl Handler + 'static) -> Self {
+           has_bad_key_predicate: HasNoneOfTagKeysPredicate) -> Self {
         Self {
             handle_types,
             has_good_key_predicate,
             has_good_key_value_predicate,
             has_bad_key_predicate,
-            next: into_next(next),
         }
     }
     fn accept_by_tags(&mut self, tags: &Vec<Tag>) -> bool {
@@ -394,42 +337,32 @@ impl ComplexElementsFilter {
     }
 }
 impl Handler for ComplexElementsFilter {
-    fn handle_node_chained(&mut self, node: &mut Node) {
-        let mut accept = true;
-        if self.handle_types.node  {
-            accept = self.accept_by_tags(&node.tags())
+    fn handle_node(&mut self, node: Node) -> Option<Node> {
+        if !self.handle_types.node  {
+            return Some(node)
         }
-        if accept {
-            if let Some(next_handler) = self.get_next() {
-                next_handler.handle_node_chained(node)
-            }
+        match self.accept_by_tags(&node.tags()) {
+            true => {Some(node)}
+            false => {None}
         }
     }
-    fn handle_way_chained(&mut self, way: &mut Way) {
-        let mut accept = true;
-        if self.handle_types.way  {
-            accept = self.accept_by_tags(&way.tags())
+    fn handle_way(&mut self, way: Way) -> Option<Way> {
+        if !self.handle_types.way  {
+            return Some(way)
         }
-        if accept {
-            if let Some(next_handler) = self.get_next() {
-                next_handler.handle_way_chained(way)
-            }
+        match self.accept_by_tags(&way.tags()) {
+            true => {Some(way)}
+            false => {None}
         }
     }
-    fn handle_relation_chained(&mut self, relation: &mut Relation) {
-        let mut accept = true;
-        if self.handle_types.relation  {
-            accept = self.accept_by_tags(&relation.tags())
+    fn handle_relation(&mut self, relation: Relation) -> Option<Relation> {
+        if !self.handle_types.relation  {
+            return Some(relation)
         }
-        if accept {
-            if let Some(next_handler) = self.get_next() {
-                next_handler.handle_relation_chained(relation)
-            }
+        match self.accept_by_tags(&relation.tags()) {
+            true => {Some(relation)}
+            false => {None}
         }
-    }
-
-    fn get_next(&mut self) -> &mut Option<Box<dyn Handler>> {
-        return &mut self.next;
     }
 }
 
@@ -490,15 +423,13 @@ struct TagFilterByKey {
     pub handle_types: OsmElementTypeSelection,
     pub key_regex: Regex,
     pub filter_type: FilterType,
-    pub next: Option<Box<dyn Handler>>,
 }
 impl TagFilterByKey {
-    fn new(handle_types: OsmElementTypeSelection, key_regex: Regex, filter_type: FilterType, next: impl Handler + 'static) -> Self {
+    fn new(handle_types: OsmElementTypeSelection, key_regex: Regex, filter_type: FilterType) -> Self {
         Self {
             handle_types,
             key_regex,
             filter_type,
-            next: into_next(next),
         }
     }
 
@@ -514,26 +445,23 @@ impl TagFilterByKey {
     }
 }
 impl Handler for TagFilterByKey {
-    fn process_node(&mut self, node: &mut Node) -> bool {
+    fn handle_node(&mut self, mut node: Node) -> Option<Node> {
         if self.handle_types.node  {
             self.filter_tags(&mut node.tags_mut());
         }
-        true
+        Some(node)
     }
-    fn process_relation(&mut self, relation: &mut Relation) -> bool {
+    fn handle_relation(&mut self, mut relation: Relation) -> Option<Relation> {
         if self.handle_types.relation  {
             self.filter_tags(&mut relation.tags_mut());
         }
-        true
+        Some(relation)
     }
-    fn process_way(&mut self, way: &mut Way) -> bool {
+    fn handle_way(&mut self, mut way: Way) -> Option<Way> {
         if self.handle_types.way  {
             self.filter_tags(&mut way.tags_mut());
         }
-        true
-    }
-    fn get_next(&mut self) -> &mut Option<Box<dyn Handler>> {
-        return &mut self.next;
+        Some(way)
     }
 }
 
@@ -545,7 +473,7 @@ mod tests {
     use osm_io::osm::model::tag::Tag;
     use regex::Regex;
     use simple_logger::SimpleLogger;
-    use crate::handler::{CountType, FilterType, Handler, HandlerResult, ElementCounter, TagValueBasedOsmElementsFilter, FinalHandler, NodeIdCollector, TagFilterByKey, OsmElementTypeSelection, TagKeyBasedOsmElementsFilter, HasOneOfTagKeysPredicate, HasNoneOfTagKeysPredicate, HasTagKeyValuePredicate, ComplexElementsFilter};
+    use crate::handler::{CountType, FilterType, Handler, HandlerResult, ElementCounter, TagValueBasedOsmElementsFilter, FinalHandler, NodeIdCollector, TagFilterByKey, OsmElementTypeSelection, TagKeyBasedOsmElementsFilter, HasOneOfTagKeysPredicate, HasNoneOfTagKeysPredicate, HasTagKeyValuePredicate, ComplexElementsFilter, HandlerChain};
 
     const EXISTING_TAG: &str = "EXISTING_TAG";
     const MISSING_TAG: &str = "MISSING_TAG";
@@ -555,43 +483,39 @@ mod tests {
     fn missing_tag() -> String { "MISSING_TAG".to_string() }
 
     #[test]
-    fn test_handle_nodes_with_manually_chanied_handlers() {
+    fn handler_chain() {
         SimpleLogger::new().init();
-        let mut handler =
-            ElementCounter::new(
+
+        let mut chain = HandlerChain::default()
+            .add(Box::new(ElementCounter::new(
                 OsmElementTypeSelection::node_only(),
-                CountType::ALL,
-                TagValueBasedOsmElementsFilter::new(
-                    OsmElementTypeSelection::node_only(),
-                    existing_tag(),
-                    Regex::new(".*p.*").unwrap(),
-                    FilterType::AcceptMatching,
-                    TagValueBasedOsmElementsFilter::new(
-                        OsmElementTypeSelection::node_only(),
-                        existing_tag(),
-                        Regex::new(".*z.*").unwrap(),
-                        FilterType::RemoveMatching,
-                        ElementCounter::new(
-                            OsmElementTypeSelection::node_only(),
-                            CountType::ACCEPTED,
-                            NodeIdCollector::new(
-                                FinalHandler::new()
-                            )
-                        )
-                    )
-                )
-            );
-        handle_test_nodes_and_verify_result(&mut handler);
+                CountType::ALL)))
+            .add_unboxed(TagValueBasedOsmElementsFilter::new(
+                OsmElementTypeSelection::node_only(),
+                existing_tag(),
+                Regex::new(".*p.*").unwrap(),
+                FilterType::AcceptMatching))
+            .add(Box::new(TagValueBasedOsmElementsFilter::new(
+                OsmElementTypeSelection::node_only(),
+                existing_tag(),
+                Regex::new(".*z.*").unwrap(),
+                FilterType::RemoveMatching)))
+            .add(Box::new(ElementCounter::new(
+                OsmElementTypeSelection::node_only(),
+                CountType::ACCEPTED)))
+            .add(Box::new(NodeIdCollector::new()))
+            .add(Box::new(FinalHandler::new()));
+
+        handle_test_nodes_and_verify_result(chain);
     }
 
-    fn handle_test_nodes_and_verify_result(handler: &mut dyn Handler) {
-        handler.handle_node_chained(&mut Node::new(1, 1, Coordinate::new(1.0f64, 1.1f64), 1, 1, 1, "a".to_string(), true, vec![Tag::new(existing_tag(), "kasper".to_string())]));
-        handler.handle_node_chained(&mut Node::new(2, 1, Coordinate::new(2.0f64, 1.2f64), 1, 1, 1, "a".to_string(), true, vec![Tag::new(existing_tag(), "seppl".to_string())]));
-        handler.handle_node_chained(&mut Node::new(3, 1, Coordinate::new(3.0f64, 1.3f64), 1, 1, 1, "a".to_string(), true, vec![Tag::new(existing_tag(), "hotzenplotz".to_string())]));
-        handler.handle_node_chained(&mut Node::new(4, 1, Coordinate::new(4.0f64, 1.4f64), 1, 1, 1, "a".to_string(), true, vec![Tag::new(existing_tag(), "großmutter".to_string())]));
+    fn handle_test_nodes_and_verify_result(mut handler_chain: HandlerChain) {
+        handler_chain.process_node(Node::new(1, 1, Coordinate::new(1.0f64, 1.1f64), 1, 1, 1, "a".to_string(), true, vec![Tag::new(existing_tag(), "kasper".to_string())]));
+        handler_chain.process_node(Node::new(2, 1, Coordinate::new(2.0f64, 1.2f64), 1, 1, 1, "a".to_string(), true, vec![Tag::new(existing_tag(), "seppl".to_string())]));
+        handler_chain.process_node(Node::new(3, 1, Coordinate::new(3.0f64, 1.3f64), 1, 1, 1, "a".to_string(), true, vec![Tag::new(existing_tag(), "hotzenplotz".to_string())]));
+        handler_chain.process_node(Node::new(4, 1, Coordinate::new(4.0f64, 1.4f64), 1, 1, 1, "a".to_string(), true, vec![Tag::new(existing_tag(), "großmutter".to_string())]));
 
-        let mut result = HandlerResult::default();
-        handler.get_results_chained(&mut result);
+        let mut result = handler_chain.collect_result();
         dbg!(&result);
 
         assert_eq!(result.count_all_nodes, 4);
@@ -602,18 +526,16 @@ mod tests {
         pub nodes: Vec<Node>,
         pub next: Option<Box<dyn Handler>>,
     }
+
     impl FinalCaptor {
         pub(crate) fn new() -> Self {
             FinalCaptor { next: None, nodes: vec![] }
         }
     }
     impl Handler for FinalCaptor {
-        fn process_node(&mut self, node: &mut Node) -> bool {
-            self.nodes.push(node.clone());
-            true
-        }
-        fn get_next(&mut self) -> &mut Option<Box<dyn Handler>> {
-            &mut self.next
+        fn handle_node(&mut self, node: Node) -> Option<Node> {
+            self.nodes.push(node);
+            None
         }
     }
 
@@ -622,24 +544,26 @@ mod tests {
         let mut tag_filter = TagFilterByKey::new(
             OsmElementTypeSelection::node_only(),
             Regex::new(".*bad.*").unwrap(),
-            FilterType::RemoveMatching,
-            FinalHandler::new());
+            FilterType::RemoveMatching);
 
-        let mut node = Node::new(1, 1, Coordinate::new(1.0f64, 1.1f64), 1, 1, 1, "a".to_string(), true,
-                                 vec![
-                                     Tag::new("bad".to_string(), "hotzenplotz".to_string()),
-                                     Tag::new("good".to_string(), "kasper".to_string()),
-                                     Tag::new("more-bad".to_string(), "vader".to_string()),
-                                     Tag::new("more-good".to_string(), "grandma".to_string()),
-                                     Tag::new("badest".to_string(), "voldemort".to_string()),
-                                 ]);
-        tag_filter.process_node(&mut node);
-        dbg!(&node);
-        assert_eq!(node.tags().len(), 2);
-        assert_eq!(node.tags()[0].k(), &"good");
-        assert_eq!(node.tags()[0].v(), &"kasper");
-        assert_eq!(node.tags()[1].k(), &"more-good");
-        assert_eq!(node.tags()[1].v(), &"grandma");
+        let mut node_option = tag_filter.handle_node(Node::new(1, 1, Coordinate::new(1.0f64, 1.1f64), 1, 1, 1, "a".to_string(), true,
+                                                               vec![
+                                                                   Tag::new("bad".to_string(), "hotzenplotz".to_string()),
+                                                                   Tag::new("good".to_string(), "kasper".to_string()),
+                                                                   Tag::new("more-bad".to_string(), "vader".to_string()),
+                                                                   Tag::new("more-good".to_string(), "grandma".to_string()),
+                                                                   Tag::new("badest".to_string(), "voldemort".to_string()),
+                                                               ]));
+        match node_option {
+            None => panic!("The element itself should not be filtered, only tags!"),
+            Some(node) => {
+                assert_eq!(node.tags().len(), 2);
+                assert_eq!(node.tags()[0].k(), &"good");
+                assert_eq!(node.tags()[0].v(), &"kasper");
+                assert_eq!(node.tags()[1].k(), &"more-good");
+                assert_eq!(node.tags()[1].v(), &"grandma");
+            }
+        }
     }
 
     #[test]
@@ -647,28 +571,31 @@ mod tests {
         let mut tag_filter = TagFilterByKey::new(
             OsmElementTypeSelection::node_only(),
             Regex::new("(.*:)?source(:.*)?|(.*:)?note(:.*)?|url|created_by|fixme|wikipedia").unwrap(),
-            FilterType::RemoveMatching,
-            FinalHandler::new());
+            FilterType::RemoveMatching);
 
-        let mut node = Node::new(1, 1, Coordinate::new(1.0f64, 1.1f64), 1, 1, 1, "a".to_string(), true,
-                                 vec![
-                                     Tag::new("closed:source".to_string(), "bad".to_string()),
-                                     Tag::new("source".to_string(), "bad".to_string()),
-                                     Tag::new("source:x".to_string(), "bad".to_string()),
-                                     Tag::new("x:source:y".to_string(), "bad".to_string()),
-                                     Tag::new("opensource".to_string(), "bad".to_string()), //really?
-                                     Tag::new("note".to_string(), "bad".to_string()),
-                                     Tag::new("url".to_string(), "bad".to_string()),
-                                     Tag::new("created_by".to_string(), "bad".to_string()),
-                                     Tag::new("fixme".to_string(), "bad".to_string()),
-                                     Tag::new("wikipedia".to_string(), "bad".to_string()),
-                                     Tag::new("wikimedia".to_string(), "good".to_string()),
-                                 ]);
-        tag_filter.process_node(&mut node);
-        dbg!(&node);
-        assert_eq!(node.tags().len(), 1);
-        for tag in node.tags() {
-            assert_eq!(tag.v(), "good")
+        let mut node_option = tag_filter.handle_node(Node::new(1, 1, Coordinate::new(1.0f64, 1.1f64), 1, 1, 1, "a".to_string(), true,
+                                                               vec![
+                                                                   Tag::new("closed:source".to_string(), "bad".to_string()),
+                                                                   Tag::new("source".to_string(), "bad".to_string()),
+                                                                   Tag::new("source:x".to_string(), "bad".to_string()),
+                                                                   Tag::new("x:source:y".to_string(), "bad".to_string()),
+                                                                   Tag::new("opensource".to_string(), "bad".to_string()), //really?
+                                                                   Tag::new("note".to_string(), "bad".to_string()),
+                                                                   Tag::new("url".to_string(), "bad".to_string()),
+                                                                   Tag::new("created_by".to_string(), "bad".to_string()),
+                                                                   Tag::new("fixme".to_string(), "bad".to_string()),
+                                                                   Tag::new("wikipedia".to_string(), "bad".to_string()),
+                                                                   Tag::new("wikimedia".to_string(), "good".to_string()),
+                                                               ]));
+        match node_option {
+            None => panic!("The element itself should not be filtered, only tags!"),
+            Some(node) => {
+                dbg!(&node);
+                assert_eq!(node.tags().len(), 1);
+                for tag in node.tags() {
+                    assert_eq!(tag.v(), "good")
+                }
+            }
         }
     }
 
@@ -677,129 +604,122 @@ mod tests {
         let mut tag_filter = TagFilterByKey::new(
             OsmElementTypeSelection::all(),
             Regex::new(".*good.*").unwrap(),
-            FilterType::AcceptMatching,
-            FinalHandler::new());
+            FilterType::AcceptMatching);
 
-        let mut node = Node::new(1, 1, Coordinate::new(1.0f64, 1.1f64), 1, 1, 1, "a".to_string(), true,
-                                 vec![
-                                     Tag::new("bad".to_string(), "hotzenplotz".to_string()),
-                                     Tag::new("good".to_string(), "kasper".to_string()),
-                                     Tag::new("more-bad".to_string(), "vader".to_string()),
-                                     Tag::new("more-good".to_string(), "grandma".to_string()),
-                                     Tag::new("badest".to_string(), "voldemort".to_string()),
-                                 ]);
-        tag_filter.process_node(&mut node);
-        dbg!(&node);
-        assert_eq!(node.tags().len(), 2);
-        assert_eq!(node.tags()[0].k(), &"good");
-        assert_eq!(node.tags()[0].v(), &"kasper");
-        assert_eq!(node.tags()[1].k(), &"more-good");
-        assert_eq!(node.tags()[1].v(), &"grandma");
+        let mut node_option = tag_filter.handle_node(Node::new(1, 1, Coordinate::new(1.0f64, 1.1f64), 1, 1, 1, "a".to_string(), true,
+                                                               vec![
+                                                                   Tag::new("bad".to_string(), "hotzenplotz".to_string()),
+                                                                   Tag::new("good".to_string(), "kasper".to_string()),
+                                                                   Tag::new("more-bad".to_string(), "vader".to_string()),
+                                                                   Tag::new("more-good".to_string(), "grandma".to_string()),
+                                                                   Tag::new("badest".to_string(), "voldemort".to_string()),
+                                                               ]));
+        match node_option {
+            None => panic!("The element itself should not be filtered, only tags!"),
+            Some(node) => {
+                dbg!(&node);
+                assert_eq!(node.tags().len(), 2);
+                assert_eq!(node.tags()[0].k(), &"good");
+                assert_eq!(node.tags()[0].v(), &"kasper");
+                assert_eq!(node.tags()[1].k(), &"more-good");
+                assert_eq!(node.tags()[1].v(), &"grandma");
+            }
+        }
     }
     #[test]
     fn test_tag_filter_by_key__node_not_handled() {
         let mut tag_filter = TagFilterByKey::new(
             OsmElementTypeSelection::way_only(),
             Regex::new(".*").unwrap(),
-            FilterType::RemoveMatching,
-            FinalHandler::new());
+            FilterType::RemoveMatching);
 
-        let mut node = Node::new(1, 1, Coordinate::new(1.0f64, 1.1f64), 1, 1, 1, "a".to_string(), true,
-                                 vec![
-                                     Tag::new("a".to_string(), "1".to_string()),
-                                     Tag::new("b".to_string(), "2".to_string()),
-                                     Tag::new("c".to_string(), "3".to_string()),
-                                 ]);
-        tag_filter.process_node(&mut node);
-        assert_eq!(node.tags().len(), 3);
+        let mut node_option = tag_filter.handle_node(Node::new(1, 1, Coordinate::new(1.0f64, 1.1f64), 1, 1, 1, "a".to_string(), true,
+                                                               vec![
+                                                                   Tag::new("a".to_string(), "1".to_string()),
+                                                                   Tag::new("b".to_string(), "2".to_string()),
+                                                                   Tag::new("c".to_string(), "3".to_string()),
+                                                               ]));
+        match node_option {
+            None => panic!("The element itself should not be filtered, only tags!"),
+            Some(node) => {
+                assert_eq!(node.tags().len(), 3);
+            }
+        }
     }
     #[test]
     fn test_tag_filter_by_key__node_handled() {
         let mut tag_filter = TagFilterByKey::new(
             OsmElementTypeSelection::all(),
             Regex::new(".*").unwrap(),
-            FilterType::RemoveMatching,
-            FinalHandler::new());
+            FilterType::RemoveMatching);
 
-        let mut node = Node::new(1, 1, Coordinate::new(1.0f64, 1.1f64), 1, 1, 1, "a".to_string(), true,
-                                 vec![
-                                     Tag::new("a".to_string(), "1".to_string()),
-                                     Tag::new("b".to_string(), "2".to_string()),
-                                     Tag::new("c".to_string(), "3".to_string()),
-                                 ]);
-        tag_filter.process_node(&mut node);
-        dbg!(&node);
-        assert_eq!(node.tags().len(), 0);
+        let mut node_option = tag_filter.handle_node(Node::new(1, 1, Coordinate::new(1.0f64, 1.1f64), 1, 1, 1, "a".to_string(), true,
+                                                               vec![
+                                                                   Tag::new("a".to_string(), "1".to_string()),
+                                                                   Tag::new("b".to_string(), "2".to_string()),
+                                                                   Tag::new("c".to_string(), "3".to_string()),
+                                                               ]));
+        match node_option {
+            None => panic!("The element itself should not be filtered, only tags!"),
+            Some(node) => {
+                dbg!(&node);
+                assert_eq!(node.tags().len(), 0);
+            }
+        }
     }
     #[test]
     fn filter_elements_remove_by_keys() {
         let mut filter = TagKeyBasedOsmElementsFilter::new(
             OsmElementTypeSelection::all(),
             vec!["bad".to_string(), "ugly".to_string()],
-            FilterType::RemoveMatching,
-            ElementCounter::new(
-                OsmElementTypeSelection::all(),
-                CountType::ALL,
-                FinalHandler::new()
-            )
-        );
-
-        filter.handle_node_chained(&mut Node::new(1, 1, Coordinate::new(1.0f64, 1.1f64), 1, 1, 1, "a".to_string(), true,
-                                                  vec![
-                                                      Tag::new("good".to_string(), "1".to_string()),
-                                                      Tag::new("bad".to_string(), "2".to_string()),
-                                                  ]));
-        filter.handle_node_chained(&mut Node::new(1, 1, Coordinate::new(1.0f64, 1.1f64), 1, 1, 1, "a".to_string(), true,
-                                                  vec![
-                                                      Tag::new("good".to_string(), "1".to_string()),
-                                                      Tag::new("nice".to_string(), "2".to_string()),
-                                                  ]));
-        filter.handle_node_chained(&mut Node::new(1, 1, Coordinate::new(1.0f64, 1.1f64), 1, 1, 1, "a".to_string(), true,
-                                                  vec![
-                                                      Tag::new("ugly".to_string(), "1".to_string()),
-                                                      Tag::new("bad".to_string(), "2".to_string()),
-                                                  ]));
-        let mut result = HandlerResult::default();
-        filter.get_results_chained(&mut result);
-        dbg!(&result);
-
-        assert_eq!(result.count_all_nodes, 1);
+            FilterType::RemoveMatching);
+        assert!(filter.handle_node(Node::new(1, 1, Coordinate::new(1.0f64, 1.1f64), 1, 1, 1, "a".to_string(), true,
+                                             vec![
+                                                 Tag::new("good".to_string(), "1".to_string()),
+                                                 Tag::new("bad".to_string(), "2".to_string()),
+                                             ]))
+            .is_none());
+        assert!(filter.handle_node(Node::new(1, 1, Coordinate::new(1.0f64, 1.1f64), 1, 1, 1, "a".to_string(), true,
+                                             vec![
+                                                 Tag::new("good".to_string(), "1".to_string()),
+                                                 Tag::new("nice".to_string(), "2".to_string()),
+                                             ]))
+            .is_some());
+        assert!(filter.handle_node(Node::new(1, 1, Coordinate::new(1.0f64, 1.1f64), 1, 1, 1, "a".to_string(), true,
+                                             vec![
+                                                 Tag::new("ugly".to_string(), "1".to_string()),
+                                                 Tag::new("bad".to_string(), "2".to_string()),
+                                             ]))
+            .is_none());
     }
+
     #[test]
     fn filter_elements_accept_by_keys() {
         let mut filter = TagKeyBasedOsmElementsFilter::new(
             OsmElementTypeSelection::all(),
             vec!["bad".to_string(), "ugly".to_string()],
             FilterType::AcceptMatching,
-            ElementCounter::new(
-                OsmElementTypeSelection::all(),
-                CountType::ALL,
-                FinalHandler::new()
-            )
         );
 
-        filter.handle_node_chained(&mut Node::new(1, 1, Coordinate::new(1.0f64, 1.1f64), 1, 1, 1, "a".to_string(), true,
-                                                  vec![
-                                                      Tag::new("good".to_string(), "1".to_string()),
-                                                      Tag::new("bad".to_string(), "2".to_string()),
-                                                  ]));
-        filter.handle_node_chained(&mut Node::new(1, 1, Coordinate::new(1.0f64, 1.1f64), 1, 1, 1, "a".to_string(), true,
-                                                  vec![
-                                                      Tag::new("good".to_string(), "1".to_string()),
-                                                      Tag::new("nice".to_string(), "2".to_string()),
-                                                  ]));
-        filter.handle_node_chained(&mut Node::new(1, 1, Coordinate::new(1.0f64, 1.1f64), 1, 1, 1, "a".to_string(), true,
-                                                  vec![
-                                                      Tag::new("ugly".to_string(), "1".to_string()),
-                                                      Tag::new("bad".to_string(), "2".to_string()),
-                                                  ]));
-        let mut result = HandlerResult::default();
-        filter.get_results_chained(&mut result);
-        dbg!(&result);
-
-        assert_eq!(result.count_all_nodes, 2);
+        assert!(filter.handle_node(Node::new(1, 1, Coordinate::new(1.0f64, 1.1f64), 1, 1, 1, "a".to_string(), true,
+                                             vec![
+                                                 Tag::new("good".to_string(), "1".to_string()),
+                                                 Tag::new("bad".to_string(), "2".to_string()),
+                                             ]))
+            .is_some());
+        assert!(filter.handle_node(Node::new(1, 1, Coordinate::new(1.0f64, 1.1f64), 1, 1, 1, "a".to_string(), true,
+                                             vec![
+                                                 Tag::new("good".to_string(), "1".to_string()),
+                                                 Tag::new("nice".to_string(), "2".to_string()),
+                                             ]))
+            .is_none());
+        assert!(filter.handle_node(Node::new(1, 1, Coordinate::new(1.0f64, 1.1f64), 1, 1, 1, "a".to_string(), true,
+                                             vec![
+                                                 Tag::new("ugly".to_string(), "1".to_string()),
+                                                 Tag::new("bad".to_string(), "2".to_string()),
+                                             ]))
+            .is_some());
     }
-
 
     #[test]
     fn has_one_of_tag_keys_predicate__only_matching_tags() {
@@ -832,7 +752,6 @@ mod tests {
             Tag::new("bad".to_string(), "2".to_string()),
         ]));
     }
-
 
     #[test]
     fn has_tag_key_value_predicate__no_matching_tag() {
@@ -889,7 +808,6 @@ mod tests {
         ]));
     }
 
-
     #[test]
     fn has_none_of_tag_keys_predicate__only_non_matching_tag() {
         let mut predicate = HasNoneOfTagKeysPredicate { keys: vec!["bad".to_string(), "ugly".to_string()] };
@@ -914,7 +832,6 @@ mod tests {
         ]));
     }
 
-
     #[test]
     fn complex_filter() {
         let mut key_values = HashMap::new();
@@ -922,14 +839,12 @@ mod tests {
         key_values.insert("public_transport".to_string(), "platform".to_string());
         key_values.insert("man_made".to_string(), "pier".to_string());
 
-        let mut filter = ElementCounter::new(
+        let mut filter = ComplexElementsFilter::new(
             OsmElementTypeSelection::all(),
-            CountType::ALL,
-            ComplexElementsFilter::new(
-                OsmElementTypeSelection::all(),
-                HasOneOfTagKeysPredicate { keys: vec!["highway".to_string(), "route".to_string()] },
-                HasTagKeyValuePredicate { key_values: key_values },
-                HasNoneOfTagKeysPredicate { keys: vec![
+            HasOneOfTagKeysPredicate { keys: vec!["highway".to_string(), "route".to_string()] },
+            HasTagKeyValuePredicate { key_values: key_values },
+            HasNoneOfTagKeysPredicate {
+                keys: vec![
                     "building".to_string(),
                     "landuse".to_string(),
                     "boundary".to_string(),
@@ -941,68 +856,55 @@ mod tests {
                     "military".to_string(),
                     "power".to_string(),
                     "communication".to_string(),
-                    "man_made".to_string()] },
-                NodeIdCollector::new(
-                    ElementCounter::new(
-                        OsmElementTypeSelection::all(),
-                        CountType::ACCEPTED,
-                        FinalHandler::new())
-                )));
+                    "man_made".to_string()]
+            });
         // has key to keep and key-value to keep, bad key 'building' should not take effect => should be accepted
-        filter.handle_node_chained(&mut Node::new(1, 1, Coordinate::new(1.0f64, 1.1f64), 1, 1, 1, "a".to_string(), true,
-                                                  vec![
-                                                      Tag::new("route".to_string(), "xyz".to_string()),
-                                                      Tag::new("railway".to_string(), "platform".to_string()),
-                                                      Tag::new("building".to_string(), "x".to_string()),
-                                                  ]));
+        assert!(filter.handle_node(Node::new(1, 1, Coordinate::new(1.0f64, 1.1f64), 1, 1, 1, "a".to_string(), true,
+                                             vec![
+                                                 Tag::new("route".to_string(), "xyz".to_string()),
+                                                 Tag::new("railway".to_string(), "platform".to_string()),
+                                                 Tag::new("building".to_string(), "x".to_string()),
+                                             ])).is_some());
 
         // has key to keep, bad key 'building' should not take effect => should be accepted
-        filter.handle_node_chained(&mut Node::new(2, 1, Coordinate::new(1.0f64, 1.1f64), 1, 1, 1, "a".to_string(), true,
-                                                  vec![
-                                                      Tag::new("route".to_string(), "xyz".to_string()),
-                                                      Tag::new("building".to_string(), "x".to_string()),
-                                                  ]));
+        assert!(filter.handle_node(Node::new(2, 1, Coordinate::new(1.0f64, 1.1f64), 1, 1, 1, "a".to_string(), true,
+                                             vec![
+                                                 Tag::new("route".to_string(), "xyz".to_string()),
+                                                 Tag::new("building".to_string(), "x".to_string()),
+                                             ])).is_some());
 
         // has key-value to keep, bad key 'building' should not take effect => should be accepted
-        filter.handle_node_chained(&mut Node::new(3, 1, Coordinate::new(1.0f64, 1.1f64), 1, 1, 1, "a".to_string(), true,
-                                                  vec![
-                                                      Tag::new("railway".to_string(), "platform".to_string()),
-                                                      Tag::new("building".to_string(), "x".to_string()),
-                                                  ]));
+        assert!(filter.handle_node(Node::new(3, 1, Coordinate::new(1.0f64, 1.1f64), 1, 1, 1, "a".to_string(), true,
+                                             vec![
+                                                 Tag::new("railway".to_string(), "platform".to_string()),
+                                                 Tag::new("building".to_string(), "x".to_string()),
+                                             ])).is_some());
 
         // has no key or key-value to keep, but also no bad key => should be accepted
-        filter.handle_node_chained(&mut Node::new(4, 1, Coordinate::new(1.0f64, 1.1f64), 1, 1, 1, "a".to_string(), true,
-                                                  vec![
-                                                      Tag::new("railway".to_string(), "wrong-value".to_string()),
-                                                      Tag::new("something".to_string(), "else".to_string()),
-                                                  ]));
+        assert!(filter.handle_node(Node::new(4, 1, Coordinate::new(1.0f64, 1.1f64), 1, 1, 1, "a".to_string(), true,
+                                             vec![
+                                                 Tag::new("railway".to_string(), "wrong-value".to_string()),
+                                                 Tag::new("something".to_string(), "else".to_string()),
+                                             ])).is_some());
 
         // has no key or key-value to keep, some other key, but also one bad key => should be filtered
-        filter.handle_node_chained(&mut Node::new(5, 1, Coordinate::new(1.0f64, 1.1f64), 1, 1, 1, "a".to_string(), true,
-                                                  vec![
-                                                      Tag::new("railway".to_string(), "wrong-value".to_string()),
-                                                      Tag::new("something".to_string(), "else".to_string()),
-                                                      Tag::new("building".to_string(), "x".to_string()),
-                                                  ]));
+        assert!(filter.handle_node(Node::new(5, 1, Coordinate::new(1.0f64, 1.1f64), 1, 1, 1, "a".to_string(), true,
+                                             vec![
+                                                 Tag::new("railway".to_string(), "wrong-value".to_string()),
+                                                 Tag::new("something".to_string(), "else".to_string()),
+                                                 Tag::new("building".to_string(), "x".to_string()),
+                                             ])).is_none());
 
         // has only one bad key => should be filtered
-        filter.handle_node_chained(&mut Node::new(6, 1, Coordinate::new(1.0f64, 1.1f64), 1, 1, 1, "a".to_string(), true,
-                                                  vec![
-                                                      Tag::new("building".to_string(), "x".to_string()),
-                                                  ]));
+        assert!(filter.handle_node(Node::new(6, 1, Coordinate::new(1.0f64, 1.1f64), 1, 1, 1, "a".to_string(), true,
+                                             vec![
+                                                 Tag::new("building".to_string(), "x".to_string()),
+                                             ])).is_none());
 
         // has only one other key => should be accepted
-        filter.handle_node_chained(&mut Node::new(7, 1, Coordinate::new(1.0f64, 1.1f64), 1, 1, 1, "a".to_string(), true,
-                                                  vec![
-                                                      Tag::new("something".to_string(), "x".to_string()),
-                                                  ]));
-
-        let mut result = HandlerResult::default();
-        filter.get_results_chained(&mut result);
-        dbg!(&result);
-
-        assert_eq!(result.count_all_nodes, 7);
-        assert_eq!(result.count_accepted_nodes, 5);
-        assert_eq!(result.node_ids, vec![1, 2, 3, 4, 7])
+        assert!(filter.handle_node(Node::new(7, 1, Coordinate::new(1.0f64, 1.1f64), 1, 1, 1, "a".to_string(), true,
+                                             vec![
+                                                 Tag::new("something".to_string(), "x".to_string()),
+                                             ])).is_some());
     }
 }
