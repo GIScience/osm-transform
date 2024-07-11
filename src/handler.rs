@@ -537,66 +537,6 @@ impl Handler for TagFilterByKey {
     }
 }
 
-
-
-#[derive(Default)]
-pub(crate) struct BboxCollector {
-    pub next: Option<Box<dyn Handler>>,
-    pub min_lat: f64,
-    pub min_lon: f64,
-    pub max_lat: f64,
-    pub max_lon: f64,
-}
-
-impl BboxCollector {
-    pub(crate) fn new(next: impl Handler + 'static) -> Self {
-        Self {
-            next: into_next(next),
-            min_lat: f64::MAX,
-            min_lon: f64::MAX,
-            max_lat: f64::MIN,
-            max_lon: f64::MIN,
-        }
-    }
-}
-
-impl Handler for BboxCollector {
-    fn process_node(&mut self, node: &mut Node) -> bool {
-        if &self.min_lat == &0.0 {
-            // self.set_min_lat(node.coordinate().lat());
-            self.min_lat = node.coordinate().lat();
-        }
-        if &self.min_lon == &0.0 {
-            self.min_lon = node.coordinate().lon()
-        }
-
-        if node.coordinate().lat() < self.min_lat {
-            // self.set_min_lat(node.coordinate().lat());
-            self.min_lat = node.coordinate().lat();
-        }
-        if node.coordinate().lon() < self.min_lon {
-            self.min_lon = node.coordinate().lon()
-        }
-
-        if node.coordinate().lat() > self.max_lat {
-            self.max_lat = node.coordinate().lat()
-        }
-        if node.coordinate().lon() > self.max_lon {
-            self.max_lon = node.coordinate().lon()
-        }
-        true
-    }
-    fn get_next(&mut self) -> &mut Option<Box<dyn Handler>> {
-        return &mut self.next;
-    }
-    fn process_results(&mut self, res: &mut HandlerResult) {
-        res.bbox_max_lon = self.max_lon;
-        res.bbox_min_lon = self.min_lon;
-        res.bbox_max_lat = self.max_lat;
-        res.bbox_min_lat = self.min_lat;
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use std::collections::HashMap;
@@ -605,7 +545,7 @@ mod tests {
     use osm_io::osm::model::tag::Tag;
     use regex::Regex;
     use simple_logger::SimpleLogger;
-    use crate::handler::{BboxCollector, CountType, FilterType, Handler, HandlerResult, ElementCounter, TagValueBasedOsmElementsFilter, FinalHandler, NodeIdCollector, TagFilterByKey, OsmElementTypeSelection, TagKeyBasedOsmElementsFilter, HasOneOfTagKeysPredicate, HasNoneOfTagKeysPredicate, HasTagKeyValuePredicate, ComplexElementsFilter};
+    use crate::handler::{CountType, FilterType, Handler, HandlerResult, ElementCounter, TagValueBasedOsmElementsFilter, FinalHandler, NodeIdCollector, TagFilterByKey, OsmElementTypeSelection, TagKeyBasedOsmElementsFilter, HasOneOfTagKeysPredicate, HasNoneOfTagKeysPredicate, HasTagKeyValuePredicate, ComplexElementsFilter};
 
     const EXISTING_TAG: &str = "EXISTING_TAG";
     const MISSING_TAG: &str = "MISSING_TAG";
@@ -631,13 +571,11 @@ mod tests {
                         existing_tag(),
                         Regex::new(".*z.*").unwrap(),
                         FilterType::RemoveMatching,
-                        BboxCollector::new(
-                            ElementCounter::new(
-                                OsmElementTypeSelection::node_only(),
-                                CountType::ACCEPTED,
-                                NodeIdCollector::new(
-                                    FinalHandler::new()
-                                )
+                        ElementCounter::new(
+                            OsmElementTypeSelection::node_only(),
+                            CountType::ACCEPTED,
+                            NodeIdCollector::new(
+                                FinalHandler::new()
                             )
                         )
                     )
@@ -659,11 +597,6 @@ mod tests {
         assert_eq!(result.count_all_nodes, 4);
         assert_eq!(result.count_accepted_nodes, 2);
         assert_eq!(result.node_ids, vec![1, 2]);
-        //BBox based on only filtered (accepted) nodes!
-        assert_eq!(result.bbox_min_lat, 1.0f64);
-        assert_eq!(result.bbox_min_lon, 1.1f64);
-        assert_eq!(result.bbox_max_lat, 2.0f64);
-        assert_eq!(result.bbox_max_lon, 1.2f64);
     }
     pub(crate) struct FinalCaptor {
         pub nodes: Vec<Node>,

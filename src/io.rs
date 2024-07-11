@@ -122,7 +122,7 @@ pub fn process_file() -> Result<(), anyhow::Error> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::handler::{BboxCollector, HandlerResult, NodeIdCollector};
+    use crate::handler::{FinalHandler, HandlerResult, NodeIdCollector};
     use pbf::reader::Reader;
 
     #[test]
@@ -141,24 +141,5 @@ mod tests {
             }
         }
         assert!(found);
-    }
-
-    #[test]
-    fn process_() {
-        let config = Config::default();
-        // let mut bbox_collector = BboxCollector{next: None, min_lat: 0f64, min_lon: 0f64, max_lat: 0f64, max_lon: 0f64};
-        // let mut filter = Filter{next: into_next(bbox_collector), node_ids: Vec::new(), way_ids: Vec::new()};
-        let mut bbox_collector = BboxCollector::new(crate::handler::FinalHandler::new());
-        let mut filter = NodeIdCollector::new(bbox_collector);
-        let _ = process_with_handler(&config, &mut filter);
-        let mut results = HandlerResult::default();
-        filter.get_results_chained(&mut results);
-        assert!(filter.node_ids.len() > 0);
-
-        // ownership of bbox_collector
-        assert_ne!(results.bbox_min_lat, 0f64);
-        assert_ne!(results.bbox_max_lat, 0f64);
-        assert_ne!(results.bbox_min_lon, 0f64);
-        assert_ne!(results.bbox_max_lon, 0f64);
     }
 }
