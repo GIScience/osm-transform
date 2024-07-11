@@ -42,6 +42,7 @@ impl ProcessorChainExecutor {
     }
 }
 
+#[derive(Default)]
 struct LoggingProcessor {}
 impl Processor for LoggingProcessor {
     fn process_node(&mut self, node: Node) -> Option<Node> {
@@ -58,6 +59,20 @@ impl Processor for TagAdder {
     fn process_node(&mut self, mut node: Node) -> Option<Node> {
         node.tags_mut().push(Tag::new(self.key.clone(), self.val.clone()));
         return Some(node);
+    }
+}
+
+
+struct TagFilter {
+    key: String,
+    val: String
+}
+impl Processor for TagFilter {
+    fn process_node(&mut self, mut node: Node) -> Option<Node> {
+        match node.tags().iter().any(|tag| tag.k().eq(&self.key) && tag.v().eq(&self.val)) {
+            true => None,
+            false => Some(node)
+        }
     }
 }
 
@@ -104,7 +119,7 @@ mod tests {
     use simple_logger::SimpleLogger;
 
     use crate::handler::{CountType, OsmElementTypeSelection};
-    use crate::processor::{Counter, LoggingProcessor, Processor, ProcessorChainExecutor, TagAdder};
+    use crate::processor::{Counter, LoggingProcessor, Processor, ProcessorChainExecutor, TagAdder, TagFilter};
 
     #[test]
     fn executor_add_preprocessors_vector() {
@@ -140,10 +155,12 @@ mod tests {
 
 
     #[test]
-    fn executor_collect_result() {
+    fn executor_filter_and_collect_result() {
         SimpleLogger::new().init();
         let mut executor = ProcessorChainExecutor::default()
             .add(Box::new(Counter::new(OsmElementTypeSelection::node_only(), CountType::ALL)))
+            .add(Box::new(TagFilter{key: "person".to_string(), val: "hotzenplotz".to_string()}))
+            .add(Box::new(LoggingProcessor::default()))
             .add(Box::new(Counter::new(OsmElementTypeSelection::node_only(), CountType::ACCEPTED)));
 
         executor.execute(Node::new(1, 1, Coordinate::new(1.0f64, 1.1f64), 1, 1, 1, "a".to_string(), true, vec![Tag::new("person".to_string(), "kasper".to_string())]));
@@ -153,6 +170,6 @@ mod tests {
         let result = executor.collect_result();
         dbg!(&result);
         assert_eq!(result.count_all_nodes, 4);
-        assert_eq!(result.count_accepted_nodes, 4);
+        assert_eq!(result.count_accepted_nodes, 3);
     }
 }
