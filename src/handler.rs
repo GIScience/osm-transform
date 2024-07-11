@@ -481,7 +481,7 @@ pub(crate) struct OsmElementTypeSelection {
 }
 impl OsmElementTypeSelection {
     fn all() -> Self { Self { node: true, way: true, relation: true } }
-    fn node_only() -> Self { Self { node: true, way: false, relation: false } }
+    pub(crate) fn node_only() -> Self { Self { node: true, way: false, relation: false } }
     fn way_only() -> Self { Self { node: false, way: true, relation: false } }
     fn relation_only() -> Self { Self { node: false, way: false, relation: true } }
 }
