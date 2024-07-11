@@ -206,7 +206,6 @@ mod tests {
             country_path: "test/mapping_test.csv".to_string(),
             input_path:  "test/baarle_small.pbf".to_string(),
             output_path:  "output.pbf".to_string(),
-            with_copy: false,
         };
 
         let mut area_handler = AreaHandler::new();

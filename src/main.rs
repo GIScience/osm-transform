@@ -36,7 +36,6 @@ fn merge_args(config: &mut Config, args: &Args) {
     config.input_path = args.input_pbf.clone();
     config.output_path = args.output_pbf.clone();
     config.country_path = args.borders.clone();
-    config.with_copy = args.with_copy.clone();
 }
 
 fn read_conf_file() -> Config {
@@ -63,7 +62,4 @@ struct Args {
     /// Turn debugging information on
     #[arg(short, long, action = clap::ArgAction::Count)]
     debug: u8,
-
-    #[arg(short = 'x', long = "with-copy")]
-    with_copy: bool,
 }
