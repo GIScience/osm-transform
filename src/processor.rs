@@ -14,6 +14,7 @@ trait Processor {
     }
 }
 
+#[derive(Default)]
 struct ProcessorChainExecutor {
     pub processors: Vec<Box<dyn Processor>>,
 }
@@ -21,15 +22,23 @@ struct ProcessorChainExecutor {
 impl ProcessorChainExecutor {
     fn execute(&mut self, mut node: Node) {
         for processor in &mut self.processors {
-            // if let Some(new_node) = processor.process_node(node) {
-            //     node = new_node;
-            // }
             let optional_node = processor.process_node(node);
             match optional_node {
                 None => { break }
                 Some(result) => { node = result }
             }
         }
+    }
+    fn collect_result(&mut self) -> HandlerResult{
+        let mut result = HandlerResult::default();
+        for processor in &mut self.processors {
+            result = processor.add_result(result);
+        }
+        result
+    }
+    fn add(mut self, handler: Box<dyn Processor>) -> ProcessorChainExecutor {
+        self.processors.push(handler);
+        self
     }
 }
 
@@ -98,7 +107,7 @@ mod tests {
     use crate::processor::{Counter, LoggingProcessor, Processor, ProcessorChainExecutor, TagAdder};
 
     #[test]
-    fn chain() {
+    fn executor_add_preprocessors_vector() {
         SimpleLogger::new().init();
         let mut processors: Vec<Box<dyn Processor>> = vec![
             Box::new(LoggingProcessor {}),
@@ -112,5 +121,38 @@ mod tests {
         executor.execute(Node::new(2, 1, Coordinate::new(2.0f64, 1.2f64), 1, 1, 1, "a".to_string(), true, vec![Tag::new("person".to_string(), "seppl".to_string())]));
         executor.execute(Node::new(3, 1, Coordinate::new(3.0f64, 1.3f64), 1, 1, 1, "a".to_string(), true, vec![Tag::new("person".to_string(), "hotzenplotz".to_string())]));
         executor.execute(Node::new(4, 1, Coordinate::new(4.0f64, 1.4f64), 1, 1, 1, "a".to_string(), true, vec![Tag::new("person".to_string(), "großmutter".to_string())]));
+    }
+
+    #[test]
+    fn executor_add_preprocessors_fluent() {
+        SimpleLogger::new().init();
+        let mut executor = ProcessorChainExecutor::default()
+            .add(Box::new(LoggingProcessor {}))
+            .add(Box::new(Counter::new(OsmElementTypeSelection::node_only(), CountType::ALL)))
+            .add(Box::new(TagAdder { key: "k1".to_string(), val: "v1".to_string() }))
+            .add(Box::new(LoggingProcessor {}));
+
+        executor.execute(Node::new(1, 1, Coordinate::new(1.0f64, 1.1f64), 1, 1, 1, "a".to_string(), true, vec![Tag::new("person".to_string(), "kasper".to_string())]));
+        executor.execute(Node::new(2, 1, Coordinate::new(2.0f64, 1.2f64), 1, 1, 1, "a".to_string(), true, vec![Tag::new("person".to_string(), "seppl".to_string())]));
+        executor.execute(Node::new(3, 1, Coordinate::new(3.0f64, 1.3f64), 1, 1, 1, "a".to_string(), true, vec![Tag::new("person".to_string(), "hotzenplotz".to_string())]));
+        executor.execute(Node::new(4, 1, Coordinate::new(4.0f64, 1.4f64), 1, 1, 1, "a".to_string(), true, vec![Tag::new("person".to_string(), "großmutter".to_string())]));
+    }
+
+
+    #[test]
+    fn executor_collect_result() {
+        SimpleLogger::new().init();
+        let mut executor = ProcessorChainExecutor::default()
+            .add(Box::new(Counter::new(OsmElementTypeSelection::node_only(), CountType::ALL)))
+            .add(Box::new(Counter::new(OsmElementTypeSelection::node_only(), CountType::ACCEPTED)));
+
+        executor.execute(Node::new(1, 1, Coordinate::new(1.0f64, 1.1f64), 1, 1, 1, "a".to_string(), true, vec![Tag::new("person".to_string(), "kasper".to_string())]));
+        executor.execute(Node::new(2, 1, Coordinate::new(2.0f64, 1.2f64), 1, 1, 1, "a".to_string(), true, vec![Tag::new("person".to_string(), "seppl".to_string())]));
+        executor.execute(Node::new(3, 1, Coordinate::new(3.0f64, 1.3f64), 1, 1, 1, "a".to_string(), true, vec![Tag::new("person".to_string(), "hotzenplotz".to_string())]));
+        executor.execute(Node::new(4, 1, Coordinate::new(4.0f64, 1.4f64), 1, 1, 1, "a".to_string(), true, vec![Tag::new("person".to_string(), "großmutter".to_string())]));
+        let result = executor.collect_result();
+        dbg!(&result);
+        assert_eq!(result.count_all_nodes, 4);
+        assert_eq!(result.count_accepted_nodes, 4);
     }
 }
