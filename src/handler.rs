@@ -1,8 +1,9 @@
 use std::collections::HashMap;
+
 use osm_io::osm::model::node::Node;
-use osm_io::osm::model::way::Way;
 use osm_io::osm::model::relation::Relation;
 use osm_io::osm::model::tag::Tag;
+use osm_io::osm::model::way::Way;
 use regex::Regex;
 
 #[derive(Default,Debug)]
@@ -26,7 +27,7 @@ pub trait Handler {
         Some(relation)
     }
 
-    fn add_result(&mut self, mut result: HandlerResult) -> HandlerResult {
+    fn add_result(&mut self, result: HandlerResult) -> HandlerResult {
         result
     }
 }
@@ -89,7 +90,7 @@ impl FinalHandler {
     }
 }
 impl Handler for FinalHandler {
-    fn handle_node(&mut self, node: Node) -> Option<Node> {
+    fn handle_node(&mut self, _node: Node) -> Option<Node> {
         None
     }
 }
@@ -468,12 +469,14 @@ impl Handler for TagFilterByKey {
 #[cfg(test)]
 mod tests {
     use std::collections::HashMap;
+
     use osm_io::osm::model::coordinate::Coordinate;
     use osm_io::osm::model::node::Node;
     use osm_io::osm::model::tag::Tag;
     use regex::Regex;
     use simple_logger::SimpleLogger;
-    use crate::handler::{CountType, FilterType, Handler, HandlerResult, ElementCounter, TagValueBasedOsmElementsFilter, FinalHandler, NodeIdCollector, TagFilterByKey, OsmElementTypeSelection, TagKeyBasedOsmElementsFilter, HasOneOfTagKeysPredicate, HasNoneOfTagKeysPredicate, HasTagKeyValuePredicate, ComplexElementsFilter, HandlerChain};
+
+    use crate::handler::{ComplexElementsFilter, CountType, ElementCounter, FilterType, FinalHandler, Handler, HandlerChain, HasNoneOfTagKeysPredicate, HasOneOfTagKeysPredicate, HasTagKeyValuePredicate, NodeIdCollector, OsmElementTypeSelection, TagFilterByKey, TagKeyBasedOsmElementsFilter, TagValueBasedOsmElementsFilter};
 
     const EXISTING_TAG: &str = "EXISTING_TAG";
     const MISSING_TAG: &str = "MISSING_TAG";
@@ -486,7 +489,7 @@ mod tests {
     fn handler_chain() {
         SimpleLogger::new().init();
 
-        let mut chain = HandlerChain::default()
+        let chain = HandlerChain::default()
             .add(Box::new(ElementCounter::new(
                 OsmElementTypeSelection::node_only(),
                 CountType::ALL)))
@@ -515,7 +518,7 @@ mod tests {
         handler_chain.process_node(Node::new(3, 1, Coordinate::new(3.0f64, 1.3f64), 1, 1, 1, "a".to_string(), true, vec![Tag::new(existing_tag(), "hotzenplotz".to_string())]));
         handler_chain.process_node(Node::new(4, 1, Coordinate::new(4.0f64, 1.4f64), 1, 1, 1, "a".to_string(), true, vec![Tag::new(existing_tag(), "großmutter".to_string())]));
 
-        let mut result = handler_chain.collect_result();
+        let result = handler_chain.collect_result();
         dbg!(&result);
 
         assert_eq!(result.count_all_nodes, 4);
@@ -540,13 +543,13 @@ mod tests {
     }
 
     #[test]
-    fn test_tag_filter_by_key__remove_matching() {
+    fn test_tag_filter_by_key_with_remove_matching() {
         let mut tag_filter = TagFilterByKey::new(
             OsmElementTypeSelection::node_only(),
             Regex::new(".*bad.*").unwrap(),
             FilterType::RemoveMatching);
 
-        let mut node_option = tag_filter.handle_node(Node::new(1, 1, Coordinate::new(1.0f64, 1.1f64), 1, 1, 1, "a".to_string(), true,
+        let node_option = tag_filter.handle_node(Node::new(1, 1, Coordinate::new(1.0f64, 1.1f64), 1, 1, 1, "a".to_string(), true,
                                                                vec![
                                                                    Tag::new("bad".to_string(), "hotzenplotz".to_string()),
                                                                    Tag::new("good".to_string(), "kasper".to_string()),
@@ -567,13 +570,13 @@ mod tests {
     }
 
     #[test]
-    fn test_tag_filter_by_key__remove_matching_complex_regex() {
+    fn test_tag_filter_by_key_with_remove_matching_complex_regex() {
         let mut tag_filter = TagFilterByKey::new(
             OsmElementTypeSelection::node_only(),
             Regex::new("(.*:)?source(:.*)?|(.*:)?note(:.*)?|url|created_by|fixme|wikipedia").unwrap(),
             FilterType::RemoveMatching);
 
-        let mut node_option = tag_filter.handle_node(Node::new(1, 1, Coordinate::new(1.0f64, 1.1f64), 1, 1, 1, "a".to_string(), true,
+        let node_option = tag_filter.handle_node(Node::new(1, 1, Coordinate::new(1.0f64, 1.1f64), 1, 1, 1, "a".to_string(), true,
                                                                vec![
                                                                    Tag::new("closed:source".to_string(), "bad".to_string()),
                                                                    Tag::new("source".to_string(), "bad".to_string()),
@@ -600,13 +603,13 @@ mod tests {
     }
 
     #[test]
-    fn test_tag_filter_by_key__keep_matching() {
+    fn test_tag_filter_by_key_with_keep_matching() {
         let mut tag_filter = TagFilterByKey::new(
             OsmElementTypeSelection::all(),
             Regex::new(".*good.*").unwrap(),
             FilterType::AcceptMatching);
 
-        let mut node_option = tag_filter.handle_node(Node::new(1, 1, Coordinate::new(1.0f64, 1.1f64), 1, 1, 1, "a".to_string(), true,
+        let node_option = tag_filter.handle_node(Node::new(1, 1, Coordinate::new(1.0f64, 1.1f64), 1, 1, 1, "a".to_string(), true,
                                                                vec![
                                                                    Tag::new("bad".to_string(), "hotzenplotz".to_string()),
                                                                    Tag::new("good".to_string(), "kasper".to_string()),
@@ -627,13 +630,13 @@ mod tests {
         }
     }
     #[test]
-    fn test_tag_filter_by_key__node_not_handled() {
+    fn test_tag_filter_by_key_with_node_not_handled() {
         let mut tag_filter = TagFilterByKey::new(
             OsmElementTypeSelection::way_only(),
             Regex::new(".*").unwrap(),
             FilterType::RemoveMatching);
 
-        let mut node_option = tag_filter.handle_node(Node::new(1, 1, Coordinate::new(1.0f64, 1.1f64), 1, 1, 1, "a".to_string(), true,
+        let node_option = tag_filter.handle_node(Node::new(1, 1, Coordinate::new(1.0f64, 1.1f64), 1, 1, 1, "a".to_string(), true,
                                                                vec![
                                                                    Tag::new("a".to_string(), "1".to_string()),
                                                                    Tag::new("b".to_string(), "2".to_string()),
@@ -647,13 +650,13 @@ mod tests {
         }
     }
     #[test]
-    fn test_tag_filter_by_key__node_handled() {
+    fn test_tag_filter_by_key_with_node_handled() {
         let mut tag_filter = TagFilterByKey::new(
             OsmElementTypeSelection::all(),
             Regex::new(".*").unwrap(),
             FilterType::RemoveMatching);
 
-        let mut node_option = tag_filter.handle_node(Node::new(1, 1, Coordinate::new(1.0f64, 1.1f64), 1, 1, 1, "a".to_string(), true,
+        let node_option = tag_filter.handle_node(Node::new(1, 1, Coordinate::new(1.0f64, 1.1f64), 1, 1, 1, "a".to_string(), true,
                                                                vec![
                                                                    Tag::new("a".to_string(), "1".to_string()),
                                                                    Tag::new("b".to_string(), "2".to_string()),
@@ -722,14 +725,14 @@ mod tests {
     }
 
     #[test]
-    fn has_one_of_tag_keys_predicate__only_matching_tags() {
+    fn has_one_of_tag_keys_predicate_with_only_matching_tags() {
         let mut predicate = HasOneOfTagKeysPredicate { keys: vec!["good".to_string(), "nice".to_string()] };
         assert_eq!(true, predicate.test(&vec![
             Tag::new("good".to_string(), "1".to_string()),
         ]));
     }
     #[test]
-    fn has_one_of_tag_keys_predicate__only_all_matching_tags() {
+    fn has_one_of_tag_keys_predicate_with_only_all_matching_tags() {
         let mut predicate = HasOneOfTagKeysPredicate { keys: vec!["good".to_string(), "nice".to_string()] };
         assert_eq!(true, predicate.test(&vec![
             Tag::new("good".to_string(), "1".to_string()),
@@ -737,7 +740,7 @@ mod tests {
         ]));
     }
     #[test]
-    fn has_one_of_tag_keys_predicate__also_matching_tags() {
+    fn has_one_of_tag_keys_predicate_with_also_matching_tags() {
         let mut predicate = HasOneOfTagKeysPredicate { keys: vec!["good".to_string(), "nice".to_string()] };
         assert_eq!(true, predicate.test(&vec![
             Tag::new("good".to_string(), "1".to_string()),
@@ -745,7 +748,7 @@ mod tests {
         ]));
     }
     #[test]
-    fn has_one_of_tag_keys_predicate__no_matching_tags() {
+    fn has_one_of_tag_keys_predicate_with_no_matching_tags() {
         let mut predicate = HasOneOfTagKeysPredicate { keys: vec!["good".to_string(), "nice".to_string()] };
         assert_eq!(false, predicate.test(&vec![
             Tag::new("ugly".to_string(), "1".to_string()),
@@ -754,7 +757,7 @@ mod tests {
     }
 
     #[test]
-    fn has_tag_key_value_predicate__no_matching_tag() {
+    fn has_tag_key_value_predicate_with_no_matching_tag() {
         let mut key_values = HashMap::new();
         key_values.insert("good".to_string(), "good".to_string());
         key_values.insert("nice".to_string(), "nice".to_string());
@@ -765,7 +768,7 @@ mod tests {
         ]));
     }
     #[test]
-    fn has_tag_key_value_predicate__only_tag_with_wrong_value() {
+    fn has_tag_key_value_predicate_with_only_tag_with_wrong_value() {
         let mut key_values = HashMap::new();
         key_values.insert("good".to_string(), "good".to_string());
         key_values.insert("nice".to_string(), "nice".to_string());
@@ -775,7 +778,7 @@ mod tests {
         ]));
     }
     #[test]
-    fn has_tag_key_value_predicate__also_tag_with_wrong_value() {
+    fn has_tag_key_value_predicate_with_also_tag_with_wrong_value() {
         let mut key_values = HashMap::new();
         key_values.insert("good".to_string(), "good".to_string());
         key_values.insert("nice".to_string(), "nice".to_string());
@@ -787,7 +790,7 @@ mod tests {
         ]));
     }
     #[test]
-    fn has_tag_key_value_predicate__only_tag_with_matching_value() {
+    fn has_tag_key_value_predicate_with_only_tag_with_matching_value() {
         let mut key_values = HashMap::new();
         key_values.insert("good".to_string(), "good".to_string());
         key_values.insert("nice".to_string(), "nice".to_string());
@@ -797,7 +800,7 @@ mod tests {
         ]));
     }
     #[test]
-    fn has_tag_key_value_predicate__also_tag_with_matching_value() {
+    fn has_tag_key_value_predicate_with_also_tag_with_matching_value() {
         let mut key_values = HashMap::new();
         key_values.insert("good".to_string(), "good".to_string());
         key_values.insert("nice".to_string(), "nice".to_string());
@@ -809,7 +812,7 @@ mod tests {
     }
 
     #[test]
-    fn has_none_of_tag_keys_predicate__only_non_matching_tag() {
+    fn has_none_of_tag_keys_predicate_with_only_non_matching_tag() {
         let mut predicate = HasNoneOfTagKeysPredicate { keys: vec!["bad".to_string(), "ugly".to_string()] };
         assert_eq!(true, predicate.test(&vec![
             Tag::new("good".to_string(), "1".to_string()),

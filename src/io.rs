@@ -9,16 +9,14 @@ use osm_io::osm::model::tag::Tag;
 use osm_io::osm::pbf;
 use osm_io::osm::pbf::compression_type::CompressionType;
 use osm_io::osm::pbf::file_info::FileInfo;
+use crate::Config;
+use crate::handler::HandlerChain;
 
-use crate::conf::Config;
-use crate::handler::{Handler, HandlerChain, HandlerResult};
-
-pub fn process_with_handler(config: &Config, mut handler_chain: &mut HandlerChain) -> Result<(), anyhow::Error> {
+pub fn process_with_handler(config: &Config, handler_chain: &mut HandlerChain) -> Result<(), anyhow::Error> {
     log::info!("Started pbf io pipeline");
     let mut stopwatch = StopWatch::new();
     stopwatch.start();
-    let input_path = PathBuf::from(config.input_path.to_string());
-    let reader = pbf::reader::Reader::new(&input_path)?;
+    let reader = pbf::reader::Reader::new(&config.input_pbf)?;
 
     log::info!("Running variant where objects are cloned...");
     for element in reader.elements()? {

@@ -3,8 +3,6 @@ use osm_io::osm::model::node::Node;
 use osm_io::osm::model::tag::Tag;
 use osm_io::osm::model::way::Way;
 
-use crate::handler::Handler;
-
 #[derive(Debug, Clone)]
 pub struct MutableNode {
     pub(crate) id: i64,
@@ -180,7 +178,7 @@ mod tests {
     fn modifyable_way_no_field_changed() {
         let way = Way::new(1, 1, 1, 1, 1, "user".to_string(),
                            true, vec![1, 2], vec![Tag::new("a_key".to_string(), "a_value".to_string())]);
-        let mut mutable_way = MutableWay::new(&way);
+        let mutable_way = MutableWay::new(&way);
         let changed = mutable_way.build();
         dbg!(&changed);
         assert_eq!(changed.id(), 1);

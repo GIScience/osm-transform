@@ -1,7 +1,7 @@
 use std::collections::BTreeMap;
 use std::error::Error;
 use std::fs::File;
-use std::path::Path;
+use std::path::PathBuf;
 use std::str::FromStr;
 use std::string::String;
 
@@ -15,7 +15,7 @@ use serde::Deserialize;
 use wkt::{Geometry, ToWkt};
 use wkt::Wkt;
 
-use crate::conf::Config;
+use crate::Config;
 use crate::handler::Handler;
 
 const GRID_SIZE: usize = 64800;
@@ -77,7 +77,7 @@ impl AreaHandler {
         Self::default()
     }
 
-    pub fn load(&mut self, config: &Config) -> Result<(), Box<dyn Error>> {
+    pub fn load(&mut self, path_buf: PathBuf) -> Result<(), Box<dyn Error>> {
         #[derive(Debug, Deserialize)]
         struct Record {
             id: String,
@@ -85,44 +85,41 @@ impl AreaHandler {
             geo: String,
         }
 
-
-        let path = Path::new(config.country_path.as_str());
-        let file_basename = path.file_stem().to_owned().unwrap_or_default().to_str().unwrap_or_default();
-        if !AreaHandler::load_area_records(file_basename) {
-            let file = File::open(path)?;
-            let mut rdr = ReaderBuilder::new().delimiter(b';').from_reader(file);
-            let mut index: u16 = 1;
-            for result in rdr.deserialize() {
-                let record: Record = result?;
-                let geo: Wkt<f64> = Wkt::from_str(record.geo.as_str())?;
-                let ls = match geo.item {
-                    Geometry::MultiPolygon(mp) => {
-                        let converted: MultiPolygon = mp.into();
-                        self.add_area(index, &record.id, &record.name, converted);
-                    }
-                    Geometry::Polygon(p) => {
-                        let converted: MultiPolygon = p.into();
-                        self.add_area(index, &record.id, &record.name, converted);
-                    }
-                    _ => {
-                        println!("Area CSV file contains row with unsupported geometry! ID: {}, Name: {}", record.id, record.name);
-                    }
-                };
-                index = index + 1;
-            }
-            AreaHandler::save_area_records(file_basename, &self.mapping);
+        let file_basename = path_buf.file_stem().to_owned().unwrap_or_default().to_str().unwrap_or_default();
+        let file =  File::open(path_buf.clone())?;
+        let mut rdr = ReaderBuilder::new().delimiter(b';').from_reader(file);
+        let mut index: u16 = 1;
+        for result in rdr.deserialize() {
+            let record: Record = result?;
+            let geo: Wkt<f64> = Wkt::from_str(record.geo.as_str())?;
+            let _ls = match geo.item {
+                Geometry::MultiPolygon(mp) => {
+                    let converted: MultiPolygon = mp.into();
+                    self.add_area(index, &record.id, &record.name, converted);
+                }
+                Geometry::Polygon(p) => {
+                    let converted: MultiPolygon = p.into();
+                    self.add_area(index, &record.id, &record.name, converted);
+                }
+                _ => {
+                    println!("Area CSV file contains row with unsupported geometry! ID: {}, Name: {}", record.id, record.name);
+                }
+            };
+            index = index + 1;
         }
+        AreaHandler::save_area_records(file_basename, &self.mapping);
+
         Ok(())
     }
 
     fn add_area(&mut self, index: u16, id: &String, name: &String, area_geometry: MultiPolygon) {
         self.mapping.id.insert(index, id.to_string());
         self.mapping.name.insert(index, name.to_string());
-        let mut intersecting_grid_tiles = 0;
+        let mut _intersecting_grid_tiles = 0;
         for i in 0..GRID_SIZE {
             let grid_polygon = &self.grid[i];
             if grid_polygon.intersects(&area_geometry) {
-                intersecting_grid_tiles += 1;
+                _intersecting_grid_tiles += 1;
                 if area_geometry.contains(grid_polygon) {
                     self.mapping.index[i] = index;
                 } else {
@@ -131,10 +128,6 @@ impl AreaHandler {
                 }
             }
         }
-    }
-
-    fn load_area_records(name: &str) -> bool {
-        false
     }
 
     fn save_area_records(name: &str, mapping: &Mapping) {
@@ -203,14 +196,14 @@ mod tests {
     #[test]
     fn test_area_handler() {
         let config = Config {
-            param: 0,
-            country_path: "test/mapping_test.csv".to_string(),
-            input_path:  "test/baarle_small.pbf".to_string(),
-            output_path:  "output.pbf".to_string(),
+            input_pbf: PathBuf::from("test/baarle_small.pbf"),
+            output_pbf:  Some(PathBuf::from("output.pbf")),
+            country_csv: Some(PathBuf::from("test/mapping_test.csv")),
+            debug: 0,
         };
 
         let mut area_handler = AreaHandler::new();
-        area_handler.load(&config).expect("Area handler failed to load CSV file");
+        area_handler.load(config.country_csv.clone().unwrap()).expect("Area handler failed to load CSV file");
 
         let mut handler_chain = HandlerChain::default()
             .add_unboxed(ElementCounter::new(OsmElementTypeSelection {node:true, way:false, relation:false}, CountType::ALL))
@@ -218,7 +211,7 @@ mod tests {
             .add_unboxed(ElementCounter::new(OsmElementTypeSelection {node:true, way:false, relation:false}, CountType::ACCEPTED));
 
         let _ = process_with_handler(&config, &mut handler_chain).expect("process_with_handler failed");
-        let mut result = handler_chain.collect_result();
+        let result = handler_chain.collect_result();
         println!("result: {:?}", result )
     }
 

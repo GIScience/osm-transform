@@ -1,14 +1,14 @@
 use std::path::PathBuf;
-use std::string::ToString;
+
 use osm_io::osm::model::element::Element;
+use osm_io::osm::model::node::Node;
 use osm_io::osm::model::relation::Relation;
 use osm_io::osm::model::way::Way;
-use osm_io::osm::model::node::Node;
 use osm_io::osm::pbf;
 use osm_io::osm::pbf::compression_type::CompressionType;
 use osm_io::osm::pbf::file_info::FileInfo;
+
 use crate::handler::{Handler, HandlerResult};
-use crate::conf::Config;
 
 pub struct OutputHandler {
     pub writer: pbf::writer::Writer,
@@ -17,11 +17,11 @@ pub struct OutputHandler {
 
 
 impl OutputHandler {
-    pub fn new(config: &Config) -> Self {
+    pub fn new(output_path: PathBuf) -> Self {
         let mut file_info = FileInfo::default();
         file_info.with_writingprogram_str("rusty-routes");
         Self {
-            writer: pbf::writer::Writer::from_file_info(PathBuf::from(config.output_path.to_string()), file_info, CompressionType::Zlib).expect("Failed to create output writer"),
+            writer: pbf::writer::Writer::from_file_info(output_path, file_info, CompressionType::Zlib).expect("Failed to create output writer"),
             next: None
         }
     }
@@ -52,7 +52,7 @@ impl Handler for OutputHandler {
         None
     }
 
-    fn add_result(&mut self, mut result: HandlerResult) -> HandlerResult {
+    fn add_result(&mut self, result: HandlerResult) -> HandlerResult {
         self.close();
         result
     }
