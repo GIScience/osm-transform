@@ -102,7 +102,7 @@ impl AreaHandler {
                     self.add_area(index, &record.id, &record.name, converted);
                 }
                 _ => {
-                    println!("Area CSV file contains row with unsupported geometry! ID: {}, Name: {}", record.id, record.name);
+                    log::warn!("Area CSV file contains row with unsupported geometry! ID: {}, Name: {}", record.id, record.name);
                 }
             };
             index = index + 1;
@@ -200,15 +200,17 @@ mod tests {
             output_pbf:  Some(PathBuf::from("output.pbf")),
             country_csv: Some(PathBuf::from("test/mapping_test.csv")),
             debug: 0,
+            with_processing: false,
+            with_node_filtering: false,
         };
 
         let mut area_handler = AreaHandler::new();
         area_handler.load(config.country_csv.clone().unwrap()).expect("Area handler failed to load CSV file");
 
         let mut handler_chain = HandlerChain::default()
-            .add_unboxed(ElementCounter::new(OsmElementTypeSelection {node:true, way:false, relation:false}, CountType::ALL))
-            .add_unboxed(area_handler)
-            .add_unboxed(ElementCounter::new(OsmElementTypeSelection {node:true, way:false, relation:false}, CountType::ACCEPTED));
+            .add(ElementCounter::new(OsmElementTypeSelection {node:true, way:false, relation:false}, CountType::ALL))
+            .add(area_handler)
+            .add(ElementCounter::new(OsmElementTypeSelection {node:true, way:false, relation:false}, CountType::ACCEPTED));
 
         let _ = process_with_handler(&config, &mut handler_chain).expect("process_with_handler failed");
         let result = handler_chain.collect_result();

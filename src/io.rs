@@ -13,12 +13,11 @@ use crate::Config;
 use crate::handler::HandlerChain;
 
 pub fn process_with_handler(config: &Config, handler_chain: &mut HandlerChain) -> Result<(), anyhow::Error> {
-    log::info!("Started pbf io pipeline");
+    log::info!("Starting pbf io pipeline...");
     let mut stopwatch = StopWatch::new();
     stopwatch.start();
     let reader = pbf::reader::Reader::new(&config.input_pbf)?;
 
-    log::info!("Running variant where objects are cloned...");
     for element in reader.elements()? {
         match element {
             Element::Node { node } => {
@@ -33,9 +32,6 @@ pub fn process_with_handler(config: &Config, handler_chain: &mut HandlerChain) -
             _ => (),
         }
     }
-
-    let handler_result = handler_chain.collect_result();
-    log::info!("Result: {:?}", handler_result);
     log::info!("Finished pbf io pipeline, time: {}", stopwatch);
     Ok(())
 }
@@ -47,7 +43,7 @@ mod tests {
     use super::*;
 
     pub fn process_file(output: String) -> Result<(), anyhow::Error> {
-        log::info!("Started pbf io pipeline");
+        log::info!("Starting pbf io pipeline...");
         let mut stopwatch = StopWatch::new();
         stopwatch.start();
         let input_path = PathBuf::from("test/baarle_small.pbf");

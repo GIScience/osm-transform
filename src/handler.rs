@@ -1,18 +1,34 @@
-use std::collections::HashMap;
-
+use std::collections::{HashMap, HashSet};
+use std::ops::Deref;
+use bit_vec::BitVec;
 use osm_io::osm::model::node::Node;
-use osm_io::osm::model::relation::Relation;
+use osm_io::osm::model::relation::{Member, Relation};
 use osm_io::osm::model::tag::Tag;
 use osm_io::osm::model::way::Way;
 use regex::Regex;
+const HIGHEST_NODE_ID: i64 = 50_000_000_000;//todo make configurable
 
-#[derive(Default,Debug)]
+#[derive(Debug)]
 pub struct HandlerResult {//todo add HashMap to add results with configurable keys
     pub count_all_nodes: i32,
     pub count_accepted_nodes: i32,
-    pub node_ids: Vec<i64>,
+    pub node_ids: BitVec,
 }
-
+impl HandlerResult {
+    fn default() -> Self {
+        Self::with_capacity(HIGHEST_NODE_ID as usize)
+    }
+    fn with_capacity(nbits: usize) -> Self {
+        HandlerResult {
+            count_accepted_nodes: 0,
+            count_all_nodes: 0,
+            node_ids: BitVec::from_elem(nbits, false)
+        }
+    }
+    pub fn to_string(&mut self) -> String {
+        format!("HandlerResult: count_all_nodes={} count_accepted_nodes={}", &self.count_all_nodes, &self.count_accepted_nodes)
+    }
+}
 pub trait Handler {
 
     fn handle_node(&mut self, node: Node) -> Option<Node> {
@@ -64,34 +80,16 @@ impl HandlerChain {
             }
         }
     }
-    pub(crate) fn collect_result(&mut self) -> HandlerResult{
+    pub(crate) fn collect_result(&mut self) -> HandlerResult {
         let mut result = HandlerResult::default();
         for processor in &mut self.handlers {
             result = processor.add_result(result);
         }
         result
     }
-    pub(crate) fn add(mut self, handler: Box<dyn Handler>) -> HandlerChain {
-        self.handlers.push(handler);
-        self
-    }
-    pub(crate) fn add_unboxed(mut self, handler: impl Handler + Sized + 'static) -> HandlerChain {
+    pub(crate) fn add(mut self, handler: impl Handler + Sized + 'static) -> HandlerChain {
         self.handlers.push(Box::new(handler));
         self
-    }
-}
-
-
-pub(crate) struct FinalHandler { //todo add node/way/relation ids and log/print those elements
-}
-impl FinalHandler {
-    pub(crate) fn new() -> Self {
-        FinalHandler { }
-    }
-}
-impl Handler for FinalHandler {
-    fn handle_node(&mut self, _node: Node) -> Option<Node> {
-        None
     }
 }
 
@@ -101,27 +99,6 @@ pub(crate) enum CountType {
     ACCEPTED,
 }
 
-#[derive(Default)]
-pub(crate) struct NodeIdCollector {
-    pub node_ids: Vec<i64>,
-}
-impl NodeIdCollector {
-    pub(crate) fn new() -> Self {
-        Self {
-            node_ids: Vec::new(),
-        }
-    }
-}
-impl Handler for NodeIdCollector {
-    fn handle_node(&mut self, node: Node) -> Option<Node> {
-        self.node_ids.push(node.id());
-        Some(node)
-    }
-    fn add_result(&mut self, mut result: HandlerResult) -> HandlerResult {
-        result.node_ids = self.node_ids.clone();//todo optimize
-        result
-    }
-}
 
 pub(crate) struct ElementCounter {
     pub nodes_count: i32,
@@ -171,7 +148,7 @@ impl Handler for ElementCounter {
 }
 
 #[derive(Debug)]
-enum FilterType {
+pub(crate) enum FilterType {
     AcceptMatching,
     RemoveMatching,
 }
@@ -309,64 +286,185 @@ impl Handler for TagKeyBasedOsmElementsFilter {
 }
 
 
-
-
-
-
-struct ComplexElementsFilter {
+pub(crate) struct AllElementsFilter {
     pub handle_types: OsmElementTypeSelection,
+}
+impl Handler for AllElementsFilter {
+    fn handle_node(&mut self, node: Node) -> Option<Node> {
+        match self.handle_types.node {
+            true => {None}
+            false => {Some(node)}
+        }
+    }
+
+    fn handle_way(&mut self, way: Way) -> Option<Way> {
+        match self.handle_types.way {
+            true => {None}
+            false => {Some(way)}
+        }
+    }
+
+    fn handle_relation(&mut self, relation: Relation) -> Option<Relation> {
+        match self.handle_types.relation {
+            true => {None}
+            false => {Some(relation)}
+        }
+    }
+}
+
+pub(crate) struct NodeIdFilter {
+    pub(crate) node_ids: BitVec
+}
+
+impl NodeIdFilter {
+    fn default() -> Self {
+        Self::with_capacity(HIGHEST_NODE_ID as usize)
+    }
+    fn with_capacity(nbits: usize) -> Self {
+        NodeIdFilter {
+            node_ids: BitVec::from_elem(nbits, false)
+        }
+    }
+}
+
+impl Handler for NodeIdFilter {
+    fn handle_node(&mut self, node: Node) -> Option<Node> {
+        match self.node_ids.get(node.id().clone() as usize).unwrap_or(false) {
+            true => {
+                log::trace!("node {} found in bitmap", &node.id().clone());
+                Some(node)
+            }
+            false => {
+                log::trace!("node {} is not in bitmap - filtering", &node.id().clone());
+                None
+            }
+        }
+    }
+}
+
+pub(crate) struct ReferencedNodeIdCollector {//todo this is an initial implementation to complete the handler chain. replace with efficient implementation, e.g. bitmap based
+    referenced_node_ids: BitVec
+}
+
+impl ReferencedNodeIdCollector {
+    pub(crate) fn default() -> Self {
+        Self::with_capacity(HIGHEST_NODE_ID as usize)
+    }
+    fn with_capacity(nbits: usize) -> Self {
+        ReferencedNodeIdCollector {
+            referenced_node_ids: BitVec::from_elem(nbits, false)
+        }
+    }
+}
+
+impl Handler for ReferencedNodeIdCollector {
+    fn handle_way(&mut self, way: Way) -> Option<Way> {
+        log::trace!("xxxxxxxxxxxxxxxxx way");
+        for id in way.refs() {
+            let idc = id.clone();
+            self.referenced_node_ids.set(idc as usize, true);
+        }
+        Some(way)
+    }
+
+    fn handle_relation(&mut self, relation: Relation) -> Option<Relation> {
+        log::trace!("xxxxxxxxxxxxxxxxx relation");
+        for member in relation.members() {
+            match member {
+                Member::Node { member } => {
+                    log::trace!("relation {} references node {} - set true in bitmap", &relation.id(), &member.id());
+                    self.referenced_node_ids.set(member.id().clone() as usize, true);
+                }
+                Member::Way { .. } => {}
+                Member::Relation { .. } => {}
+            }
+
+        }
+        Some(relation)
+    }
+
+    fn add_result(&mut self, mut result: HandlerResult) -> HandlerResult {
+        log::debug!("cloning node_ids of ReferencedNodeIdCollector with len={} into HandlerResult ", self.referenced_node_ids.len());
+        result.node_ids = self.referenced_node_ids.clone();
+        result
+    }
+}
+
+pub(crate) struct ComplexElementsFilter {
     pub has_good_key_predicate: HasOneOfTagKeysPredicate,
     pub has_good_key_value_predicate: HasTagKeyValuePredicate,
     pub has_bad_key_predicate: HasNoneOfTagKeysPredicate,
 }
 impl ComplexElementsFilter {
-    fn new(handle_types: OsmElementTypeSelection,
-           has_good_key_predicate: HasOneOfTagKeysPredicate,
-           has_good_key_value_predicate: HasTagKeyValuePredicate,
-           has_bad_key_predicate: HasNoneOfTagKeysPredicate) -> Self {
+    pub(crate) fn new(
+                      has_good_key_predicate: HasOneOfTagKeysPredicate,
+                      has_good_key_value_predicate: HasTagKeyValuePredicate,
+                      has_bad_key_predicate: HasNoneOfTagKeysPredicate) -> Self {
         Self {
-            handle_types,
             has_good_key_predicate,
             has_good_key_value_predicate,
             has_bad_key_predicate,
         }
     }
+
+    pub(crate) fn ors_default() -> Self{
+        let mut key_values = HashMap::new();
+        key_values.insert("railway".to_string(), "platform".to_string());
+        key_values.insert("public_transport".to_string(), "platform".to_string());
+        key_values.insert("man_made".to_string(), "pier".to_string());
+
+        ComplexElementsFilter::new(
+            HasOneOfTagKeysPredicate { keys: vec!["highway".to_string(), "route".to_string()] },
+            HasTagKeyValuePredicate { key_values: key_values },
+            HasNoneOfTagKeysPredicate {
+                keys: vec![
+                    "building".to_string(),
+                    "landuse".to_string(),
+                    "boundary".to_string(),
+                    "natural".to_string(),
+                    "place".to_string(),
+                    "waterway".to_string(),
+                    "aeroway".to_string(),
+                    "aviation".to_string(),
+                    "military".to_string(),
+                    "power".to_string(),
+                    "communication".to_string(),
+                    "man_made".to_string()]
+            })
+    }
+
     fn accept_by_tags(&mut self, tags: &Vec<Tag>) -> bool {
-        ( self.has_good_key_predicate.test(tags) ||
-            self.has_good_key_value_predicate.test(tags) )||
+         self.has_good_key_predicate.test(tags) ||
+            self.has_good_key_value_predicate.test(tags) ||
             self.has_bad_key_predicate.test(tags)
     }
 }
 impl Handler for ComplexElementsFilter {
-    fn handle_node(&mut self, node: Node) -> Option<Node> {
-        if !self.handle_types.node  {
-            return Some(node)
-        }
-        match self.accept_by_tags(&node.tags()) {
-            true => {Some(node)}
-            false => {None}
-        }
-    }
     fn handle_way(&mut self, way: Way) -> Option<Way> {
-        if !self.handle_types.way  {
-            return Some(way)
-        }
         match self.accept_by_tags(&way.tags()) {
-            true => {Some(way)}
-            false => {None}
+            true => {
+                log::trace!("accepting way {}", way.id());
+                Some(way)
+            }
+            false => {
+                log::trace!("removing way {}", way.id());
+                None
+            }
         }
     }
     fn handle_relation(&mut self, relation: Relation) -> Option<Relation> {
-        if !self.handle_types.relation  {
-            return Some(relation)
-        }
         match self.accept_by_tags(&relation.tags()) {
-            true => {Some(relation)}
-            false => {None}
+            true => {
+                log::trace!("accepting relation {}", relation.id());
+                Some(relation)
+            }
+            false => {
+                log::trace!("removing relation {}", relation.id());
+                None
+            }
         }
     }
 }
-
 
 
 struct HasOneOfTagKeysPredicate {
@@ -414,19 +512,19 @@ pub(crate) struct OsmElementTypeSelection {
     pub relation: bool,
 }
 impl OsmElementTypeSelection {
-    fn all() -> Self { Self { node: true, way: true, relation: true } }
+    pub(crate) fn all() -> Self { Self { node: true, way: true, relation: true } }
     pub(crate) fn node_only() -> Self { Self { node: true, way: false, relation: false } }
-    fn way_only() -> Self { Self { node: false, way: true, relation: false } }
-    fn relation_only() -> Self { Self { node: false, way: false, relation: true } }
+    pub(crate) fn way_only() -> Self { Self { node: false, way: true, relation: false } }
+    pub(crate) fn relation_only() -> Self { Self { node: false, way: false, relation: true } }
 }
 
-struct TagFilterByKey {
+pub(crate) struct TagFilterByKey {
     pub handle_types: OsmElementTypeSelection,
     pub key_regex: Regex,
     pub filter_type: FilterType,
 }
 impl TagFilterByKey {
-    fn new(handle_types: OsmElementTypeSelection, key_regex: Regex, filter_type: FilterType) -> Self {
+    pub(crate) fn new(handle_types: OsmElementTypeSelection, key_regex: Regex, filter_type: FilterType) -> Self {
         Self {
             handle_types,
             key_regex,
@@ -466,17 +564,101 @@ impl Handler for TagFilterByKey {
     }
 }
 
+
+
+
+
+
+pub(crate) struct ElementPrinter {
+    pub node_ids: HashSet<i64>,
+    pub way_ids: HashSet<i64>,
+    pub relation_ids: HashSet<i64>,
+    pub handle_types: OsmElementTypeSelection
+}
+impl Default for ElementPrinter {
+    fn default() -> Self {
+        Self {
+            node_ids: HashSet::new(),
+            way_ids: HashSet::new(),
+            relation_ids: HashSet::new(),
+            handle_types: OsmElementTypeSelection::all(),
+        }
+    }
+}
+impl ElementPrinter {
+    fn print_node(mut self, id: i64) -> Self {self.node_ids.insert(id); self}
+    fn print_way(mut self, id: i64) -> Self {self.way_ids.insert(id); self}
+    fn print_relation(mut self, id: i64) -> Self {self.relation_ids.insert(id); self}
+}
+impl Handler for ElementPrinter {
+    fn handle_node(&mut self, node: Node) -> Option<Node> {
+        if self.handle_types.node && self.node_ids.contains(&node.id()) {
+            println!("node {} visible: {}",&node.id(), &node.visible());
+            println!("  version:    {}", &node.version());
+            println!("  coordinate: lat,lon = {},{}", &node.coordinate().lat(), &node.coordinate().lon());
+            println!("  changeset:  {}", &node.changeset());
+            println!("  timestamp:  {}", &node.timestamp());
+            println!("  uid:        {}", &node.uid());
+            println!("  user:       {}", &node.user());
+            println!("  tags:");
+            for tag in node.tags() {
+                println!("   '{}' = '{}'", &tag.k(), &tag.v())
+            }
+        }
+        Some(node)
+    }
+    fn handle_way(&mut self, way: Way) -> Option<Way> {
+        if self.handle_types.way &&  self.way_ids.contains(&way.id()) {
+            println!("way {} visible: {}",&way.id(), &way.visible());
+            println!("  version:   {}", &way.version());
+            println!("  changeset: {}", &way.changeset());
+            println!("  timestamp: {}", &way.timestamp());
+            println!("  uid:       {}", &way.uid());
+            println!("  user:      {}", &way.user());
+            println!("  tags:");
+            for tag in way.tags() {
+                println!("   '{}' = '{}'", &tag.k(), &tag.v())
+            }
+            println!("  refs:");
+            for id in way.refs() {
+                println!("   {}", &id)
+            }
+        }
+        Some(way)
+    }
+    fn handle_relation(&mut self, relation: Relation) -> Option<Relation> {
+        if self.handle_types.relation &&  self.relation_ids.contains(&relation.id()) {
+            println!("relation {} visible: {}",&relation.id(), &relation.visible());
+            println!("  version:   {}", &relation.version());
+            println!("  changeset: {}", &relation.changeset());
+            println!("  timestamp: {}", &relation.timestamp());
+            println!("  uid:       {}", &relation.uid());
+            println!("  user:      {}", &relation.user());
+            println!("  tags:");
+            for tag in relation.tags() {
+                println!("   '{}' = '{}'", &tag.k(), &tag.v())
+            }
+            println!("  members:");
+            for member in relation.members() {
+                println!("   {:?}", &member)
+            }
+        }
+        Some(relation)
+    }
+}
+
+
 #[cfg(test)]
 mod tests {
     use std::collections::HashMap;
-
+    use bit_vec::BitVec;
     use osm_io::osm::model::coordinate::Coordinate;
     use osm_io::osm::model::node::Node;
     use osm_io::osm::model::tag::Tag;
     use regex::Regex;
     use simple_logger::SimpleLogger;
 
-    use crate::handler::{ComplexElementsFilter, CountType, ElementCounter, FilterType, FinalHandler, Handler, HandlerChain, HasNoneOfTagKeysPredicate, HasOneOfTagKeysPredicate, HasTagKeyValuePredicate, NodeIdCollector, OsmElementTypeSelection, TagFilterByKey, TagKeyBasedOsmElementsFilter, TagValueBasedOsmElementsFilter};
+    use crate::handler::{ComplexElementsFilter, CountType, ElementCounter, ElementPrinter, FilterType, Handler, HandlerChain, HandlerResult, HasNoneOfTagKeysPredicate, HasOneOfTagKeysPredicate, HasTagKeyValuePredicate, HIGHEST_NODE_ID, NodeIdFilter, OsmElementTypeSelection, TagFilterByKey, TagKeyBasedOsmElementsFilter, TagValueBasedOsmElementsFilter};
 
     const EXISTING_TAG: &str = "EXISTING_TAG";
     const MISSING_TAG: &str = "MISSING_TAG";
@@ -488,33 +670,51 @@ mod tests {
     #[test]
     fn handler_chain() {
         SimpleLogger::new().init();
-
         let chain = HandlerChain::default()
-            .add(Box::new(ElementCounter::new(
+            .add(ElementCounter::new(
                 OsmElementTypeSelection::node_only(),
-                CountType::ALL)))
-            .add_unboxed(TagValueBasedOsmElementsFilter::new(
+                CountType::ALL))
+            .add(TagValueBasedOsmElementsFilter::new(
                 OsmElementTypeSelection::node_only(),
                 existing_tag(),
                 Regex::new(".*p.*").unwrap(),
                 FilterType::AcceptMatching))
-            .add(Box::new(TagValueBasedOsmElementsFilter::new(
+            .add(TagValueBasedOsmElementsFilter::new(
                 OsmElementTypeSelection::node_only(),
                 existing_tag(),
                 Regex::new(".*z.*").unwrap(),
-                FilterType::RemoveMatching)))
-            .add(Box::new(ElementCounter::new(
+                FilterType::RemoveMatching))
+            .add(ElementCounter::new(
                 OsmElementTypeSelection::node_only(),
-                CountType::ACCEPTED)))
-            .add(Box::new(NodeIdCollector::new()))
-            .add(Box::new(FinalHandler::new()));
+                CountType::ACCEPTED))
+            .add(TestOnlyNodeIdCollector::new(100));
+
+        handle_test_nodes_and_verify_result(chain);
+    }
+
+
+    #[test]
+    fn handler_chain_with_node_id_filter() {
+        SimpleLogger::new().init();
+        let mut node_ids = BitVec::from_elem(HIGHEST_NODE_ID as usize, false);
+        node_ids.set(1usize, true);
+        node_ids.set(2usize, true);
+        let chain = HandlerChain::default()
+            .add(ElementCounter::new(
+                OsmElementTypeSelection::node_only(),
+                CountType::ALL))
+            .add(NodeIdFilter { node_ids: node_ids })
+            .add(ElementCounter::new(
+                OsmElementTypeSelection::node_only(),
+                CountType::ACCEPTED))
+            ;
 
         handle_test_nodes_and_verify_result(chain);
     }
 
     fn handle_test_nodes_and_verify_result(mut handler_chain: HandlerChain) {
-        handler_chain.process_node(Node::new(1, 1, Coordinate::new(1.0f64, 1.1f64), 1, 1, 1, "a".to_string(), true, vec![Tag::new(existing_tag(), "kasper".to_string())]));
         handler_chain.process_node(Node::new(2, 1, Coordinate::new(2.0f64, 1.2f64), 1, 1, 1, "a".to_string(), true, vec![Tag::new(existing_tag(), "seppl".to_string())]));
+        handler_chain.process_node(Node::new(1, 1, Coordinate::new(1.0f64, 1.1f64), 1, 1, 1, "a".to_string(), true, vec![Tag::new(existing_tag(), "kasper".to_string())]));
         handler_chain.process_node(Node::new(3, 1, Coordinate::new(3.0f64, 1.3f64), 1, 1, 1, "a".to_string(), true, vec![Tag::new(existing_tag(), "hotzenplotz".to_string())]));
         handler_chain.process_node(Node::new(4, 1, Coordinate::new(4.0f64, 1.4f64), 1, 1, 1, "a".to_string(), true, vec![Tag::new(existing_tag(), "großmutter".to_string())]));
 
@@ -523,22 +723,30 @@ mod tests {
 
         assert_eq!(result.count_all_nodes, 4);
         assert_eq!(result.count_accepted_nodes, 2);
-        assert_eq!(result.node_ids, vec![1, 2]);
-    }
-    pub(crate) struct FinalCaptor {
-        pub nodes: Vec<Node>,
-        pub next: Option<Box<dyn Handler>>,
+        assert_eq!(result.node_ids[0], false);
+        assert_eq!(result.node_ids[1], true);
+        assert_eq!(result.node_ids[2], true);
+        assert_eq!(result.node_ids[3], false);
     }
 
-    impl FinalCaptor {
-        pub(crate) fn new() -> Self {
-            FinalCaptor { next: None, nodes: vec![] }
+    pub(crate) struct TestOnlyNodeIdCollector {
+        pub node_ids: BitVec,
+    }
+    impl TestOnlyNodeIdCollector {
+        pub fn new(nbits: usize) -> Self {
+            TestOnlyNodeIdCollector {
+                node_ids: BitVec::from_elem(nbits, false)
+            }
         }
     }
-    impl Handler for FinalCaptor {
+    impl Handler for TestOnlyNodeIdCollector {
         fn handle_node(&mut self, node: Node) -> Option<Node> {
-            self.nodes.push(node);
-            None
+            self.node_ids.set(node.id() as usize, true);
+            Some(node)
+        }
+        fn add_result(&mut self, mut result: HandlerResult) -> HandlerResult {
+            result.node_ids = self.node_ids.clone();
+            result
         }
     }
 
@@ -836,31 +1044,8 @@ mod tests {
     }
 
     #[test]
-    fn complex_filter() {
-        let mut key_values = HashMap::new();
-        key_values.insert("railway".to_string(), "platform".to_string());
-        key_values.insert("public_transport".to_string(), "platform".to_string());
-        key_values.insert("man_made".to_string(), "pier".to_string());
-
-        let mut filter = ComplexElementsFilter::new(
-            OsmElementTypeSelection::all(),
-            HasOneOfTagKeysPredicate { keys: vec!["highway".to_string(), "route".to_string()] },
-            HasTagKeyValuePredicate { key_values: key_values },
-            HasNoneOfTagKeysPredicate {
-                keys: vec![
-                    "building".to_string(),
-                    "landuse".to_string(),
-                    "boundary".to_string(),
-                    "natural".to_string(),
-                    "place".to_string(),
-                    "waterway".to_string(),
-                    "aeroway".to_string(),
-                    "aviation".to_string(),
-                    "military".to_string(),
-                    "power".to_string(),
-                    "communication".to_string(),
-                    "man_made".to_string()]
-            });
+    fn complex_filter_with_ors_default() {
+        let mut filter = ComplexElementsFilter::ors_default();
         // has key to keep and key-value to keep, bad key 'building' should not take effect => should be accepted
         assert!(filter.handle_node(Node::new(1, 1, Coordinate::new(1.0f64, 1.1f64), 1, 1, 1, "a".to_string(), true,
                                              vec![
@@ -910,4 +1095,51 @@ mod tests {
                                                  Tag::new("something".to_string(), "x".to_string()),
                                              ])).is_some());
     }
+    #[test]
+    fn element_printer(){
+        let mut printer = ElementPrinter::default().print_node(2);
+
+        // has only one bad key => should be filtered
+        assert!(printer.handle_node(Node::new(1, 1, Coordinate::new(1.0f64, 1.1f64), 1, 1, 1, "a".to_string(), true,
+                                              vec![
+                                                 Tag::new("building".to_string(), "x".to_string()),
+                                             ])).is_some());
+
+        // has only one other key => should be accepted
+        assert!(printer.handle_node(Node::new(2, 1, Coordinate::new(1.0f64, 1.1f64), 1, 1, 1, "a".to_string(), true,
+                                              vec![
+                                                 Tag::new("something".to_string(), "x".to_string()),
+                                             ])).is_some());
+
+    }
+
+    #[test]
+    fn node_id_collector(){
+        let mut collector = TestOnlyNodeIdCollector::new(10);
+        assert_eq!(10, collector.node_ids.len());
+        collector.handle_node(Node::new(2, 1, Coordinate::new(1.0f64, 1.1f64), 1, 1, 1, "a".to_string(), true,vec![]));
+        assert_eq!(false, collector.node_ids.get(0).unwrap_or(false));
+        assert_eq!(false, collector.node_ids.get(1).unwrap_or(false));
+        assert_eq!(true, collector.node_ids.get(2).unwrap_or(false));
+    }
+    #[test]
+    #[should_panic(expected = "index out of bounds: 12 >= 10")]
+    fn node_id_collector_out_of_bounds(){
+        let mut collector = TestOnlyNodeIdCollector::new(10);
+        collector.handle_node(Node::new(12, 1, Coordinate::new(1.0f64, 1.1f64), 1, 1, 1, "a".to_string(), true,vec![]));
+    }
+    #[test]
+    fn node_id_collector_out_of_bounds_real(){
+        let mut collector = TestOnlyNodeIdCollector::new(HIGHEST_NODE_ID as usize);
+
+        collector.handle_node(Node::new(1, 1, Coordinate::new(1.0f64, 1.1f64), 1, 1, 1, "a".to_string(), true,vec![]));
+        assert_eq!(false, collector.node_ids.get(0).unwrap_or(false));
+        assert_eq!(true, collector.node_ids.get(1).unwrap_or(false));
+        assert_eq!(false, collector.node_ids.get(2).unwrap_or(false));
+        assert_eq!(false, collector.node_ids.get(11414456780).unwrap_or(false));
+
+        collector.handle_node(Node::new(11414456780, 1, Coordinate::new(1.0f64, 1.1f64), 1, 1, 1, "a".to_string(), true,vec![]));
+        assert_eq!(true, collector.node_ids.get(11414456780).unwrap_or(false));
+    }
+
 }

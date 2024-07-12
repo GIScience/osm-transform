@@ -12,7 +12,6 @@ use crate::handler::{Handler, HandlerResult};
 
 pub struct OutputHandler {
     pub writer: pbf::writer::Writer,
-    pub next: Option<Box<dyn Handler>>
 }
 
 
@@ -22,7 +21,6 @@ impl OutputHandler {
         file_info.with_writingprogram_str("rusty-routes");
         Self {
             writer: pbf::writer::Writer::from_file_info(output_path, file_info, CompressionType::Zlib).expect("Failed to create output writer"),
-            next: None
         }
     }
 

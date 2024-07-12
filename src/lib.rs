@@ -4,14 +4,16 @@ pub mod handler;
 pub mod output;
 pub mod osm_model;
 
+use std::collections::HashMap;
 use std::path::PathBuf;
 use benchmark_rs::stopwatch::StopWatch;
 use log4rs::append::console::ConsoleAppender;
 use log4rs::config::{Appender, Logger, Root};
 use log::LevelFilter;
+use regex::Regex;
 use crate::io::process_with_handler;
 use area::AreaHandler;
-use crate::handler::{FinalHandler, HandlerChain};
+use crate::handler::{HandlerChain, ComplexElementsFilter, OsmElementTypeSelection, ElementCounter, CountType, HandlerResult, AllElementsFilter, ReferencedNodeIdCollector, NodeIdFilter, TagFilterByKey, FilterType};
 use crate::output::OutputHandler;
 
 
@@ -26,17 +28,59 @@ pub fn init(config: &Config) {
     let stdout = ConsoleAppender::builder().build();
     let config = log4rs::Config::builder()
         .appender(Appender::builder().build("stdout", Box::new(stdout)))
-        .logger(Logger::builder().build("rrt", log_level))
-        .build(Root::builder().appender("stdout").build(log_level))
+        .logger(Logger::builder().build("rusty_routes_transformer", log_level))
+        .build(Root::builder().appender("stdout").build(LevelFilter::Off))
         .unwrap();
     let _handle = log4rs::init_config(config).unwrap();
 }
 
-pub fn run(config: &Config) {
+pub fn run(config: &Config) -> HandlerResult{
+    let mut result: Option<HandlerResult> = None;
+    if config.with_node_filtering {
+        result = Some(extract_referenced_nodes(config));
+    }
+    if config.with_processing {
+        result = Some(process(config, result));
+    }
+    result.unwrap()
+}
+fn extract_referenced_nodes(config: &Config) -> HandlerResult {
+    let mut handler_chain = HandlerChain::default()
+        .add(ElementCounter::new(OsmElementTypeSelection::all(), CountType::ALL))
+        .add(AllElementsFilter{handle_types: OsmElementTypeSelection::node_only()})
+        .add(ComplexElementsFilter::ors_default())
+        .add(ReferencedNodeIdCollector::default())
+        .add(ElementCounter::new(OsmElementTypeSelection::all(), CountType::ACCEPTED))
+        ;
+
+    log::info!("Starting extraction of referenced node ids...");
     let mut stopwatch = StopWatch::new();
+    stopwatch.start();
+    let _ = process_with_handler(config, &mut handler_chain).expect("Extraction of referenced node ids failed");
+    let mut handler_result = handler_chain.collect_result();
+    log::info!("Finished extraction of referenced node ids, time: {}", stopwatch);
+    log::info!("{}" , &handler_result.to_string());
+    stopwatch.reset();
+    handler_result
+}
 
-    let mut handler_chain = HandlerChain::default();
+fn process(config: &Config, node_filter_result: Option<HandlerResult>) -> HandlerResult {
 
+    let mut handler_chain = HandlerChain::default()
+        .add(ElementCounter::new(OsmElementTypeSelection::all(), CountType::ALL))
+        .add(ComplexElementsFilter::ors_default())
+        ;
+
+    match node_filter_result {
+        None => {}
+        Some(result) => {
+            log::debug!("Cloning result node_ids with len={}", result.node_ids.len());
+            let node_id_filter = NodeIdFilter { node_ids: result.node_ids.clone() };
+            log::debug!("node_id_filter has node_ids with len={}", node_id_filter.node_ids.len());
+            handler_chain = handler_chain.add(node_id_filter);
+        }
+    }
+    let mut stopwatch = StopWatch::new();
     match &config.country_csv {
         Some(path_buf) => {
             log::info!("Reading area mapping CSV");
@@ -45,11 +89,20 @@ pub fn run(config: &Config) {
             area_handler.load(path_buf.clone()).expect("Area handler failed to load CSV file");
             log::info!("Loaded: {} areas", area_handler.mapping.id.len());
             log::info!("Finished reading area mapping, time: {}", stopwatch);
-            handler_chain = handler_chain.add_unboxed(area_handler);
+            handler_chain = handler_chain.add(area_handler);
             stopwatch.reset();
         }
         None => ()
     }
+
+    //todo add elevation processing
+
+    handler_chain = handler_chain.add(TagFilterByKey::new(
+        OsmElementTypeSelection::all(),
+        Regex::new("(.*:)?source(:.*)?|(.*:)?note(:.*)?|url|created_by|fixme|wikipedia").unwrap(),
+        FilterType::RemoveMatching));
+
+    handler_chain = handler_chain.add(ElementCounter::new(OsmElementTypeSelection::all(), CountType::ACCEPTED));
 
     match &config.output_pbf {
         Some(path_buf) => {
@@ -57,24 +110,29 @@ pub fn run(config: &Config) {
             stopwatch.start();
             let mut output_handler = OutputHandler::new(path_buf.clone());
             output_handler.init();
+            handler_chain = handler_chain.add(output_handler);
             stopwatch.reset();
-            handler_chain = handler_chain.add_unboxed(output_handler);
         }
-        None => {
-            handler_chain = handler_chain.add_unboxed(FinalHandler::new());
-        }
+        None => {}
     }
 
+    log::info!("Starting processing of pbf elements...");
+    let mut stopwatch = StopWatch::new();
     stopwatch.start();
-    let _ = process_with_handler(config, &mut handler_chain).expect("Area handler failed");
-    log::info!("Finished mapping, time: {}", stopwatch);
+    let _ = process_with_handler(config, &mut handler_chain).expect("Processing failed");
+    let mut processing_result = handler_chain.collect_result();
+    log::info!("Finished processing of pbf elements, time: {}", stopwatch);
+    log::info!("{}" , &processing_result.to_string());
+    stopwatch.reset();
+    processing_result
 }
-
 
 #[derive(Debug, Default)]
 pub struct Config {
     pub input_pbf: PathBuf,
     pub country_csv: Option<PathBuf>,
     pub output_pbf: Option<PathBuf>,
-    pub debug: u8
+    pub with_node_filtering: bool,
+    pub with_processing: bool,
+    pub debug: u8,
 }
