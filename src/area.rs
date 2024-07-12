@@ -6,7 +6,7 @@ use std::path::Path;
 use std::str::FromStr;
 
 use csv::{ReaderBuilder, WriterBuilder};
-use geo::{Contains, Coord, coord, Intersects, MultiPolygon, Rect};
+use geo::{BoundingRect, Contains, Coord, coord, Intersects, MultiPolygon, Rect};
 use geo::BooleanOps;
 use btreemultimap::BTreeMultiMap;
 use osm_io::osm::model::tag::Tag;
@@ -107,11 +107,11 @@ impl AreaHandler {
                 let ls = match geo.item {
                     Geometry::MultiPolygon(mp) => {
                         let converted: MultiPolygon = mp.into();
-                        self.add_area(index, &record.id, &record.name, converted);
+                        self.add_area(index, &record.id, &record.name, &converted);
                     }
                     Geometry::Polygon(p) => {
                         let converted: MultiPolygon = p.into();
-                        self.add_area(index, &record.id, &record.name, converted);
+                        self.add_area(index, &record.id, &record.name, &converted);
                     }
                     _ => {
                         println!("Area CSV file contains row with unsupported geometry! ID: {}, Name: {}", record.id, record.name);
@@ -124,13 +124,14 @@ impl AreaHandler {
         Ok(())
     }
 
-    fn add_area(&mut self, index: u16, id: &String, name: &String, area_geometry: MultiPolygon) {
+    fn add_area(&mut self, index: u16, id: &String, name: &String, area_geometry: &MultiPolygon) {
         self.mapping.id.insert(index, id.to_string());
         self.mapping.name.insert(index, name.to_string());
+        let area_bbox = &area_geometry.bounding_rect().unwrap();
         let mut intersecting_grid_tiles = 0;
         for i in 0..GRID_SIZE {
             let tile_bbox = &self.grid[i].bbox;
-            if tile_bbox.intersects(&area_geometry) {
+            if tile_bbox.intersects(area_bbox) && tile_bbox.intersects(area_geometry) {
                 intersecting_grid_tiles += 1;
                 if area_geometry.contains(tile_bbox) {
                     self.mapping.index[i] = index;
