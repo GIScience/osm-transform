@@ -7,7 +7,7 @@ use std::string::String;
 
 use btreemultimap::BTreeMultiMap;
 use csv::{ReaderBuilder, WriterBuilder};
-use geo::{Contains, Coord, Intersects, LineString, MultiPolygon, Polygon};
+use geo::{BoundingRect, Contains, Coord, coord, Intersects, MultiPolygon, Rect};
 use geo::BooleanOps;
 use osm_io::osm::model::node::Node;
 use osm_io::osm::model::tag::Tag;
@@ -21,9 +21,14 @@ use crate::handler::Handler;
 const GRID_SIZE: usize = 64800;
 const AREA_ID_MULTIPLE: u16 = u16::MAX;
 
+pub struct Tile {
+    bbox: Rect<f64>,
+    poly: MultiPolygon<f64>,
+}
+
 pub struct AreaHandler {
     pub mapping: Mapping,
-    grid: Vec<MultiPolygon<f64>>,
+    grid: Vec<Tile>,
 }
 
 pub struct Mapping {
@@ -54,16 +59,15 @@ impl Default for AreaHandler {
         Self {
             mapping: Mapping::default(),
             grid: {
-                let mut grid: Vec<MultiPolygon<f64>> = Vec::new();
+                let mut grid: Vec<Tile> = Vec::new();
                 for grid_lat in 0..180 {
                     for grid_lon in 0..360 {
                         let box_lon: f64 = grid_lon as f64 - 180.0;
                         let box_lat: f64 = grid_lat as f64 - 90.0;
-                        let polygon = Polygon::new(
-                            LineString::from(vec![(box_lon, box_lat), (box_lon + 1f64, box_lat), (box_lon + 1f64, box_lat + 1f64), (box_lon, box_lat + 1f64), (box_lon, box_lat)]),
-                            vec![],
-                        );
-                        grid.push(polygon.into());
+                        let bbox = Rect::new(coord! {x: box_lon, y: box_lat},
+                                             coord! {x: box_lon + 1f64, y: box_lat + 1f64},);
+                        let poly = bbox.to_polygon().into();
+                        grid.push(Tile{bbox, poly});
                     }
                 }
                 grid
@@ -95,11 +99,11 @@ impl AreaHandler {
             let _ls = match geo.item {
                 Geometry::MultiPolygon(mp) => {
                     let converted: MultiPolygon = mp.into();
-                    self.add_area(index, &record.id, &record.name, converted);
+                    self.add_area(index, &record.id, &record.name, &converted);
                 }
                 Geometry::Polygon(p) => {
                     let converted: MultiPolygon = p.into();
-                    self.add_area(index, &record.id, &record.name, converted);
+                    self.add_area(index, &record.id, &record.name, &converted);
                 }
                 _ => {
                     log::warn!("Area CSV file contains row with unsupported geometry! ID: {}, Name: {}", record.id, record.name);
@@ -112,19 +116,21 @@ impl AreaHandler {
         Ok(())
     }
 
-    fn add_area(&mut self, index: u16, id: &String, name: &String, area_geometry: MultiPolygon) {
+    fn add_area(&mut self, index: u16, id: &String, name: &String, area_geometry: &MultiPolygon) {
         self.mapping.id.insert(index, id.to_string());
         self.mapping.name.insert(index, name.to_string());
+        let area_bbox = &area_geometry.bounding_rect().unwrap();
         let mut _intersecting_grid_tiles = 0;
         for i in 0..GRID_SIZE {
-            let grid_polygon = &self.grid[i];
-            if grid_polygon.intersects(&area_geometry) {
+            let tile_bbox = &self.grid[i].bbox;
+            if tile_bbox.intersects(area_bbox) && tile_bbox.intersects(area_geometry) {
                 _intersecting_grid_tiles += 1;
-                if area_geometry.contains(grid_polygon) {
+                if area_geometry.contains(tile_bbox) {
                     self.mapping.index[i] = index;
                 } else {
+                    let tile_poly = &self.grid[i].poly;
                     self.mapping.index[i] = AREA_ID_MULTIPLE;
-                    self.mapping.area.insert(i as u16, AreaIntersect{id: index, geo: grid_polygon.intersection(&area_geometry)});
+                    self.mapping.area.insert(i as u16, AreaIntersect{id: index, geo: tile_poly.intersection(&area_geometry)});
                 }
             }
         }
