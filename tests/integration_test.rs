@@ -28,7 +28,7 @@ fn run_all() {
 #[test]
 fn run_no_output_pbf() {
     let mut config = base_config();
-    config.country_csv = None;
+    config.output_pbf = None;
     let result = rusty_routes_transformer::run(&config);
     assert_eq!(result.count_all_nodes, 3964);
     assert_eq!(result.count_accepted_nodes, 299);
@@ -37,7 +37,7 @@ fn run_no_output_pbf() {
 #[test]
 fn run_no_country_csv() {
     let mut config = base_config();
-    config.output_pbf = None;
+    config.country_csv = None;
     rusty_routes_transformer::init(&config);
     let result = rusty_routes_transformer::run(&config);
     assert_eq!(result.count_all_nodes, 3964);
