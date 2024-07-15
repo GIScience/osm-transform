@@ -1,3 +1,4 @@
+use std::collections::HashSet;
 use std::path::PathBuf;
 
 use clap::Parser;
@@ -16,28 +17,36 @@ fn main() {
 #[command(version, about, long_about = None)]
 pub struct Args {
     /// PBF file to preprocess.
-    #[arg(short, long, value_name = "FILE")]
+    #[arg(short = 'i', long, value_name = "FILE")]
     pub(crate) input_pbf: PathBuf,
 
     /// Result PBF file. Will be overwritten if existing! If not specified, no output is written to a file. But can still be useful in combination with id-logging.
-    #[arg(short, long, value_name = "FILE")]
+    #[arg(short = 'o', long, value_name = "FILE")]
     pub(crate) output_pbf: Option<PathBuf>,
 
     /// CSV File with border geometries for country mapping. If not specified, no area mapping is performed, no country tags added.
-    #[arg(short, long, value_name = "FILE")]
+    #[arg(short = 'c', long, value_name = "FILE")]
     pub(crate) country_csv: Option<PathBuf>,
 
     /// Turn debugging information on.
-    #[arg(short, long, action = clap::ArgAction::Count)]
+    #[arg(short = 'd', long, action = clap::ArgAction::Count)]
     pub debug: u8,
+
+    /// Print node with id=<ID> at beginning and end of processing pipeline.
+    #[arg(short = 'n', long, value_name = "ID")]
+    pub print_node_ids: Vec<i64>,
+    /// Print way with id=<ID> at beginning and end of processing pipeline.
+
+    #[arg(short = 'w', long, value_name = "ID")]
+    pub print_way_ids: Vec<i64>,
+    /// Print relation with id=<ID> at beginning and end of processing pipeline.
+
+    #[arg(short = 'r', long, value_name = "ID")]
+    pub print_relation_ids: Vec<i64>,
 
     /// Suppress node filtering. This means, that ALL nodes, ways, relations are handled by thy processing pass.
     #[arg(long)]
     pub suppress_node_filtering: bool,
-
-    /// Suppress changing the pbf elements. The output (except pbf header) should be the same as the input. Can be used for performance measuring of the read/write/node-filtering parts.
-    #[arg(long)]
-    pub suppress_processing: bool,
 }
 impl Args {
     pub fn to_config(mut self) -> Config {
@@ -47,7 +56,9 @@ impl Args {
             output_pbf: self.output_pbf,
             debug: self.debug,
             with_node_filtering: ! self.suppress_node_filtering,
-            with_processing: ! self.suppress_processing,
+            print_node_ids: HashSet::from_iter(self.print_node_ids),
+            print_way_ids: HashSet::from_iter(self.print_way_ids),
+            print_relation_ids: HashSet::from_iter(self.print_relation_ids),
         }
     }
 }

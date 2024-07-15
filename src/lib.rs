@@ -4,7 +4,7 @@ pub mod handler;
 pub mod output;
 pub mod osm_model;
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;
 use benchmark_rs::stopwatch::StopWatch;
 use log4rs::append::console::ConsoleAppender;
@@ -13,7 +13,7 @@ use log::LevelFilter;
 use regex::Regex;
 use crate::io::process_with_handler;
 use area::AreaHandler;
-use crate::handler::{HandlerChain, ComplexElementsFilter, OsmElementTypeSelection, ElementCounter, CountType, HandlerResult, AllElementsFilter, ReferencedNodeIdCollector, NodeIdFilter, TagFilterByKey, FilterType};
+use crate::handler::{HandlerChain, ComplexElementsFilter, OsmElementTypeSelection, ElementCounter, CountType, HandlerResult, AllElementsFilter, ReferencedNodeIdCollector, NodeIdFilter, TagFilterByKey, FilterType, ElementPrinter};
 use crate::output::OutputHandler;
 
 
@@ -39,9 +39,7 @@ pub fn run(config: &Config) -> HandlerResult{
     if config.with_node_filtering {
         result = Some(extract_referenced_nodes(config));
     }
-    if config.with_processing {
-        result = Some(process(config, result));
-    }
+    result = Some(process(config, result));
     result.unwrap()
 }
 fn extract_referenced_nodes(config: &Config) -> HandlerResult {
@@ -65,11 +63,14 @@ fn extract_referenced_nodes(config: &Config) -> HandlerResult {
 }
 
 fn process(config: &Config, node_filter_result: Option<HandlerResult>) -> HandlerResult {
-
     let mut handler_chain = HandlerChain::default()
-        .add(ElementCounter::new(OsmElementTypeSelection::all(), CountType::ALL))
-        .add(ComplexElementsFilter::ors_default())
-        ;
+        .add(ElementPrinter::with_prefix("input:----------------\n".to_string())
+            .with_node_ids(config.print_node_ids.clone())
+            .with_way_ids(config.print_way_ids.clone())
+            .with_relation_ids(config.print_relation_ids.clone()))
+        .add(ElementCounter::new(OsmElementTypeSelection::all(), CountType::ALL));
+
+    handler_chain = handler_chain.add(ComplexElementsFilter::ors_default());
 
     match node_filter_result {
         None => {}
@@ -80,6 +81,7 @@ fn process(config: &Config, node_filter_result: Option<HandlerResult>) -> Handle
             handler_chain = handler_chain.add(node_id_filter);
         }
     }
+
     let mut stopwatch = StopWatch::new();
     match &config.country_csv {
         Some(path_buf) => {
@@ -103,6 +105,11 @@ fn process(config: &Config, node_filter_result: Option<HandlerResult>) -> Handle
         FilterType::RemoveMatching));
 
     handler_chain = handler_chain.add(ElementCounter::new(OsmElementTypeSelection::all(), CountType::ACCEPTED));
+
+    handler_chain = handler_chain.add(ElementPrinter::with_prefix("output:----------------\n".to_string())
+        .with_node_ids(config.print_node_ids.clone())
+        .with_way_ids(config.print_way_ids.clone())
+        .with_relation_ids(config.print_relation_ids.clone()));
 
     match &config.output_pbf {
         Some(path_buf) => {
@@ -133,6 +140,8 @@ pub struct Config {
     pub country_csv: Option<PathBuf>,
     pub output_pbf: Option<PathBuf>,
     pub with_node_filtering: bool,
-    pub with_processing: bool,
     pub debug: u8,
+    pub print_node_ids: HashSet<i64>,
+    pub print_way_ids: HashSet<i64>,
+    pub print_relation_ids: HashSet<i64>,
 }
