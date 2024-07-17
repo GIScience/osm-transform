@@ -25,6 +25,5 @@ geo = "0.28.0"
 log4rs = "1.3.0"
 btreemultimap = "0.1.1"
 clap = { version = "4.5.9", features = ["derive"] }
-#var-bitmap = "0.1.0"
-#bitrush-index = "0.1.1"
 bit-vec = "0.6"
+tiff = "0.9.1"

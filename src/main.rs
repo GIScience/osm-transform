@@ -1,6 +1,6 @@
 use std::collections::HashSet;
 use std::path::PathBuf;
-
+use rusty_routes_transformer::handler::geotiff::GeoTiff;
 use clap::Parser;
 
 use rusty_routes_transformer::{Config, init, run};
@@ -10,6 +10,7 @@ fn main() {
     let config = args.to_config();
     init(&config);
     run(&config);
+    let geotiff = GeoTiff{};
 }
 
 /// Preprocessor to prepare OSM PBF-Files for openrouteservice

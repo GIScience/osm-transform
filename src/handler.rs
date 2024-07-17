@@ -1,3 +1,5 @@
+pub mod geotiff;
+
 use std::collections::{HashMap, HashSet};
 use std::ops::Deref;
 use bit_vec::BitVec;
