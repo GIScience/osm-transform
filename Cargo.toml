@@ -26,4 +26,5 @@ log4rs = "1.3.0"
 btreemultimap = "0.1.1"
 clap = { version = "4.5.9", features = ["derive"] }
 bit-vec = "0.6"
-tiff = "0.9.1"
+#tiff = "0.9.1"
+georaster = "0.1.0"
