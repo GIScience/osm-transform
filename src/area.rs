@@ -32,15 +32,15 @@ pub struct AreaHandler {
     grid: Vec<Tile>,
 }
 
-fn gridX(lon: f64) -> usize {
+fn grid_x(lon: f64) -> usize {
     (lon as i32 + 180) as usize
 }
 
-fn gridY(lat: f64) -> usize {
+fn grid_y(lat: f64) -> usize {
     (lat as i32 + 90) as usize
 }
 
-fn gridIndex(x: usize, y: usize) -> usize {
+fn grid_index(x: usize, y: usize) -> usize {
     y * 360 + x
 }
 
@@ -142,14 +142,14 @@ impl AreaHandler {
         let area_bbox = &area_geometry.bounding_rect().unwrap();
         let min = &area_bbox.min();
         let max = &area_bbox.max();
-        let minX = gridX(min.x);
-        let minY = gridY(min.y);
-        let maxX = gridX(max.x);
-        let maxY = gridY(max.y);
+        let minX = grid_x(min.x);
+        let minY = grid_y(min.y);
+        let maxX = grid_x(max.x);
+        let maxY = grid_y(max.y);
         let mut _intersecting_grid_tiles = 0;
         for y in minY..=maxY {
             for x in minX..=maxX {
-                let i = gridIndex(x, y);
+                let i = grid_index(x, y);
                 let tile_bbox = &self.grid[i].bbox;
                 if tile_bbox.intersects(area_geometry) {
                     _intersecting_grid_tiles += 1;
