@@ -13,7 +13,7 @@ use log::LevelFilter;
 use regex::Regex;
 use crate::io::process_with_handler;
 use area::AreaHandler;
-use crate::handler::{HandlerChain, ComplexElementsFilter, OsmElementTypeSelection, ElementCounter, CountType, HandlerResult, AllElementsFilter, ReferencedNodeIdCollector, NodeIdFilter, TagFilterByKey, FilterType, ElementPrinter};
+use crate::handler::{HandlerChain, ComplexElementsFilter, OsmElementTypeSelection, ElementCounter, CountType, HandlerResult, AllElementsFilter, ReferencedNodeIdCollector, NodeIdFilter, TagFilterByKey, FilterType, ElementPrinter, MetadataRemover};
 use crate::output::OutputHandler;
 
 
@@ -69,6 +69,10 @@ fn process(config: &Config, node_filter_result: Option<HandlerResult>) -> Handle
             .with_way_ids(config.print_way_ids.clone())
             .with_relation_ids(config.print_relation_ids.clone()))
         .add(ElementCounter::new(OsmElementTypeSelection::all(), CountType::ALL));
+
+    if config.remove_metadata {
+        handler_chain = handler_chain.add(MetadataRemover::default())
+    }
 
     handler_chain = handler_chain.add(ComplexElementsFilter::ors_default());
 
@@ -144,4 +148,5 @@ pub struct Config {
     pub print_node_ids: HashSet<i64>,
     pub print_way_ids: HashSet<i64>,
     pub print_relation_ids: HashSet<i64>,
+    pub remove_metadata: bool,
 }

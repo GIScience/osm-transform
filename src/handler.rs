@@ -6,6 +6,8 @@ use osm_io::osm::model::relation::{Member, Relation};
 use osm_io::osm::model::tag::Tag;
 use osm_io::osm::model::way::Way;
 use regex::Regex;
+use serde::de::Unexpected::Str;
+
 const HIGHEST_NODE_ID: i64 = 50_000_000_000;//todo make configurable
 
 #[derive(Debug)]
@@ -689,6 +691,23 @@ impl Handler for ElementPrinter {
     }
 }
 
+#[derive(Default)]
+pub(crate) struct MetadataRemover;
+
+impl Handler for MetadataRemover {
+    fn handle_node(&mut self, node: Node) -> Option<Node> {
+        Some(Node::new(node.id(), 0, node.coordinate().clone(), 0, 0, 0, String::default(), node.visible(), node.tags().clone()))
+    }
+
+    fn handle_way(&mut self, way: Way) -> Option<Way> {
+        Some(Way::new(way.id(), 0, 0, 0, 0, String::default(), way.visible(), way.refs().clone(), way.tags().clone()))
+    }
+
+    fn handle_relation(&mut self, relation: Relation) -> Option<Relation> {
+        Some(Relation::new(relation.id(), 0, 0, 0, 0, String::default(), relation.visible(), relation.members().clone(), relation.tags().clone()))
+    }
+}
+
 
 #[cfg(test)]
 mod tests {
@@ -701,7 +720,7 @@ mod tests {
     use regex::Regex;
     use simple_logger::SimpleLogger;
 
-    use crate::handler::{ComplexElementsFilter, CountType, ElementCounter, ElementPrinter, FilterType, Handler, HandlerChain, HandlerResult, HasNoneOfTagKeysPredicate, HasOneOfTagKeysPredicate, HasTagKeyValuePredicate, HIGHEST_NODE_ID, NodeIdFilter, OsmElementTypeSelection, TagFilterByKey, TagKeyBasedOsmElementsFilter, TagValueBasedOsmElementsFilter};
+    use crate::handler::{ComplexElementsFilter, CountType, ElementCounter, ElementPrinter, FilterType, Handler, HandlerChain, HandlerResult, HasNoneOfTagKeysPredicate, HasOneOfTagKeysPredicate, HasTagKeyValuePredicate, HIGHEST_NODE_ID, MetadataRemover, NodeIdFilter, OsmElementTypeSelection, TagFilterByKey, TagKeyBasedOsmElementsFilter, TagValueBasedOsmElementsFilter};
 
     const EXISTING_TAG: &str = "EXISTING_TAG";
     const MISSING_TAG: &str = "MISSING_TAG";
@@ -1184,4 +1203,25 @@ mod tests {
         assert_eq!(true, collector.node_ids.get(11414456780).unwrap_or(false));
     }
 
+    #[test]
+    fn metadata_remover() {
+        let mut metadata_remover = MetadataRemover::default();
+        let node = metadata_remover.handle_node(Node::new(1, 1, Coordinate::new(1.0f64, 1.1f64), 1, 1, 1, "a".to_string(), true,vec![
+            Tag::new("a".to_string(), "x".to_string()),
+            Tag::new("b".to_string(), "y".to_string()),
+        ])).unwrap();
+        assert_eq!(node.id(), 1);
+        assert_eq!(node.version(), 0);
+        assert_eq!(node.coordinate().lat(), 1.0f64);
+        assert_eq!(node.coordinate().lon(), 1.1f64);
+        assert_eq!(node.timestamp(), 0);
+        assert_eq!(node.changeset(), 0);
+        assert_eq!(node.uid(), 0);
+        assert_eq!(node.user(), &String::default());
+        assert_eq!(node.visible(), true);
+        assert_eq!(node.tags()[0].k(), &"a".to_string());
+        assert_eq!(node.tags()[0].v(), &"x".to_string());
+        assert_eq!(node.tags()[1].k(), &"b".to_string());
+        assert_eq!(node.tags()[1].v(), &"y".to_string());
+    }
 }

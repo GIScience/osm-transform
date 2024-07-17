@@ -47,6 +47,11 @@ pub struct Args {
     /// Suppress node filtering. This means, that ALL nodes, ways, relations are handled by thy processing pass.
     #[arg(long)]
     pub suppress_node_filtering: bool,
+
+    /// Do NOT remove metadata 'version', 'timestamp', 'changeset', 'uid', 'user'
+    #[arg(long)]
+    pub keep_metadata: bool
+
 }
 impl Args {
     pub fn to_config(mut self) -> Config {
@@ -59,6 +64,7 @@ impl Args {
             print_node_ids: HashSet::from_iter(self.print_node_ids),
             print_way_ids: HashSet::from_iter(self.print_way_ids),
             print_relation_ids: HashSet::from_iter(self.print_relation_ids),
+            remove_metadata: ! self.keep_metadata
         }
     }
 }

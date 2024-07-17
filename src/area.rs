@@ -212,6 +212,7 @@ mod tests {
             print_node_ids: HashSet::new(),
             print_way_ids: HashSet::new(),
             print_relation_ids: HashSet::new(),
+            remove_metadata: true
         };
 
         let mut area_handler = AreaHandler::new();
