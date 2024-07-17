@@ -32,6 +32,18 @@ pub struct AreaHandler {
     grid: Vec<Tile>,
 }
 
+fn gridX(lon: f64) -> usize {
+    (lon as i32 + 180) as usize
+}
+
+fn gridY(lat: f64) -> usize {
+    (lat as i32 + 90) as usize
+}
+
+fn gridIndex(x: usize, y: usize) -> usize {
+    y * 360 + x
+}
+
 pub struct Mapping {
     pub index: [u16; GRID_SIZE],
     pub area: BTreeMultiMap<u16, AreaIntersect>,
@@ -128,17 +140,26 @@ impl AreaHandler {
         self.mapping.id.insert(index, id.to_string());
         self.mapping.name.insert(index, name.to_string());
         let area_bbox = &area_geometry.bounding_rect().unwrap();
-        let mut intersecting_grid_tiles = 0;
-        for i in 0..GRID_SIZE {
-            let tile_bbox = &self.grid[i].bbox;
-            if tile_bbox.intersects(area_bbox) && tile_bbox.intersects(area_geometry) {
-                intersecting_grid_tiles += 1;
-                if area_geometry.contains(tile_bbox) {
-                    self.mapping.index[i] = index;
-                } else {
-                    let tile_poly = &self.grid[i].poly;
-                    self.mapping.index[i] = AREA_ID_MULTIPLE;
-                    self.mapping.area.insert(i as u16, AreaIntersect{id: index, geo: tile_poly.intersection(&area_geometry)});
+        let min = &area_bbox.min();
+        let max = &area_bbox.max();
+        let minX = gridX(min.x);
+        let minY = gridY(min.y);
+        let maxX = gridX(max.x);
+        let maxY = gridY(max.y);
+        let mut _intersecting_grid_tiles = 0;
+        for y in minY..=maxY {
+            for x in minX..=maxX {
+                let i = gridIndex(x, y);
+                let tile_bbox = &self.grid[i].bbox;
+                if tile_bbox.intersects(area_geometry) {
+                    _intersecting_grid_tiles += 1;
+                    if area_geometry.contains(tile_bbox) {
+                        self.mapping.index[i] = index;
+                    } else {
+                        let tile_poly = &self.grid[i].poly;
+                        self.mapping.index[i] = AREA_ID_MULTIPLE;
+                        self.mapping.area.insert(i as u16, AreaIntersect { id: index, geo: tile_poly.intersection(&area_geometry) });
+                    }
                 }
             }
         }
