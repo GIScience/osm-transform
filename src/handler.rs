@@ -715,6 +715,7 @@ mod tests {
     use bit_vec::BitVec;
     use osm_io::osm::model::coordinate::Coordinate;
     use osm_io::osm::model::node::Node;
+    use osm_io::osm::model::relation::{Member, MemberData, Relation};
     use osm_io::osm::model::tag::Tag;
     use osm_io::osm::model::way::Way;
     use regex::Regex;
@@ -1204,7 +1205,7 @@ mod tests {
     }
 
     #[test]
-    fn metadata_remover() {
+    fn metadata_remover_node() {
         let mut metadata_remover = MetadataRemover::default();
         let node = metadata_remover.handle_node(Node::new(1, 1, Coordinate::new(1.0f64, 1.1f64), 1, 1, 1, "a".to_string(), true,vec![
             Tag::new("a".to_string(), "x".to_string()),
@@ -1224,4 +1225,56 @@ mod tests {
         assert_eq!(node.tags()[1].k(), &"b".to_string());
         assert_eq!(node.tags()[1].v(), &"y".to_string());
     }
+
+    #[test]
+    fn metadata_remover_way() {
+        let mut metadata_remover = MetadataRemover::default();
+        let way = metadata_remover.handle_way(Way::new(1, 1, 1, 1, 1, "user".to_string(), true, vec![4, 6], vec![
+            Tag::new("a".to_string(), "x".to_string()),
+            Tag::new("b".to_string(), "y".to_string()),
+        ])).unwrap();
+        assert_eq!(way.id(), 1);
+        assert_eq!(way.version(), 0);
+        assert_eq!(way.timestamp(), 0);
+        assert_eq!(way.changeset(), 0);
+        assert_eq!(way.uid(), 0);
+        assert_eq!(way.user(), &String::default());
+        assert_eq!(way.visible(), true);
+        assert_eq!(way.refs()[0], 4);
+        assert_eq!(way.refs()[1], 6);
+        assert_eq!(way.tags()[0].k(), &"a".to_string());
+        assert_eq!(way.tags()[0].v(), &"x".to_string());
+        assert_eq!(way.tags()[1].k(), &"b".to_string());
+        assert_eq!(way.tags()[1].v(), &"y".to_string());
+    }
+
+    #[test]
+    fn metadata_remover_relation() {
+        let mut metadata_remover = MetadataRemover::default();
+        let relation = metadata_remover.handle_relation(Relation::new(1, 1, 1, 1, 1, "user".to_string(), true, vec![
+            Member::Node {member: MemberData::new(5, "a".to_string())},
+            Member::Node {member: MemberData::new(6, "b".to_string())},
+            Member::Way {member: MemberData::new(10, "b".to_string())},
+            Member::Relation {member: MemberData::new(20, "b".to_string())},
+        ], vec![
+            Tag::new("a".to_string(), "x".to_string()),
+            Tag::new("b".to_string(), "y".to_string()),
+        ])).unwrap();
+        assert_eq!(relation.id(), 1);
+        assert_eq!(relation.version(), 0);
+        assert_eq!(relation.timestamp(), 0);
+        assert_eq!(relation.changeset(), 0);
+        assert_eq!(relation.uid(), 0);
+        assert_eq!(relation.user(), &String::default());
+        assert_eq!(relation.visible(), true);
+        assert_eq!(relation.members()[0], Member::Node {member: MemberData::new(5, "a".to_string())});
+        assert_eq!(relation.members()[1], Member::Node {member: MemberData::new(6, "b".to_string())});
+        assert_eq!(relation.members()[2], Member::Way {member: MemberData::new(10, "b".to_string())});
+        assert_eq!(relation.members()[3], Member::Relation {member: MemberData::new(20, "b".to_string())});
+        assert_eq!(relation.tags()[0].k(), &"a".to_string());
+        assert_eq!(relation.tags()[0].v(), &"x".to_string());
+        assert_eq!(relation.tags()[1].k(), &"b".to_string());
+        assert_eq!(relation.tags()[1].v(), &"y".to_string());
+    }
+    
 }
