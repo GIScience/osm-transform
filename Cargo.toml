@@ -26,5 +26,14 @@ log4rs = "1.3.0"
 btreemultimap = "0.1.1"
 clap = { version = "4.5.9", features = ["derive"] }
 bit-vec = "0.6"
-#tiff = "0.9.1"
+tiff = "0.9.1"
 georaster = "0.1.0"
+#proj = "0.27.2"
+#proj5 = "0.1.7" use proj4rs = "0.1.3" instead
+proj4rs = { version = "0.1.3", features = ["crs-definitions"] }
+#geo-types = "0.7.13"
+epsg = "=11.1.2"
+phf = "0.11.2"
+#for lazy static hashmap (srs)
+lazy_static = "1.4"
+maplit = "1.0.2"

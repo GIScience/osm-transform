@@ -4,6 +4,8 @@ use rusty_routes_transformer::handler::geotiff::GeoTiff;
 use clap::Parser;
 
 use rusty_routes_transformer::{Config, init, run};
+#[macro_use]
+extern crate maplit;
 
 fn main() {
     let args = Args::parse();

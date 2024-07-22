@@ -3,6 +3,10 @@ pub mod area;
 pub mod handler;
 pub mod output;
 pub mod osm_model;
+pub mod srs;
+
+#[macro_use]
+extern crate maplit;
 
 use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;
@@ -13,7 +17,7 @@ use log::LevelFilter;
 use regex::Regex;
 use crate::io::process_with_handler;
 use area::AreaHandler;
-use crate::handler::{HandlerChain, ComplexElementsFilter, OsmElementTypeSelection, ElementCounter, CountType, HandlerResult, AllElementsFilter, ReferencedNodeIdCollector, NodeIdFilter, TagFilterByKey, FilterType, ElementPrinter, MetadataRemover};
+use crate::handler::{AllElementsFilter, ComplexElementsFilter, CountType, ElementCounter, ElementPrinter, FilterType, HandlerChain, HandlerResult, MetadataRemover, NodeIdFilter, OsmElementTypeSelection, ReferencedNodeIdCollector, TagFilterByKey};
 use crate::output::OutputHandler;
 
 
