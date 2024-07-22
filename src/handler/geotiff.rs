@@ -1,22 +1,16 @@
-use std::collections::HashMap;
 use std::error::Error;
 use std::fs::File;
 use std::io::BufReader;
-use std::path::Path;
-use csv::ReaderBuilder;
-use epsg::CRS;
+
 use georaster::geotiff::{GeoTiffReader, RasterValue};
-use osm_io::osm::model::node::Node;
-use osm_io::osm::model::relation::Relation;
-use osm_io::osm::model::way::Way;
-use phf::phf_map;
 use proj4rs::Proj;
+
 use crate::handler::Handler;
 use crate::srs::SrsResolver;
 
 pub struct GeoTiff {
-    srs: String,
-    epsg: u16,
+    proj_wgs_84: Proj,
+    proj_tiff: Proj,
     top_left_x: f64,
     top_left_y: f64,
     pixel_width: f64,
@@ -27,61 +21,21 @@ pub struct GeoTiff {
 }
 
 impl GeoTiff {
-    pub(crate) fn get_value(&mut self, lat: f64, lon: f64) -> RasterValue {
-        let xy = &self.to_image_xy(lat, lon);
-        self.geotiffreader.read_pixel(xy.0, xy.1)
+    pub(crate) fn get_value_for_wgs_84(&mut self, lon: f64, lat: f64) -> RasterValue {
+        let tiff_coord = &self.wgs_84_to_tiff_coord(lon, lat);
+        let pixel_coord = &self.tiff_to_pixel_coord(tiff_coord.0, tiff_coord.1);
+        self.get_value_for_pixel_coord(pixel_coord.0, pixel_coord.1)
     }
-    pub(crate) fn get_value_for_pixel_coord(&mut self, x: u32, y: u32) -> RasterValue {
+
+    fn get_value_for_pixel_coord(&mut self, x: u32, y: u32) -> RasterValue {
         self.geotiffreader.read_pixel(x, y)
     }
 
-    pub(crate) fn check(&self) {
-        if (!self.srs.starts_with("WGS 84|")) {
-            log::warn!("UNSUPPORTED SRS {}", self.srs)
-        }
+    fn wgs_84_to_tiff_coord(&self, lon: f64, lat: f64) -> (f64, f64) {
+        transform(&self.proj_wgs_84, &self.proj_tiff, lon, lat).expect("transformation error")
     }
 
-    pub(crate) fn to_image_xy(&self, lat: f64, lon: f64) -> (u32, u32) {
-        // (lat as u32, lon as u32) //todo implement transformation
-
-        // Get the GeoTIFF's CRS (this example assumes it's EPSG:4326 for simplicity)
-        // You will need to get the actual CRS from the metadata if it's different
-        let tiff_crs = "EPSG:4326"; // Replace with actual CRS if different
-        // let tiff_crs = self.reader.geo_params.unwrap(); // Replace with actual CRS if different
-
-        // Create a Proj instance to transform coordinates
-        // let wgs84_to_tiff_crs = Proj ::new_known_crs("EPSG:4326", tiff_crs, None)?;
-
-        // Transform the WGS84 coordinates to the GeoTIFF's CRS
-        // let (x, y) = wgs84_to_tiff_crs.convert((lon, lat))?;
-        // println!("Transformed coordinates in GeoTIFF CRS: ({}, {})", x, y);
-
-        // temporary workaround without Proj (proj dependency)
-        // let (x, y) = (lat as u32, lon as u32);
-        let (x, y) = (lon as u32, lat as u32);
-
-        // attempt with proj4rs
-        // let from = Proj::from_proj_string(concat!(
-        let from_wgs_84 = Proj::from_epsg_code(4326).unwrap();
-        // "+proj=longlat +ellps=WGS84",
-        // " +datum=WGS84 +no_defs"
-        // ))
-        //     .unwrap();
-        // let to = Proj::from_proj_string(concat!(
-        let to = Proj::from_epsg_code(25832).unwrap();
-        // "+proj=utm +zone=32 +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs +type=crs"
-        // ))
-        //     .unwrap();
-        let mut point_3d = (lon, lat, 0.0);
-        proj4rs::transform::transform(&from_wgs_84, &to, &mut point_3d).unwrap();
-
-        // XXX Note that angular unit is radians, not degrees !
-        point_3d.0 = point_3d.0.to_degrees();
-        point_3d.1 = point_3d.1.to_degrees();
-
-        let (x, y) = (point_3d.0, point_3d.1);
-
-
+    pub(crate) fn tiff_to_pixel_coord(&self, lon: f64, lat: f64) -> (u32, u32) {
         let binding = self.geotiffreader.origin().unwrap();
         let top_left_x = binding.get(0).unwrap();
         let top_left_y = binding.get(1).unwrap();
@@ -92,32 +46,47 @@ impl GeoTiff {
         let pixel_x = ((lon - top_left_x) / pixel_width).round() as u32;
         let pixel_y = ((lat - top_left_y) / pixel_height).round() as u32;
 
-        println!("Pixel coordinates: ({}, {})", pixel_x, pixel_y);
-
         (pixel_x, pixel_y)
     }
 }
+fn transform(src: &Proj, dst: &Proj, lon: f64, lat: f64) -> Result<(f64, f64), proj4rs::errors::Error> {
+    let mut point = (lon, lat, 0.);
 
-pub struct GeoTiffLoader{
+    if src.is_latlong() {
+        point.0 = point.0.to_radians();
+        point.1 = point.1.to_radians();
+    }
+
+    proj4rs::transform::transform(&src, &dst, &mut point)?;
+
+    if dst.is_latlong() {
+        point.0 = point.0.to_degrees();
+        point.1 = point.1.to_degrees();
+    }
+
+    Ok((point.0, point.1))
 }
+
+pub struct GeoTiffLoader;
 impl GeoTiffLoader {
-    pub fn load_geotiff(mut self, file_path: &str, srs_resolver: &SrsResolver) -> Result<GeoTiff, Box<dyn std::error::Error>> {
+    pub fn load_geotiff(mut self, file_path: &str, srs_resolver: &SrsResolver) -> Result<GeoTiff, Box<dyn Error>> {
         let img_file = BufReader::new(File::open(file_path).expect("Could not open input file"));
         let mut geotiffreader = GeoTiffReader::open(img_file).expect("Could not read input file as tiff");
 
         let origin = geotiffreader.origin().unwrap();
         let pixel_size = geotiffreader.pixel_size().unwrap();
-        let geo_params = geotiffreader.geo_params.clone().unwrap(); //todo use this to derive epsg
+        let geo_params = geotiffreader.geo_params.clone().unwrap();
         let dimensions = geotiffreader.images().get(0).expect("no image in tiff").dimensions.unwrap();
 
-        println!("Origin: {:?}", origin);
-        println!("Pixel size: {:?}", pixel_size);
-        println!("SRS: {:?}", geo_params);
-        println!("Dimensions: {:?}", dimensions);
+        let geo_params : Vec<&str> = geo_params.split("|").collect();
+        let proj_tiff = srs_resolver.get_epsg(geo_params[0]).expect("not found");
+
+        let proj_wgs84 = Proj::from_epsg_code(4326).unwrap();
+        let proj_tiff = Proj::from_epsg_code(proj_tiff as u16).unwrap(); //as u16 should not be necessary, SrsResolver should return u16
 
         let geo_tiff = GeoTiff {
-            srs: geo_params,
-            epsg: 4326, // this should be checked
+            proj_wgs_84: proj_wgs84,
+            proj_tiff: proj_tiff,
             top_left_x: origin[0],
             top_left_y: origin[1],
             pixel_width: pixel_size[0],
@@ -126,7 +95,6 @@ impl GeoTiffLoader {
             pixels_vertical: dimensions.1,
             geotiffreader: geotiffreader,
         };
-        geo_tiff.check();
         Ok(geo_tiff)
     }
 }
@@ -145,32 +113,31 @@ impl ElevationResolver {
     }
     pub fn get_elevation(&mut self, lat: f64, lon: f64) -> RasterValue {
         let tiff: &mut GeoTiff = self.find_geotiff(lat, lon);
-        tiff.get_value(lat, lon)
+        tiff.get_value_for_wgs_84(lon, lat)
     }
 }
 
 
 #[cfg(test)]
 mod tests {
-    use std::collections::HashMap;
     use std::fs::File;
-    use std::path::Path;
+    use std::io::BufReader;
     use epsg::CRS;
     use georaster::geotiff::{GeoTiffReader, RasterValue};
     use proj4rs::Proj;
-    // use proj::Proj;
-    use crate::handler::geotiff::{ElevationResolver, GeoTiffLoader, SrsResolver};
+
+    use crate::handler::geotiff::{ElevationResolver, GeoTiff, GeoTiffLoader, SrsResolver, transform};
+
+    fn create_geotiff_limburg() -> GeoTiff {
+        let mut tiff_loader = GeoTiffLoader {};
+        let mut geotiff = tiff_loader.load_geotiff("test/limburg_an_der_lahn.tif", &SrsResolver::new()).expect("got error");
+        geotiff
+    }
+
 
     #[test]
-    fn srs_resolver() {
-        let srs_resolver = SrsResolver::new();
-        assert_eq!(4326, srs_resolver.get_epsg("WGS 84").expect("not found"))
-    }
-    #[test]
     fn load() {
-        let srs_resolver = SrsResolver::new();
-        let mut tiff_loader = GeoTiffLoader {};
-        let geotiff = tiff_loader.load_geotiff("test/limburg_an_der_lahn.tif", &srs_resolver).expect("got error");
+        let geotiff = create_geotiff_limburg();
         let mut resolver = ElevationResolver { geotiffs: vec![] };
         resolver.add_geotiff(geotiff);
         assert_eq!(resolver.find_geotiff(50f64, 50f64).pixels_vertical, 991);
@@ -179,27 +146,23 @@ mod tests {
 
     #[test]
     fn geotiff_get_value_for_pixel_coord() {
-        let srs_resolver = SrsResolver::new();
-        let mut tiff_loader = GeoTiffLoader {};
-        let mut geotiff = tiff_loader.load_geotiff("test/limburg_an_der_lahn.tif", &srs_resolver).expect("got error");
+        let mut geotiff = create_geotiff_limburg();
 
         let value = geotiff.get_value_for_pixel_coord(540u32, 978u32);
         dbg!(&value);
-        assert_eq!(&value, &RasterValue::F32(163.98439));
+        assert_eq!(&value, &RasterValue::F32(190.338));
 
         let value = geotiff.get_value_for_pixel_coord(461u32, 731u32);
         dbg!(&value);
-        assert_eq!(&value, &RasterValue::F32(190.338));
+        assert_eq!(&value, &RasterValue::F32(163.98439));
     }
 
     #[test]
-    fn geotiff_get_value() {
-        let mut tiff_loader = GeoTiffLoader {};
-        let mut geotiff = tiff_loader.load_geotiff("test/limburg_an_der_lahn.tif", &SrsResolver::new()).expect("got error");
-
-        let value = geotiff.get_value(50.39f64, 8.06f64);
+    fn geotiff_get_value_for_wgs_84() {
+        let mut geotiff = create_geotiff_limburg();
+        let value = geotiff.get_value_for_wgs_84(8.06185930f64, 50.38536322f64 );
         dbg!(&value);
-        assert_eq!(&value, &RasterValue::F32(163.98439));
+        assert_eq!(&value, &RasterValue::F32(121.10445));
     }
 
     #[test]
@@ -226,10 +189,120 @@ mod tests {
         println!("\n{value} ({source}):");
         dbg!(Proj::from_proj_string(value));
         dbg!(Proj::from_user_string(value));
-        // dbg!(get_crs(value));
         dbg!(CRS::try_from(value.to_string()));
         dbg!(epsg::references::get_name(value));
         dbg!(srs_resolver.get_epsg(value));
     }
 
+    fn create_fake_geotiff(proj_tiff: Proj, file_path: &str) -> GeoTiff {
+        let img_file = BufReader::new(File::open(file_path).expect("Could not open input file"));
+        let mut geotiffreader = GeoTiffReader::open(img_file).expect("Could not read input file as tiff");
+        GeoTiff {
+            proj_wgs_84: Proj::from_epsg_code(4326).unwrap(),
+            proj_tiff: proj_tiff,
+            top_left_x: 0.0,
+            top_left_y: 0.0,
+            pixel_width: 1.0,
+            pixel_height: 1.0,
+            pixels_horizontal: 10,
+            pixels_vertical: 10,
+            geotiffreader: geotiffreader,
+        }
+    }
+
+    fn are_floats_close_7(a: f64, b: f64) -> bool {
+        are_floats_close(a, b, 1e-7)
+    }
+    fn are_floats_close(a: f64, b: f64, epsilon: f64) -> bool {
+        (a - b).abs() < epsilon
+    }
+
+    #[test]
+    fn proj_from_epsg_code_from_user_string(){
+        dbg!(Proj::from_epsg_code(4326).expect("not found"));
+        dbg!(Proj::from_user_string("+proj=longlat +datum=WGS84 +no_defs +type=crs").expect("not found"));
+
+        dbg!(Proj::from_epsg_code(25832).expect("not found"));
+        dbg!(Proj::from_user_string("+proj=utm +zone=32 +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs +type=crs").expect("not found"));
+    }
+
+    #[test]
+    fn transform_4326_to_4326(){
+        let mut point_3d = transform(
+            &Proj::from_epsg_code(4326).expect("not found"),
+            &Proj::from_epsg_code(4326).expect("not found"),
+            8.06185930f64, 50.38536322f64).expect("transformation error");
+        assert_eq!(point_3d.0, 8.06185930f64);
+        assert_eq!(point_3d.1, 50.38536322f64);
+    }
+    #[test]
+    fn transform_25832_to_4326(){
+        let mut point_3d = transform(
+            &Proj::from_epsg_code(25832).expect("not found"),
+            &Proj::from_epsg_code(4326).expect("not found"),
+            433305.7043197789f64, 5581899.216447188f64).expect("transformation error");
+        assert!(are_floats_close_7(point_3d.0, 8.06185930f64));
+        assert!(are_floats_close_7(point_3d.1, 50.38536322f64));
+    }
+    #[test]
+    fn transform_4326_to_25832(){
+        let mut point_3d = transform(
+            &Proj::from_epsg_code(4326).expect("not found"),
+            &Proj::from_epsg_code(25832).expect("not found"),
+            8.06185930f64, 50.38536322f64).expect("transformation error");
+        dbg!(&point_3d);
+        assert!(are_floats_close(point_3d.0, 433305.7043197789f64, 1e-2)); //todo is this still ok?
+        assert!(are_floats_close(point_3d.1, 5581899.216447188f64, 1e-2)); //todo is this still ok?
+    }
+
+    #[test]
+    fn proj4rs_transform_5174_to_4326(){
+        //values taken from https://github.com/3liz/proj4rs/
+        let mut point_3d = (198236.3200000003, 453407.8560000006, 0.0);
+        dbg!(&point_3d);
+        proj4rs::transform::transform(
+            &Proj::from_epsg_code(5174).expect("not found"),
+            &Proj::from_epsg_code(4326).expect("not found"),
+            &mut point_3d);
+        dbg!(&point_3d);
+        point_3d.0 = point_3d.0.to_degrees();
+        point_3d.1 = point_3d.1.to_degrees();
+        dbg!(&point_3d);
+        assert!(are_floats_close(point_3d.0, 126.98069676435814, 1e-2));
+        assert!(are_floats_close(point_3d.1, 37.58308534678718, 1e-2));
+    }
+    #[test]
+    fn wgs_84_to_tiff_coord_4326(){
+        let mut geotiff = create_fake_geotiff(Proj::from_epsg_code(4326).unwrap(), "test/limburg_an_der_lahn.tif");
+        let tiff_coord = geotiff.wgs_84_to_tiff_coord(8.06185930f64, 50.38536322f64);
+        assert_eq!(tiff_coord.0, 8.06185930f64);
+        assert_eq!(tiff_coord.1, 50.38536322f64);
+    }
+    #[test]
+    fn wgs_84_to_tiff_coord_25832(){
+        let mut geotiff = create_fake_geotiff(Proj::from_epsg_code(25832).unwrap(), "test/limburg_an_der_lahn.tif");
+        let tiff_coord = geotiff.wgs_84_to_tiff_coord(8.06185930f64, 50.38536322f64);
+        assert!(are_floats_close(tiff_coord.0, 433305.7043197789f64, 1e-2));
+        assert!(are_floats_close(tiff_coord.1, 5581899.216447188f64, 1e-2));
+    }
+
+    #[test]
+    fn tiff_to_pixel_coord_and_get_value_for_pixel_coord(){
+        //Values and expected results picket from QGIS
+        let mut geotiff = create_geotiff_limburg();
+        check_tiff_to_pixel_coord_and_get_value_for_pixel_coord(&mut geotiff, (435123.07f64, 5587878.78f64), (520u32, 73u32), 238.54259);
+        check_tiff_to_pixel_coord_and_get_value_for_pixel_coord(&mut geotiff, (434919.63f64, 5588157.30f64), (500u32, 45u32), 210.00824);
+        check_tiff_to_pixel_coord_and_get_value_for_pixel_coord(&mut geotiff, (430173.346f64, 5581806.030f64), (25u32, 680u32), 108.33898);
+        check_tiff_to_pixel_coord_and_get_value_for_pixel_coord(&mut geotiff, (435705.34f64, 5579115.43f64), (579u32, 950u32), 186.90695);
+        check_tiff_to_pixel_coord_and_get_value_for_pixel_coord(&mut geotiff, (439837f64, 5582052f64), (992u32, 656u32), 177.24083);
+        check_tiff_to_pixel_coord_and_get_value_for_pixel_coord(&mut geotiff, (434743f64, 5582302f64), (482u32, 631u32), 109.42);
+    }
+    fn check_tiff_to_pixel_coord_and_get_value_for_pixel_coord(geotiff: &mut GeoTiff, tiff_coord: (f64, f64), expected_pixel_coord: (u32, u32), expected_value: f32 ){
+        let pixel_coord = geotiff.tiff_to_pixel_coord(tiff_coord.0, tiff_coord.1);
+        dbg!(&pixel_coord);
+        let value = geotiff.get_value_for_pixel_coord(pixel_coord.0, pixel_coord.1);
+        dbg!(&value);
+        assert_eq!(pixel_coord, expected_pixel_coord);
+        assert_eq!(value, RasterValue::F32(expected_value));
+    }
 }

@@ -7822,30 +7822,7 @@ impl SrsResolver<'_> {
                 }
             }
         }
-    //
-    // fn load_proj4_epsg_mapping(&mut self, file_path: &str, delimiter: u8, proj4_header: &str, epsg_header: &str) -> Result<(), Box<dyn Error>> {
-    //     let mut rdr = ReaderBuilder::new()
-    //         .delimiter(delimiter)
-    //         // .delimiter(b'\t')
-    //         .from_reader(File::open(file_path)?);
-    //
-    //     let headers = rdr.headers()?.clone();
-    //     let key_idx = headers.iter().position(|h| h == proj4_header)
-    //         .ok_or_else(|| format!("Key header '{}' not found", proj4_header))?;
-    //     let value_idx = headers.iter().position(|h| h == epsg_header)
-    //         .ok_or_else(|| format!("Value header '{}' not found", epsg_header))?;
-    //
-    //     let mut map = HashMap::new();
-    //
-    //     for result in rdr.records() {
-    //         let record = result?;
-    //         let key = record[key_idx].to_string();
-    //         let value: u16 = record[value_idx].parse()?;
-    //         map.insert(key, value);
-    //     }
-    //     self.proj4_to_epsg = map;
-    //     Ok(())
-    // }
+
     pub(crate) fn get_epsg(&self, proj4: &str) -> Option<u32> {
         match self.proj4_to_epsg.get(proj4) {
             Some(u32) => Some(u32.clone()),
