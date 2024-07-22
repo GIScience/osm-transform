@@ -256,6 +256,17 @@ mod tests {
     }
 
     #[test]
+    fn transform_4326_to_25832_2(){
+        let mut point_3d = transform(
+            &Proj::from_epsg_code(4326).expect("not found"),
+            &Proj::from_epsg_code(25832).expect("not found"),
+            8.06f64, 50.28f64).expect("transformation error");
+        dbg!(&point_3d);
+        assert!(are_floats_close(point_3d.0, 433025.5633903637f64, 1e-4)); //todo is this still ok?
+        assert!(are_floats_close(point_3d.1, 5570185.7364423815f64, 1e-3)); //todo is this still ok?
+    }
+
+    #[test]
     fn proj4rs_transform_5174_to_4326(){
         //values taken from https://github.com/3liz/proj4rs/
         let mut point_3d = (198236.3200000003, 453407.8560000006, 0.0);
