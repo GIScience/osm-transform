@@ -43,15 +43,8 @@ impl GeoTiff {
     }
 
     pub(crate) fn tiff_to_pixel_coord(&self, lon: f64, lat: f64) -> (u32, u32) {
-        let binding = self.geotiffreader.origin().unwrap();
-        let top_left_x = binding.get(0).unwrap();
-        let top_left_y = binding.get(1).unwrap();
-        let binding = self.geotiffreader.pixel_size().unwrap();
-        let pixel_width = binding.get(0).unwrap();
-        let pixel_height = binding.get(1).unwrap();
-
-        let pixel_x = ((lon - top_left_x) / pixel_width).round() as u32;
-        let pixel_y = ((lat - top_left_y) / pixel_height).round() as u32;
+        let pixel_x = ((lon - self.top_left_x) / self.pixel_width) as u32;
+        let pixel_y = ((lat - self.top_left_y) / self.pixel_height) as u32;
 
         (pixel_x, pixel_y)
     }
