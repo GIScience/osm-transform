@@ -171,6 +171,28 @@ mod tests {
         let mut geotiff = tiff_loader.load_geotiff("test/srtm_38_03.tif", &SrsResolver::new()).expect("got error");
         geotiff
     }
+    fn create_fake_geotiff(proj_tiff: Proj, file_path: &str) -> GeoTiff {
+        let img_file = BufReader::new(File::open(file_path).expect("Could not open input file"));
+        let mut geotiffreader = GeoTiffReader::open(img_file).expect("Could not read input file as tiff");
+        GeoTiff {
+            proj_wgs_84: Proj::from_epsg_code(4326).unwrap(),
+            proj_tiff: proj_tiff,
+            top_left_x: 0.0,
+            top_left_y: 0.0,
+            pixel_width: 1.0,
+            pixel_height: 1.0,
+            pixels_horizontal: 10,
+            pixels_vertical: 10,
+            geotiffreader: geotiffreader,
+        }
+    }
+
+    fn are_floats_close_7(a: f64, b: f64) -> bool {
+        are_floats_close(a, b, 1e-7)
+    }
+    fn are_floats_close(a: f64, b: f64, epsilon: f64) -> bool {
+        (a - b).abs() < epsilon
+    }
 
     #[test]
     fn geotiff_limburg_load() {
@@ -238,29 +260,6 @@ mod tests {
         dbg!(CRS::try_from(value.to_string()));
         dbg!(epsg::references::get_name(value));
         dbg!(srs_resolver.get_epsg(value));
-    }
-
-    fn create_fake_geotiff(proj_tiff: Proj, file_path: &str) -> GeoTiff {
-        let img_file = BufReader::new(File::open(file_path).expect("Could not open input file"));
-        let mut geotiffreader = GeoTiffReader::open(img_file).expect("Could not read input file as tiff");
-        GeoTiff {
-            proj_wgs_84: Proj::from_epsg_code(4326).unwrap(),
-            proj_tiff: proj_tiff,
-            top_left_x: 0.0,
-            top_left_y: 0.0,
-            pixel_width: 1.0,
-            pixel_height: 1.0,
-            pixels_horizontal: 10,
-            pixels_vertical: 10,
-            geotiffreader: geotiffreader,
-        }
-    }
-
-    fn are_floats_close_7(a: f64, b: f64) -> bool {
-        are_floats_close(a, b, 1e-7)
-    }
-    fn are_floats_close(a: f64, b: f64, epsilon: f64) -> bool {
-        (a - b).abs() < epsilon
     }
 
     #[test]
