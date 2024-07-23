@@ -17,10 +17,17 @@ pub struct GeoTiff {
     pixel_height: f64,
     pixels_horizontal: u32,
     pixels_vertical: u32,
+    // data_type: ,//todo
+    // no_data_value: ,//todo
     geotiffreader: GeoTiffReader<BufReader<File>>,
 }
 
 impl GeoTiff {
+    pub(crate) fn get_string_value_for_wgs_84(&mut self, lon: f64, lat: f64) -> Option<String> {
+        let raster_value = self.get_value_for_wgs_84(lon, lat);
+        format_as_elevation_string(raster_value)
+    }
+
     pub(crate) fn get_value_for_wgs_84(&mut self, lon: f64, lat: f64) -> RasterValue {
         let tiff_coord = &self.wgs_84_to_tiff_coord(lon, lat);
         let pixel_coord = &self.tiff_to_pixel_coord(tiff_coord.0, tiff_coord.1);
@@ -65,6 +72,38 @@ fn transform(src: &Proj, dst: &Proj, lon: f64, lat: f64) -> Result<(f64, f64), p
     }
 
     Ok((point.0, point.1))
+}
+fn round_f32(num: f32, dec_places: f32) -> String {
+    let factor = 10.0_f32.powf(dec_places);
+    let rounded_num: f32 = (num * factor).round() / factor;
+    let dec_places = dec_places as usize;
+    format!("{:.dec_places$}", rounded_num)
+}
+fn round_f64(num: f64, dec_places: f64) -> String {
+    let factor = 10.0_f64.powf(dec_places);
+    let rounded_num: f64 = (num * factor).round() / factor;
+    let dec_places = dec_places as usize;
+    format!("{:.dec_places$}", rounded_num)
+}
+fn format_as_elevation_string(raster_value: RasterValue) -> Option<String> {
+    match raster_value {
+        RasterValue::NoData => {return None}
+        RasterValue::U8(val) => {return Some(val.to_string())}
+        RasterValue::U16(val) => {return Some(val.to_string())}
+        RasterValue::U32(val) => {return Some(val.to_string())}
+        RasterValue::U64(val) => {return Some(val.to_string())}
+        RasterValue::F32(val) => {return Some(round_f32(val, 2.0))}
+        RasterValue::F64(val) => {return Some(round_f64(val, 2.0))}
+        RasterValue::I8(val) => {return Some(val.to_string())}
+        RasterValue::I16(val) => {return Some(val.to_string())}
+        RasterValue::I32(val) => {return Some(val.to_string())}
+        RasterValue::I64(val) => {return Some(val.to_string())}
+        RasterValue::Rgb8(_, _, _) => {return None}
+        RasterValue::Rgba8(_, _, _, _) => {return None}
+        RasterValue::Rgb16(_, _, _) => {return None}
+        RasterValue::Rgba16(_, _, _, _) => {return None}
+        _ => {return None}
+    }
 }
 
 pub struct GeoTiffLoader;
@@ -126,7 +165,8 @@ mod tests {
     use georaster::geotiff::{GeoTiffReader, RasterValue};
     use proj4rs::Proj;
 
-    use crate::handler::geotiff::{ElevationResolver, GeoTiff, GeoTiffLoader, SrsResolver, transform};
+    use crate::handler::geotiff::{ElevationResolver, GeoTiff, GeoTiffLoader, SrsResolver,
+                                  transform, round_f32, round_f64, format_as_elevation_string};
 
     fn create_geotiff_limburg() -> GeoTiff {
         let mut tiff_loader = GeoTiffLoader {};
@@ -327,5 +367,44 @@ mod tests {
         let value = geotiff.get_value_for_pixel_coord(pixel_coord.0, pixel_coord.1);
         dbg!(&value);
         assert_eq!(value, RasterValue::F32(163.81));
+    }
+
+    #[test]
+    fn test_round_f32() {
+        assert_eq!(round_f32(123.555555f32, 0.0), "124");
+        assert_eq!(round_f32(123.555555f32, 1.0), "123.6");
+        assert_eq!(round_f32(123.555555f32, 2.0), "123.56");
+        assert_eq!(round_f32(123.555555f32, 3.0), "123.556");
+    }
+    #[test]
+    fn test_round_f64() {
+        assert_eq!(round_f64(123.555555f64, 0.0), "124");
+        assert_eq!(round_f64(123.555555f64, 1.0), "123.6");
+        assert_eq!(round_f64(123.555555f64, 2.0), "123.56");
+        assert_eq!(round_f64(123.555555f64, 3.0), "123.556");
+    }
+    #[test]
+    fn test_format_as_elevation_string() {
+        assert_eq!(format_as_elevation_string(RasterValue::NoData), None);
+        assert_eq!(format_as_elevation_string(RasterValue::U8(123)), Some("123".to_string()));
+        assert_eq!(format_as_elevation_string(RasterValue::U16(123)), Some("123".to_string()));
+        assert_eq!(format_as_elevation_string(RasterValue::U32(123)), Some("123".to_string()));
+        assert_eq!(format_as_elevation_string(RasterValue::U64(123)), Some("123".to_string()));
+        assert_eq!(format_as_elevation_string(RasterValue::F32(1234.56789)), Some("1234.57".to_string()));
+        assert_eq!(format_as_elevation_string(RasterValue::F32(-1234.56789)), Some("-1234.57".to_string()));
+        assert_eq!(format_as_elevation_string(RasterValue::F64(1234.56789)), Some("1234.57".to_string()));
+        assert_eq!(format_as_elevation_string(RasterValue::F64(-1234.56789)), Some("-1234.57".to_string()));
+        assert_eq!(format_as_elevation_string(RasterValue::I8(123)), Some("123".to_string()));
+        assert_eq!(format_as_elevation_string(RasterValue::I8(-123)), Some("-123".to_string()));
+        assert_eq!(format_as_elevation_string(RasterValue::I16(123)), Some("123".to_string()));
+        assert_eq!(format_as_elevation_string(RasterValue::I16(-123)), Some("-123".to_string()));
+        assert_eq!(format_as_elevation_string(RasterValue::I32(123)), Some("123".to_string()));
+        assert_eq!(format_as_elevation_string(RasterValue::I32(-123)), Some("-123".to_string()));
+        assert_eq!(format_as_elevation_string(RasterValue::I64(123)), Some("123".to_string()));
+        assert_eq!(format_as_elevation_string(RasterValue::I64(-123)), Some("-123".to_string()));
+        assert_eq!(format_as_elevation_string(RasterValue::Rgb8(123, 255, 0)), None);
+        assert_eq!(format_as_elevation_string(RasterValue::Rgba8(123, 255, 0, 3)), None);
+        assert_eq!(format_as_elevation_string(RasterValue::Rgb16(1234, 1234, 1234)), None);
+        assert_eq!(format_as_elevation_string(RasterValue::Rgba16(1234, 1234, 1234, 1234)), None);
     }
 }
