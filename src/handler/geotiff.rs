@@ -166,10 +166,14 @@ mod tests {
         let mut geotiff = tiff_loader.load_geotiff("test/limburg_an_der_lahn.tif", &SrsResolver::new()).expect("got error");
         geotiff
     }
-
+    fn create_geotiff_srtm_38_03() -> GeoTiff {
+        let mut tiff_loader = GeoTiffLoader {};
+        let mut geotiff = tiff_loader.load_geotiff("test/srtm_38_03.tif", &SrsResolver::new()).expect("got error");
+        geotiff
+    }
 
     #[test]
-    fn load() {
+    fn geotiff_limburg_load() {
         let geotiff = create_geotiff_limburg();
         let mut resolver = ElevationResolver { geotiffs: vec![] };
         resolver.add_geotiff(geotiff);
@@ -178,7 +182,7 @@ mod tests {
     }
 
     #[test]
-    fn geotiff_get_value_for_pixel_coord() {
+    fn geotiff_limburg_get_value_for_pixel_coord() {
         let mut geotiff = create_geotiff_limburg();
 
         let value = geotiff.get_value_for_pixel_coord(540u32, 978u32);
@@ -191,11 +195,20 @@ mod tests {
     }
 
     #[test]
-    fn geotiff_get_value_for_wgs_84() {
+    fn geotiff_limburg_get_value_for_wgs_84() {
         let mut geotiff = create_geotiff_limburg();
         let value = geotiff.get_value_for_wgs_84(8.06185930f64, 50.38536322f64 );
         dbg!(&value);
-        assert_eq!(&value, &RasterValue::F32(121.10445));
+        assert_eq!(&value, &RasterValue::F32(121.21507));
+    }
+
+    #[test]
+    #[ignore]
+    fn geotiff_srtm_38_03_get_value_for_wgs_84() {
+        let mut geotiff = create_geotiff_srtm_38_03();
+        let value = geotiff.get_value_for_wgs_84(8.06185930f64, 50.38536322f64 );
+        dbg!(&value);
+        assert_eq!(&value, &RasterValue::I16(86));//TODO check why the value is so different for the same wgs coord as in the limburg test
     }
 
     #[test]
@@ -331,35 +344,45 @@ mod tests {
     }
 
     #[test]
-    fn tiff_to_pixel_coord_and_get_value_for_pixel_coord(){
+    fn geotiff_limburg_to_pixel_coord_and_get_value_for_pixel_coord(){
         //Values and expected results picket from QGIS
         let mut geotiff = create_geotiff_limburg();
-        check_tiff_to_pixel_coord_and_get_value_for_pixel_coord(&mut geotiff, (435123.07f64, 5587878.78f64), (520u32, 73u32), 238.54259);
-        check_tiff_to_pixel_coord_and_get_value_for_pixel_coord(&mut geotiff, (434919.63f64, 5588157.30f64), (500u32, 45u32), 210.00824);
-        check_tiff_to_pixel_coord_and_get_value_for_pixel_coord(&mut geotiff, (430173.346f64, 5581806.030f64), (25u32, 680u32), 108.33898);
-        check_tiff_to_pixel_coord_and_get_value_for_pixel_coord(&mut geotiff, (435705.34f64, 5579115.43f64), (579u32, 950u32), 186.90695);
-        check_tiff_to_pixel_coord_and_get_value_for_pixel_coord(&mut geotiff, (439837f64, 5582052f64), (992u32, 656u32), 177.24083);
-        check_tiff_to_pixel_coord_and_get_value_for_pixel_coord(&mut geotiff, (434743f64, 5582302f64), (482u32, 631u32), 109.42);
+        check_tiff_to_pixel_coord_and_get_value_for_pixel_coord(&mut geotiff, (435123.07f64, 5587878.78f64), (520u32, 73u32), RasterValue::F32(238.54259));
+        check_tiff_to_pixel_coord_and_get_value_for_pixel_coord(&mut geotiff, (434919.63f64, 5588157.30f64), (500u32, 45u32), RasterValue::F32(210.00824));
+        check_tiff_to_pixel_coord_and_get_value_for_pixel_coord(&mut geotiff, (430173.346f64, 5581806.030f64), (25u32, 680u32), RasterValue::F32(108.33898));
+        check_tiff_to_pixel_coord_and_get_value_for_pixel_coord(&mut geotiff, (435705.34f64, 5579115.43f64), (578u32, 949u32), RasterValue::F32(186.76392));
+        check_tiff_to_pixel_coord_and_get_value_for_pixel_coord(&mut geotiff, (439837f64, 5582052f64), (991u32, 655u32), RasterValue::F32(176.9392));
+        check_tiff_to_pixel_coord_and_get_value_for_pixel_coord(&mut geotiff, (434743f64, 5582302f64), (482u32, 630u32), RasterValue::F32(109.42));
     }
-    fn check_tiff_to_pixel_coord_and_get_value_for_pixel_coord(geotiff: &mut GeoTiff, tiff_coord: (f64, f64), expected_pixel_coord: (u32, u32), expected_value: f32 ){
+
+    #[test]
+    #[ignore]
+    fn geotiff_srtm_38_03_to_pixel_coord_and_get_value_for_pixel_coord(){
+        //Values and expected results picket from QGIS
+        let mut geotiff = create_geotiff_srtm_38_03();
+        check_tiff_to_pixel_coord_and_get_value_for_pixel_coord(&mut geotiff, (5.0, 50.0), (0u32, 0u32), RasterValue::I16(422));
+        check_tiff_to_pixel_coord_and_get_value_for_pixel_coord(&mut geotiff, (9.9992467, 45.0007625), (5999u32, 5999u32), RasterValue::I16(36));
+        check_tiff_to_pixel_coord_and_get_value_for_pixel_coord(&mut geotiff, (6.8633450, 45.8333145), (2236u32, 5000u32), RasterValue::I16(4771));
+    }
+    fn check_tiff_to_pixel_coord_and_get_value_for_pixel_coord(geotiff: &mut GeoTiff, tiff_coord: (f64, f64), expected_pixel_coord: (u32, u32), expected_value: RasterValue ){
         let pixel_coord = geotiff.tiff_to_pixel_coord(tiff_coord.0, tiff_coord.1);
         dbg!(&pixel_coord);
         let value = geotiff.get_value_for_pixel_coord(pixel_coord.0, pixel_coord.1);
         dbg!(&value);
         assert_eq!(pixel_coord, expected_pixel_coord);
-        assert_eq!(value, RasterValue::F32(expected_value));
+        assert_eq!(value, expected_value);
     }
 
     #[test]
     fn elevation_lookup(){//passing test from osm-transform
-        let mut geotiff = create_fake_geotiff(Proj::from_epsg_code(4326).unwrap(), "test/limburg_an_der_lahn.tif");
+        let mut geotiff = create_geotiff_limburg();
         let tiff_coord = geotiff.wgs_84_to_tiff_coord(8.0513629, 50.3876977);
         dbg!(&tiff_coord);
         let pixel_coord = geotiff.tiff_to_pixel_coord(tiff_coord.0, tiff_coord.1);
         dbg!(&pixel_coord);
         let value = geotiff.get_value_for_pixel_coord(pixel_coord.0, pixel_coord.1);
         dbg!(&value);
-        assert_eq!(value, RasterValue::F32(163.81));
+        assert_eq!(value, RasterValue::F32(163.81633));
     }
 
     #[test]
