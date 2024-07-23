@@ -316,4 +316,16 @@ mod tests {
         assert_eq!(pixel_coord, expected_pixel_coord);
         assert_eq!(value, RasterValue::F32(expected_value));
     }
+
+    #[test]
+    fn elevation_lookup(){//passing test from osm-transform
+        let mut geotiff = create_fake_geotiff(Proj::from_epsg_code(4326).unwrap(), "test/limburg_an_der_lahn.tif");
+        let tiff_coord = geotiff.wgs_84_to_tiff_coord(8.0513629, 50.3876977);
+        dbg!(&tiff_coord);
+        let pixel_coord = geotiff.tiff_to_pixel_coord(tiff_coord.0, tiff_coord.1);
+        dbg!(&pixel_coord);
+        let value = geotiff.get_value_for_pixel_coord(pixel_coord.0, pixel_coord.1);
+        dbg!(&value);
+        assert_eq!(value, RasterValue::F32(163.81));
+    }
 }
