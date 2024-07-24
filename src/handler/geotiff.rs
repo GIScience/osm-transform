@@ -1,14 +1,18 @@
+use std::collections::BTreeMap;
 use std::error::Error;
 use std::fs::File;
 use std::io::BufReader;
 
 use georaster::geotiff::{GeoTiffReader, RasterValue};
+use glob::glob;
+use log::error;
 use proj4rs::Proj;
-
+use rstar::{RTree, RTreeObject, AABB, Point, PointDistance, Envelope};
 use crate::handler::Handler;
 use crate::srs::SrsResolver;
 
 pub struct GeoTiff {
+    file_path: String,
     proj_wgs_84: Proj,
     proj_tiff: Proj,
     top_left_x: f64,
@@ -47,6 +51,14 @@ impl GeoTiff {
         let pixel_y = ((lat - self.top_left_y) / self.pixel_height) as u32;
 
         (pixel_x, pixel_y)
+    }
+    pub(crate) fn get_top_left_as_wgs84(&self) -> Result<(f64, f64), proj4rs::errors::Error> {
+        transform(&self.proj_tiff, &self.proj_wgs_84, self.top_left_x, self.top_left_y)
+    }
+    pub(crate) fn get_bottom_right_as_wgs84(&self) -> Result<(f64, f64), proj4rs::errors::Error> {
+        let lon_tiff = self.top_left_x + (self.pixel_width * self.pixels_horizontal as f64);
+        let lat_tiff = self.top_left_y + (self.pixel_height * self.pixels_vertical as f64);
+        transform(&self.proj_tiff, &self.proj_wgs_84, lon_tiff, lat_tiff)
     }
 }
 fn transform(src: &Proj, dst: &Proj, lon: f64, lat: f64) -> Result<(f64, f64), proj4rs::errors::Error> {
@@ -99,9 +111,43 @@ fn format_as_elevation_string(raster_value: RasterValue) -> Option<String> {
     }
 }
 
-pub struct GeoTiffLoader;
-impl GeoTiffLoader {
-    pub fn load_geotiff(mut self, file_path: &str, srs_resolver: &SrsResolver) -> Result<GeoTiff, Box<dyn Error>> {
+pub struct GeoTiffLoader {
+    index: Box<dyn GeoTiffIndex>
+}
+impl GeoTiffLoader {//todo rename to GeoTiffManager
+    pub fn new() -> Self {
+        Self {
+            index: Box::new(RSGeoTiffIndex::new())
+        }
+    }
+    pub fn load_geotiffs(&mut self, files_pattern: &str, srs_resolver: &SrsResolver) {//todo rename to load_and_index o.ä.
+        match glob(files_pattern) {
+            Ok(paths) => {
+                for entry in paths {
+                    match entry {
+                        Ok(path) => {
+                            if path.is_file() {
+                                let geotiff = self.load_geotiff(path.to_str().unwrap(), srs_resolver);
+                                match geotiff {
+                                    Ok(geotiff) => {
+                                        self.index.add_geotiff(geotiff, path.to_str().unwrap());
+                                        log::debug!("Successfully indexed geotiff file '{:?}'", path);
+                                    }
+                                    Err(error) => {
+                                        log::error!("{:?}", error)
+                                    }
+                                }
+                            }
+                        }
+                        Err(e) => error!("Error reading path: {:?}", e),
+                    }
+                }
+            }
+            Err(e) => error!("Failed to read glob pattern: {:?}", e),
+        }
+    }
+
+    pub fn load_geotiff(&mut self, file_path: &str, srs_resolver: &SrsResolver) -> Result<GeoTiff, Box<dyn Error>> {
         let img_file = BufReader::new(File::open(file_path).expect("Could not open input file"));
         let mut geotiffreader = GeoTiffReader::open(img_file).expect("Could not read input file as tiff");
 
@@ -117,6 +163,7 @@ impl GeoTiffLoader {
         let proj_tiff = Proj::from_epsg_code(proj_tiff as u16).unwrap(); //as u16 should not be necessary, SrsResolver should return u16
 
         let geo_tiff = GeoTiff {
+            file_path: file_path.to_string(),
             proj_wgs_84: proj_wgs84,
             proj_tiff: proj_tiff,
             top_left_x: origin[0],
@@ -131,23 +178,120 @@ impl GeoTiffLoader {
     }
 }
 
-pub struct ElevationResolver {
-    geotiffs: Vec<GeoTiff>,
+
+
+
+
+
+
+
+// Save wgs84 Bounding Boxes with geotiff_id that can be found efficiently by wgs84 coords.
+// Clients of the index can identify which geotiff contains the coordinate of interest.
+// It's their own responsibility to get the GeoTiffLoader by the id and get the geotiff value for the coordinate.
+// The geotiff's file path is a candidate for a geotiff_id.
+pub trait GeoTiffIndex {
+    fn add_geotiff(&mut self, geotiff: GeoTiff, geotiff_id: &str);
+    fn find_geotiff_id_for_wgs84_coord(&mut self, lon: f64, lat: f64) -> Vec<String>;
+    fn get_geotiff_by_id(&mut self, geotiff_id: &str) -> Option<String>;
+    fn get_geotiff_count(&mut self) -> usize;
 }
-impl ElevationResolver {
-    pub fn add_geotiff(&mut self, geotiff: GeoTiff) {
-        //todo update index (e.g. rtree)
-        self.geotiffs.push(geotiff)
-    }
-    pub fn find_geotiff(&mut self, lat: f64, lon: f64) -> &mut GeoTiff {
-        //todo find the correct tiff e.g. with the help of an rtree
-        &mut self.geotiffs[0] //this is a first workaround
-    }
-    pub fn get_elevation(&mut self, lat: f64, lon: f64) -> RasterValue {
-        let tiff: &mut GeoTiff = self.find_geotiff(lat, lon);
-        tiff.get_value_for_wgs_84(lon, lat)
+
+
+
+
+
+
+
+pub struct RSGeoTiffIndex {
+    rtree: RTree<RSBoundingBox>
+}
+impl RSGeoTiffIndex {
+    pub fn new() -> Self {
+        Self {
+            rtree: RTree::new()
+        }
     }
 }
+impl GeoTiffIndex for RSGeoTiffIndex {
+    fn add_geotiff(&mut self, geotiff: GeoTiff, geotiff_id: &str) {
+        let top_left_wgs84 = geotiff.get_top_left_as_wgs84().expect("Could not transform top left corner to WGS 84");
+        let bottom_right_wgs84 = geotiff.get_bottom_right_as_wgs84().expect("Could not transform bottom right corner to WGS 84");
+        let bbox = RSBoundingBox::new(geotiff_id.to_string(),
+                                      [top_left_wgs84.0, bottom_right_wgs84.1],
+                                      [bottom_right_wgs84.0, top_left_wgs84.1]
+        );
+        self.rtree.insert(bbox);
+    }
+
+    fn find_geotiff_id_for_wgs84_coord(&mut self, lon: f64, lat: f64) -> Vec<String> {
+        let point_to_find = [lon, lat];
+        // for b in self.rtree.iter(){
+        //     dbg!(b);
+        // }
+        // dbg!(&point_to_find);
+        self.rtree.locate_all_at_point(&point_to_find)
+            .map(|bbox| bbox.id.clone())
+            .collect()
+    }
+
+    fn get_geotiff_by_id(&mut self, geotiff_id: &str) -> Option<String> {
+        let option = self.rtree.iter().find(|bbox| bbox.id.as_str() == geotiff_id);
+        match option {
+            None => None,
+            Some(rsboundingbox) => Some(rsboundingbox.id.clone()),
+        }
+    }
+
+    fn get_geotiff_count(&mut self) -> usize {
+        self.rtree.size()
+    }
+
+}
+
+
+
+
+
+
+
+
+
+#[derive(Clone, Debug)]
+struct RSBoundingBox {
+    id: String,
+    min: [f64; 2],
+    max: [f64; 2],
+}
+impl RSBoundingBox {
+    fn new(id: String, min: [f64; 2], max: [f64; 2]) -> Self {
+        Self { id, min, max }
+    }
+}
+impl RTreeObject for RSBoundingBox
+{
+    type Envelope = AABB<[f64; 2]>;
+
+    fn envelope(&self) -> Self::Envelope {
+        AABB::from_corners([self.min[0], self.min[1]], [self.max[0], self.max[1]])
+    }
+}
+impl PointDistance for RSBoundingBox {
+    fn distance_2(&self, point: &<Self::Envelope as Envelope>::Point) -> <<Self::Envelope as Envelope>::Point as Point>::Scalar {
+        log::warn!("distance_2 was called - but is not implemented");
+        todo!()
+    }
+
+    fn contains_point(&self, point: &<Self::Envelope as Envelope>::Point) -> bool {
+        point[0] >= self.min[0] && point[0] <= self.max[0]
+            && point[1] >= self.min[1] && point[1] <= self.max[1]
+    }
+}
+
+
+
+
+
+
 
 
 #[cfg(test)]
@@ -157,17 +301,16 @@ mod tests {
     use epsg::CRS;
     use georaster::geotiff::{GeoTiffReader, RasterValue};
     use proj4rs::Proj;
-
-    use crate::handler::geotiff::{ElevationResolver, GeoTiff, GeoTiffLoader, SrsResolver,
-                                  transform, round_f32, round_f64, format_as_elevation_string};
+    use simple_logger::SimpleLogger;
+    use crate::handler::geotiff::{GeoTiff, GeoTiffLoader, SrsResolver, transform, round_f32, round_f64, format_as_elevation_string, RSBoundingBox};
 
     fn create_geotiff_limburg() -> GeoTiff {
-        let mut tiff_loader = GeoTiffLoader {};
+        let mut tiff_loader = GeoTiffLoader::new();
         let mut geotiff = tiff_loader.load_geotiff("test/limburg_an_der_lahn.tif", &SrsResolver::new()).expect("got error");
         geotiff
     }
     fn create_geotiff_srtm_38_03() -> GeoTiff {
-        let mut tiff_loader = GeoTiffLoader {};
+        let mut tiff_loader = GeoTiffLoader::new();
         let mut geotiff = tiff_loader.load_geotiff("test/srtm_38_03.tif", &SrsResolver::new()).expect("got error");
         geotiff
     }
@@ -175,6 +318,7 @@ mod tests {
         let img_file = BufReader::new(File::open(file_path).expect("Could not open input file"));
         let mut geotiffreader = GeoTiffReader::open(img_file).expect("Could not read input file as tiff");
         GeoTiff {
+            file_path: file_path.to_string(),
             proj_wgs_84: Proj::from_epsg_code(4326).unwrap(),
             proj_tiff: proj_tiff,
             top_left_x: 0.0,
@@ -197,10 +341,41 @@ mod tests {
     #[test]
     fn geotiff_limburg_load() {
         let geotiff = create_geotiff_limburg();
-        let mut resolver = ElevationResolver { geotiffs: vec![] };
-        resolver.add_geotiff(geotiff);
-        assert_eq!(resolver.find_geotiff(50f64, 50f64).pixels_vertical, 991);
-        assert_eq!(resolver.find_geotiff(50f64, 50f64).pixels_horizontal, 1016);
+        assert_eq!(geotiff.pixels_vertical, 991);
+        assert_eq!(geotiff.pixels_horizontal, 1016);
+    }
+    #[test]
+    fn test_load_geotiffs() {
+        SimpleLogger::new().init();
+        let srs_resolver = SrsResolver::new();
+        let mut geotiff_loader = GeoTiffLoader::new();
+        geotiff_loader.load_geotiffs("test/*.tif", &srs_resolver);
+        assert_eq!(1, geotiff_loader.index.get_geotiff_count());
+        assert!(geotiff_loader.index.get_geotiff_by_id("test/limburg_an_der_lahn.tif").is_some());
+        // assert!(geotiff_loader.index.get_geotiff_by_id("test/srtm_38_03.tif").is_some());
+    }
+    #[test]
+    fn test_find_geotiff_id_for_wgs84_coord() {
+        SimpleLogger::new().init();
+        let srs_resolver = SrsResolver::new();
+        let mut geotiff_loader = GeoTiffLoader::new();
+        geotiff_loader.load_geotiffs("test/*.tif", &srs_resolver);
+        assert_eq!(1, geotiff_loader.index.get_geotiff_count());
+        let geotiffs = geotiff_loader.index.find_geotiff_id_for_wgs84_coord(8.06185930f64, 50.38536322f64);
+        assert_eq!(1, geotiffs.len());
+        assert_eq!("test/limburg_an_der_lahn.tif", geotiffs[0]);
+    }
+    #[test]
+    #[ignore]
+    fn test_find_geotiff_id_for_wgs84_coord_srtm_38_03() {
+        SimpleLogger::new().init();
+        let srs_resolver = SrsResolver::new();
+        let mut geotiff_loader = GeoTiffLoader::new();
+        geotiff_loader.load_geotiffs("/home/jh/data/elevation/srtm/*.tif", &srs_resolver);
+        assert_eq!(7, geotiff_loader.index.get_geotiff_count());
+        let geotiffs = geotiff_loader.index.find_geotiff_id_for_wgs84_coord(6.8633450, 45.8333145);
+        assert_eq!(1, geotiffs.len());
+        assert_eq!("/home/jh/data/elevation/srtm/srtm_38_03.tif", geotiffs[0]);
     }
 
     #[test]

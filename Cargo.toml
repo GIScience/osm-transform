@@ -36,3 +36,5 @@ phf = "0.11.2"
 #for lazy static hashmap (srs)
 lazy_static = "1.4"
 maplit = "1.0.2"
+glob = "0.3"
+rstar = "0.12.0"
