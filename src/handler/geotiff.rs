@@ -1,14 +1,15 @@
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, HashMap};
 use std::error::Error;
 use std::fs::File;
 use std::io::BufReader;
-
+use bit_vec::BitVec;
 use georaster::geotiff::{GeoTiffReader, RasterValue};
 use glob::glob;
 use log::error;
+use osm_io::osm::model::node::Node;
 use proj4rs::Proj;
 use rstar::{RTree, RTreeObject, AABB, Point, PointDistance, Envelope};
-use crate::handler::Handler;
+use crate::handler::{Handler, HIGHEST_NODE_ID};
 use crate::srs::SrsResolver;
 
 pub struct GeoTiff {
@@ -112,7 +113,7 @@ fn format_as_elevation_string(raster_value: RasterValue) -> Option<String> {
 }
 
 pub struct GeoTiffLoader {
-    index: Box<dyn GeoTiffIndex>
+    index: Box<dyn GeoTiffIndex>,
 }
 impl GeoTiffLoader {//todo rename to GeoTiffManager
     pub fn new() -> Self {
@@ -287,6 +288,47 @@ impl PointDistance for RSBoundingBox {
     }
 }
 
+
+
+
+
+
+
+
+
+pub(crate) struct BufferingElevationEnricher {
+    geotiff_loader: GeoTiffLoader,
+    nodes_for_geotiffs: HashMap<String,Vec<Node>>,
+}
+impl BufferingElevationEnricher {
+    fn new() -> Self {
+        Self {
+            geotiff_loader: GeoTiffLoader::new(),
+            nodes_for_geotiffs: HashMap::new(),
+        }
+    }
+    fn init(mut self, file_pattern: &str, srs_resolver: &SrsResolver) -> BufferingElevationEnricher {
+        self.geotiff_loader.load_geotiffs(file_pattern, srs_resolver);
+        self
+    }
+}
+impl Handler for BufferingElevationEnricher {
+    fn handle_node(&mut self, node: Node) -> Vec<Node> {
+        //get geotiff_id for node coords
+        //add node to map nodes_for_geotiffs
+        //check if one map entry vector has configured flush size,
+        // if yes: load the geotiff for this id and handle all nodes and return as vector?
+        // Problem: Handlers are not chained. Interface Handler needs to be changed: Return Vec<Node> instead of Option<Node>?
+        todo!()
+    }
+    fn flush_nodes(&mut self) -> Vec<Node> {
+        // this function is called when no more nodes are received
+        // handle all remaining nodes from all modes_for_geotiffs vectors
+        // Problem: Handlers are not chained. Instead of finish() add a boolean isLast to handle_node()?
+        println!("+++++++++++++++++++++++++++++++++ flush_nodes called +++++++++++++++++++++++++++++++++");
+        todo!()
+    }
+}
 
 
 

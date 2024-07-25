@@ -4,6 +4,7 @@ pub mod handler;
 pub mod output;
 pub mod osm_model;
 pub mod srs;
+pub mod processor;
 
 #[macro_use]
 extern crate maplit;

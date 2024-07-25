@@ -32,6 +32,7 @@ pub fn process_with_handler(config: &Config, handler_chain: &mut HandlerChain) -
             _ => (),
         }
     }
+    // handler_chain.flush_nodes();
     log::info!("Finished pbf io pipeline, time: {}", stopwatch);
     Ok(())
 }

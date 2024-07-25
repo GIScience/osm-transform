@@ -35,17 +35,21 @@ impl HandlerResult {
 }
 pub trait Handler {
 
-    fn handle_node(&mut self, node: Node) -> Option<Node> {
-        Some(node)
+    fn handle_node(&mut self, node: Node) -> Vec<Node> {
+        vec![node]
     }
 
-    fn handle_way(&mut self, way: Way) -> Option<Way> {
-        Some(way)
+    fn handle_way(&mut self, way: Way) -> Vec<Way> {
+        vec![way]
     }
 
-    fn handle_relation(&mut self, relation: Relation) -> Option<Relation> {
-        Some(relation)
+    fn handle_relation(&mut self, relation: Relation) -> Vec<Relation> {
+        vec![relation]
     }
+
+    fn flush_nodes(&mut self) -> Vec<Node> {vec![]}
+    fn flush_ways(&mut self) -> Vec<Way> {vec![]}
+    fn flush_relations(&mut self) -> Vec<Relation> {vec![]}
 
     fn add_result(&mut self, result: HandlerResult) -> HandlerResult {
         result
@@ -58,30 +62,53 @@ pub(crate) struct HandlerChain {
 }
 impl HandlerChain {
     pub(crate) fn process_node(&mut self, mut node: Node) {
+        let mut collected = vec![node];
         for processor in &mut self.handlers {
-            let optional_node = processor.handle_node(node);
-            match optional_node {
-                None => { break }
-                Some(result) => { node = result }
+            let mut new_collected = vec![];
+            for node in collected {
+                new_collected.append(&mut processor.handle_node(node));
             }
+            collected = new_collected;
         }
     }
+    // If a processor has buffered elements, process and free them now
+    // and let downstream processors first handle the flushed nodes,
+    // and then flush downstream handlers, too.
+    // pub(crate) fn flush_nodes(&mut self) {
+    //     let mut flushing_handler_pos = 0;
+    //     for flushing_handler in &mut self.handlers {
+    //         let mut nodes_to_handle = flushing_handler.flush_nodes();
+    //         flushing_handler_pos += 1;
+    //         unsafe {
+    //         // let mut downstream_handlers_positions = &[flushing_handler_pos..self.handlers.len()-1];
+    //         for handling_handler in self.handlers.iter_mut().skip(flushing_handler_pos) {
+    //             let mut handled_nodes = vec![];
+    //             for node in nodes_to_handle {
+    //                 handled_nodes.append(&mut handling_handler.handle_node(node));
+    //             }
+    //             nodes_to_handle = handled_nodes;
+    //         }
+    //         }
+    //     }
+    // }
     pub(crate) fn process_way(&mut self, mut way: Way) {
+        let mut collected = vec![way];
         for processor in &mut self.handlers {
-            let optional_way = processor.handle_way(way);
-            match optional_way {
-                None => { break }
-                Some(result) => { way = result }
+            let mut new_collected = vec![];
+            for way in collected {
+                new_collected.append(&mut processor.handle_way(way));
             }
+            collected = new_collected;
         }
     }
     pub(crate) fn process_relation(&mut self, mut relation: Relation) {
+        let mut collected = vec![relation];
         for processor in &mut self.handlers {
-            let optional_relation = processor.handle_relation(relation);
-            match optional_relation {
-                None => { break }
-                Some(result) => { relation = result }
+            let mut new_collected = vec![];
+            for relation in collected {
+                new_collected.append(&mut processor.handle_relation(relation));
             }
+            collected = new_collected;
         }
     }
     pub(crate) fn collect_result(&mut self) -> HandlerResult {
@@ -123,23 +150,23 @@ impl ElementCounter {
     }
 }
 impl Handler for ElementCounter {
-    fn handle_node(&mut self, node: Node) -> Option<Node> {
+    fn handle_node(&mut self, node: Node) -> Vec<Node> {
         if self.handle_types.node {
             self.nodes_count += 1;
         }
-        Some(node)
+        vec![node]
     }
-    fn handle_way(&mut self, way: Way) -> Option<Way> {
+    fn handle_way(&mut self, way: Way) -> Vec<Way> {
         if self.handle_types.way {
             self.ways_count += 1;
         }
-        Some(way)
+        vec![way]
     }
-    fn handle_relation(&mut self, relation: Relation) -> Option<Relation> {
+    fn handle_relation(&mut self, relation: Relation) -> Vec<Relation> {
         if self.handle_types.relation {
             self.relations_count += 1;
         }
-        Some(relation)
+        vec![relation]
     }
 
     fn add_result(&mut self, mut result: HandlerResult) -> HandlerResult {
@@ -199,31 +226,31 @@ impl TagValueBasedOsmElementsFilter {
     }
 }
 impl Handler for TagValueBasedOsmElementsFilter {
-    fn handle_node(&mut self, node: Node) -> Option<Node> {
+    fn handle_node(&mut self, node: Node) -> Vec<Node> {
         if !self.handle_types.node  {
-            return Some(node)
+            return vec![node]
         }
         match self.accept_by_tags(&node.tags()) {
-            true => {Some(node)}
-            false => {None}
+            true => {vec![node]}
+            false => {vec![]}
         }
     }
-    fn handle_way(&mut self, way: Way) -> Option<Way> {
+    fn handle_way(&mut self, way: Way) -> Vec<Way> {
         if !self.handle_types.way  {
-            return Some(way)
+            return vec![way]
         }
         match self.accept_by_tags(&way.tags()) {
-            true => {Some(way)}
-            false => {None}
+            true => {vec![way]}
+            false => {vec![]}
         }
     }
-    fn handle_relation(&mut self, relation: Relation) -> Option<Relation> {
+    fn handle_relation(&mut self, relation: Relation) -> Vec<Relation> {
         if !self.handle_types.relation  {
-            return Some(relation)
+            return vec![relation]
         }
         match self.accept_by_tags(&relation.tags()) {
-            true => {Some(relation)}
-            false => {None}
+            true => {vec![relation]}
+            false => {vec![]}
         }
     }
 }
@@ -259,31 +286,31 @@ impl TagKeyBasedOsmElementsFilter {
     }
 }
 impl Handler for TagKeyBasedOsmElementsFilter {
-    fn handle_node(&mut self, node: Node) -> Option<Node> {
+    fn handle_node(&mut self, node: Node) -> Vec<Node> {
         if ! self.handle_types.node {
-            return Some(node)
+            return vec![node]
         }
         match self.accept_by_tags(&node.tags()) {
-            true => {Some(node)}
-            false => {None}
+            true => {vec![node]}
+            false => {vec![]}
         }
     }
-    fn handle_way(&mut self, way: Way) -> Option<Way> {
+    fn handle_way(&mut self, way: Way) -> Vec<Way> {
         if !self.handle_types.way  {
-            return Some(way)
+            return vec![way]
         }
         match self.accept_by_tags(&way.tags()) {
-            true => {Some(way)}
-            false => {None}
+            true => {vec![way]}
+            false => {vec![]}
         }
     }
-    fn handle_relation(&mut self, relation: Relation) -> Option<Relation> {
+    fn handle_relation(&mut self, relation: Relation) -> Vec<Relation> {
         if !self.handle_types.relation  {
-            return Some(relation)
+            return vec![relation]
         }
         match self.accept_by_tags(&relation.tags()) {
-            true => {Some(relation)}
-            false => {None}
+            true => {vec![relation]}
+            false => {vec![]}
         }
     }
 
@@ -294,24 +321,24 @@ pub(crate) struct AllElementsFilter {
     pub handle_types: OsmElementTypeSelection,
 }
 impl Handler for AllElementsFilter {
-    fn handle_node(&mut self, node: Node) -> Option<Node> {
+    fn handle_node(&mut self, node: Node) -> Vec<Node> {
         match self.handle_types.node {
-            true => {None}
-            false => {Some(node)}
+            true => {vec![]}
+            false => {vec![node]}
         }
     }
 
-    fn handle_way(&mut self, way: Way) -> Option<Way> {
+    fn handle_way(&mut self, way: Way) -> Vec<Way> {
         match self.handle_types.way {
-            true => {None}
-            false => {Some(way)}
+            true => {vec![]}
+            false => {vec![way]}
         }
     }
 
-    fn handle_relation(&mut self, relation: Relation) -> Option<Relation> {
+    fn handle_relation(&mut self, relation: Relation) -> Vec<Relation> {
         match self.handle_types.relation {
-            true => {None}
-            false => {Some(relation)}
+            true => {vec![]}
+            false => {vec![relation]}
         }
     }
 }
@@ -332,15 +359,15 @@ impl NodeIdFilter {
 }
 
 impl Handler for NodeIdFilter {
-    fn handle_node(&mut self, node: Node) -> Option<Node> {
+    fn handle_node(&mut self, node: Node) -> Vec<Node> {
         match self.node_ids.get(node.id().clone() as usize).unwrap_or(false) {
             true => {
                 log::trace!("node {} found in bitmap", &node.id().clone());
-                Some(node)
+                vec![node]
             }
             false => {
                 log::trace!("node {} is not in bitmap - filtering", &node.id().clone());
-                None
+                vec![]
             }
         }
     }
@@ -362,16 +389,16 @@ impl ReferencedNodeIdCollector {
 }
 
 impl Handler for ReferencedNodeIdCollector {
-    fn handle_way(&mut self, way: Way) -> Option<Way> {
+    fn handle_way(&mut self, way: Way) -> Vec<Way> {
         log::trace!("xxxxxxxxxxxxxxxxx way");
         for id in way.refs() {
             let idc = id.clone();
             self.referenced_node_ids.set(idc as usize, true);
         }
-        Some(way)
+        vec![way]
     }
 
-    fn handle_relation(&mut self, relation: Relation) -> Option<Relation> {
+    fn handle_relation(&mut self, relation: Relation) -> Vec<Relation> {
         log::trace!("xxxxxxxxxxxxxxxxx relation");
         for member in relation.members() {
             match member {
@@ -384,7 +411,7 @@ impl Handler for ReferencedNodeIdCollector {
             }
 
         }
-        Some(relation)
+        vec![relation]
     }
 
     fn add_result(&mut self, mut result: HandlerResult) -> HandlerResult {
@@ -444,27 +471,27 @@ impl ComplexElementsFilter {
     }
 }
 impl Handler for ComplexElementsFilter {
-    fn handle_way(&mut self, way: Way) -> Option<Way> {
+    fn handle_way(&mut self, way: Way) -> Vec<Way> {
         match self.accept_by_tags(&way.tags()) {
             true => {
                 log::trace!("accepting way {}", way.id());
-                Some(way)
+                vec![way]
             }
             false => {
                 log::trace!("removing way {}", way.id());
-                None
+                vec![]
             }
         }
     }
-    fn handle_relation(&mut self, relation: Relation) -> Option<Relation> {
+    fn handle_relation(&mut self, relation: Relation) -> Vec<Relation> {
         match self.accept_by_tags(&relation.tags()) {
             true => {
                 log::trace!("accepting relation {}", relation.id());
-                Some(relation)
+                vec![relation]
             }
             false => {
                 log::trace!("removing relation {}", relation.id());
-                None
+                vec![]
             }
         }
     }
@@ -549,23 +576,23 @@ impl TagFilterByKey {
     }
 }
 impl Handler for TagFilterByKey {
-    fn handle_node(&mut self, mut node: Node) -> Option<Node> {
+    fn handle_node(&mut self, mut node: Node) -> Vec<Node> {
         if self.handle_types.node  {
             self.filter_tags(&mut node.tags_mut());
         }
-        Some(node)
+        vec![node]
     }
-    fn handle_relation(&mut self, mut relation: Relation) -> Option<Relation> {
+    fn handle_relation(&mut self, mut relation: Relation) -> Vec<Relation> {
         if self.handle_types.relation  {
             self.filter_tags(&mut relation.tags_mut());
         }
-        Some(relation)
+        vec![relation]
     }
-    fn handle_way(&mut self, mut way: Way) -> Option<Way> {
+    fn handle_way(&mut self, mut way: Way) -> Vec<Way> {
         if self.handle_types.way  {
             self.filter_tags(&mut way.tags_mut());
         }
-        Some(way)
+        vec![way]
     }
 }
 
@@ -637,7 +664,7 @@ impl ElementPrinter {
     }
 }
 impl Handler for ElementPrinter {
-    fn handle_node(&mut self, node: Node) -> Option<Node> {
+    fn handle_node(&mut self, node: Node) -> Vec<Node> {
         if self.handle_types.node && self.node_ids.contains(&node.id()) {
             println!("{}node {} visible: {}", &self.prefix, &node.id(), &node.visible());
             println!("  version:    {}", &node.version());
@@ -651,9 +678,9 @@ impl Handler for ElementPrinter {
                 println!("   '{}' = '{}'", &tag.k(), &tag.v())
             }
         }
-        Some(node)
+        vec![node]
     }
-    fn handle_way(&mut self, way: Way) -> Option<Way> {
+    fn handle_way(&mut self, way: Way) -> Vec<Way> {
         if self.handle_types.way &&  self.way_ids.contains(&way.id()) {
             println!("{}way {} visible: {}", &self.prefix ,&way.id(), &way.visible());
             println!("  version:   {}", &way.version());
@@ -670,9 +697,9 @@ impl Handler for ElementPrinter {
                 println!("   {}", &id)
             }
         }
-        Some(way)
+        vec![way]
     }
-    fn handle_relation(&mut self, relation: Relation) -> Option<Relation> {
+    fn handle_relation(&mut self, relation: Relation) -> Vec<Relation> {
         if self.handle_types.relation &&  self.relation_ids.contains(&relation.id()) {
             println!("{}relation {} visible: {}", &self.prefix ,&relation.id(), &relation.visible());
             println!("  version:   {}", &relation.version());
@@ -689,7 +716,7 @@ impl Handler for ElementPrinter {
                 println!("   {:?}", &member)
             }
         }
-        Some(relation)
+        vec![relation]
     }
 }
 
@@ -697,16 +724,16 @@ impl Handler for ElementPrinter {
 pub(crate) struct MetadataRemover;
 
 impl Handler for MetadataRemover {
-    fn handle_node(&mut self, node: Node) -> Option<Node> {
-        Some(Node::new(node.id(), 0, node.coordinate().clone(), 0, 0, 0, String::default(), node.visible(), node.tags().clone()))
+    fn handle_node(&mut self, node: Node) -> Vec<Node> {
+        vec![Node::new(node.id(), 0, node.coordinate().clone(), 0, 0, 0, String::default(), node.visible(), node.tags().clone())]
     }
 
-    fn handle_way(&mut self, way: Way) -> Option<Way> {
-        Some(Way::new(way.id(), 0, 0, 0, 0, String::default(), way.visible(), way.refs().clone(), way.tags().clone()))
+    fn handle_way(&mut self, way: Way) -> Vec<Way> {
+        vec![Way::new(way.id(), 0, 0, 0, 0, String::default(), way.visible(), way.refs().clone(), way.tags().clone())]
     }
 
-    fn handle_relation(&mut self, relation: Relation) -> Option<Relation> {
-        Some(Relation::new(relation.id(), 0, 0, 0, 0, String::default(), relation.visible(), relation.members().clone(), relation.tags().clone()))
+    fn handle_relation(&mut self, relation: Relation) -> Vec<Relation> {
+        vec![Relation::new(relation.id(), 0, 0, 0, 0, String::default(), relation.visible(), relation.members().clone(), relation.tags().clone())]
     }
 }
 
@@ -804,9 +831,9 @@ mod tests {
         }
     }
     impl Handler for TestOnlyNodeIdCollector {
-        fn handle_node(&mut self, node: Node) -> Option<Node> {
+        fn handle_node(&mut self, node: Node) -> Vec<Node> {
             self.node_ids.set(node.id() as usize, true);
-            Some(node)
+            vec![node]
         }
         fn add_result(&mut self, mut result: HandlerResult) -> HandlerResult {
             result.node_ids = self.node_ids.clone();
@@ -821,24 +848,20 @@ mod tests {
             Regex::new(".*bad.*").unwrap(),
             FilterType::RemoveMatching);
 
-        let node_option = tag_filter.handle_node(Node::new(1, 1, Coordinate::new(1.0f64, 1.1f64), 1, 1, 1, "a".to_string(), true,
-                                                               vec![
+        let handled_nodes = tag_filter.handle_node(Node::new(1, 1, Coordinate::new(1.0f64, 1.1f64), 1, 1, 1, "a".to_string(), true,
+                                                             vec![
                                                                    Tag::new("bad".to_string(), "hotzenplotz".to_string()),
                                                                    Tag::new("good".to_string(), "kasper".to_string()),
                                                                    Tag::new("more-bad".to_string(), "vader".to_string()),
                                                                    Tag::new("more-good".to_string(), "grandma".to_string()),
                                                                    Tag::new("badest".to_string(), "voldemort".to_string()),
                                                                ]));
-        match node_option {
-            None => panic!("The element itself should not be filtered, only tags!"),
-            Some(node) => {
-                assert_eq!(node.tags().len(), 2);
-                assert_eq!(node.tags()[0].k(), &"good");
-                assert_eq!(node.tags()[0].v(), &"kasper");
-                assert_eq!(node.tags()[1].k(), &"more-good");
-                assert_eq!(node.tags()[1].v(), &"grandma");
-            }
-        }
+        assert_eq!(1, handled_nodes.len());
+        assert_eq!(handled_nodes[0].tags().len(), 2);
+        assert_eq!(handled_nodes[0].tags()[0].k(), &"good");
+        assert_eq!(handled_nodes[0].tags()[0].v(), &"kasper");
+        assert_eq!(handled_nodes[0].tags()[1].k(), &"more-good");
+        assert_eq!(handled_nodes[0].tags()[1].v(), &"grandma");
     }
 
     #[test]
@@ -848,8 +871,8 @@ mod tests {
             Regex::new("(.*:)?source(:.*)?|(.*:)?note(:.*)?|url|created_by|fixme|wikipedia").unwrap(),
             FilterType::RemoveMatching);
 
-        let node_option = tag_filter.handle_node(Node::new(1, 1, Coordinate::new(1.0f64, 1.1f64), 1, 1, 1, "a".to_string(), true,
-                                                               vec![
+        let handled_nodes = tag_filter.handle_node(Node::new(1, 1, Coordinate::new(1.0f64, 1.1f64), 1, 1, 1, "a".to_string(), true,
+                                                             vec![
                                                                    Tag::new("closed:source".to_string(), "bad".to_string()),
                                                                    Tag::new("source".to_string(), "bad".to_string()),
                                                                    Tag::new("source:x".to_string(), "bad".to_string()),
@@ -862,15 +885,10 @@ mod tests {
                                                                    Tag::new("wikipedia".to_string(), "bad".to_string()),
                                                                    Tag::new("wikimedia".to_string(), "good".to_string()),
                                                                ]));
-        match node_option {
-            None => panic!("The element itself should not be filtered, only tags!"),
-            Some(node) => {
-                dbg!(&node);
-                assert_eq!(node.tags().len(), 1);
-                for tag in node.tags() {
-                    assert_eq!(tag.v(), "good")
-                }
-            }
+        assert_eq!(1, handled_nodes.len());
+        assert_eq!(handled_nodes[0].tags().len(), 1);
+        for tag in handled_nodes[0].tags() {
+            assert_eq!(tag.v(), "good")
         }
     }
 
@@ -881,25 +899,22 @@ mod tests {
             Regex::new(".*good.*").unwrap(),
             FilterType::AcceptMatching);
 
-        let node_option = tag_filter.handle_node(Node::new(1, 1, Coordinate::new(1.0f64, 1.1f64), 1, 1, 1, "a".to_string(), true,
-                                                               vec![
+        let handled_nodes = tag_filter.handle_node(Node::new(1, 1, Coordinate::new(1.0f64, 1.1f64), 1, 1, 1, "a".to_string(), true,
+                                                             vec![
                                                                    Tag::new("bad".to_string(), "hotzenplotz".to_string()),
                                                                    Tag::new("good".to_string(), "kasper".to_string()),
                                                                    Tag::new("more-bad".to_string(), "vader".to_string()),
                                                                    Tag::new("more-good".to_string(), "grandma".to_string()),
                                                                    Tag::new("badest".to_string(), "voldemort".to_string()),
                                                                ]));
-        match node_option {
-            None => panic!("The element itself should not be filtered, only tags!"),
-            Some(node) => {
-                dbg!(&node);
-                assert_eq!(node.tags().len(), 2);
-                assert_eq!(node.tags()[0].k(), &"good");
-                assert_eq!(node.tags()[0].v(), &"kasper");
-                assert_eq!(node.tags()[1].k(), &"more-good");
-                assert_eq!(node.tags()[1].v(), &"grandma");
-            }
-        }
+        assert_eq!(1, handled_nodes.len());
+        let node = &handled_nodes[0];
+        assert_eq!(node.tags().len(), 2);
+        assert_eq!(node.tags().len(), 2);
+        assert_eq!(node.tags()[0].k(), &"good");
+        assert_eq!(node.tags()[0].v(), &"kasper");
+        assert_eq!(node.tags()[1].k(), &"more-good");
+        assert_eq!(node.tags()[1].v(), &"grandma");
     }
     #[test]
     fn test_tag_filter_by_key_with_node_not_handled() {
@@ -908,18 +923,15 @@ mod tests {
             Regex::new(".*").unwrap(),
             FilterType::RemoveMatching);
 
-        let node_option = tag_filter.handle_node(Node::new(1, 1, Coordinate::new(1.0f64, 1.1f64), 1, 1, 1, "a".to_string(), true,
-                                                               vec![
+        let handled_nodes = tag_filter.handle_node(Node::new(1, 1, Coordinate::new(1.0f64, 1.1f64), 1, 1, 1, "a".to_string(), true,
+                                                             vec![
                                                                    Tag::new("a".to_string(), "1".to_string()),
                                                                    Tag::new("b".to_string(), "2".to_string()),
                                                                    Tag::new("c".to_string(), "3".to_string()),
                                                                ]));
-        match node_option {
-            None => panic!("The element itself should not be filtered, only tags!"),
-            Some(node) => {
-                assert_eq!(node.tags().len(), 3);
-            }
-        }
+        assert_eq!(1, handled_nodes.len());
+        let node = &handled_nodes[0];
+        assert_eq!(node.tags().len(), 3);
     }
     #[test]
     fn test_tag_filter_by_key_with_node_handled() {
@@ -928,19 +940,15 @@ mod tests {
             Regex::new(".*").unwrap(),
             FilterType::RemoveMatching);
 
-        let node_option = tag_filter.handle_node(Node::new(1, 1, Coordinate::new(1.0f64, 1.1f64), 1, 1, 1, "a".to_string(), true,
-                                                               vec![
+        let handled_nodes = tag_filter.handle_node(Node::new(1, 1, Coordinate::new(1.0f64, 1.1f64), 1, 1, 1, "a".to_string(), true,
+                                                             vec![
                                                                    Tag::new("a".to_string(), "1".to_string()),
                                                                    Tag::new("b".to_string(), "2".to_string()),
                                                                    Tag::new("c".to_string(), "3".to_string()),
                                                                ]));
-        match node_option {
-            None => panic!("The element itself should not be filtered, only tags!"),
-            Some(node) => {
-                dbg!(&node);
-                assert_eq!(node.tags().len(), 0);
-            }
-        }
+        assert_eq!(handled_nodes.len(), 1);
+        let node = &handled_nodes[0];
+        assert_eq!(node.tags().len(), 0);
     }
     #[test]
     fn filter_elements_remove_by_keys() {
@@ -948,24 +956,24 @@ mod tests {
             OsmElementTypeSelection::all(),
             vec!["bad".to_string(), "ugly".to_string()],
             FilterType::RemoveMatching);
-        assert!(filter.handle_node(Node::new(1, 1, Coordinate::new(1.0f64, 1.1f64), 1, 1, 1, "a".to_string(), true,
+        assert_eq!(filter.handle_node(Node::new(1, 1, Coordinate::new(1.0f64, 1.1f64), 1, 1, 1, "a".to_string(), true,
                                              vec![
                                                  Tag::new("good".to_string(), "1".to_string()),
                                                  Tag::new("bad".to_string(), "2".to_string()),
                                              ]))
-            .is_none());
-        assert!(filter.handle_node(Node::new(1, 1, Coordinate::new(1.0f64, 1.1f64), 1, 1, 1, "a".to_string(), true,
+                       .len(), 0);
+        assert_eq!(filter.handle_node(Node::new(1, 1, Coordinate::new(1.0f64, 1.1f64), 1, 1, 1, "a".to_string(), true,
                                              vec![
                                                  Tag::new("good".to_string(), "1".to_string()),
                                                  Tag::new("nice".to_string(), "2".to_string()),
                                              ]))
-            .is_some());
-        assert!(filter.handle_node(Node::new(1, 1, Coordinate::new(1.0f64, 1.1f64), 1, 1, 1, "a".to_string(), true,
+                       .len(), 1);
+        assert_eq!(filter.handle_node(Node::new(1, 1, Coordinate::new(1.0f64, 1.1f64), 1, 1, 1, "a".to_string(), true,
                                              vec![
                                                  Tag::new("ugly".to_string(), "1".to_string()),
                                                  Tag::new("bad".to_string(), "2".to_string()),
                                              ]))
-            .is_none());
+                       .len(), 0);
     }
 
     #[test]
@@ -976,24 +984,24 @@ mod tests {
             FilterType::AcceptMatching,
         );
 
-        assert!(filter.handle_node(Node::new(1, 1, Coordinate::new(1.0f64, 1.1f64), 1, 1, 1, "a".to_string(), true,
+        assert_eq!(filter.handle_node(Node::new(1, 1, Coordinate::new(1.0f64, 1.1f64), 1, 1, 1, "a".to_string(), true,
                                              vec![
                                                  Tag::new("good".to_string(), "1".to_string()),
                                                  Tag::new("bad".to_string(), "2".to_string()),
                                              ]))
-            .is_some());
-        assert!(filter.handle_node(Node::new(1, 1, Coordinate::new(1.0f64, 1.1f64), 1, 1, 1, "a".to_string(), true,
+                    .len(), 1);
+        assert_eq!(filter.handle_node(Node::new(1, 1, Coordinate::new(1.0f64, 1.1f64), 1, 1, 1, "a".to_string(), true,
                                              vec![
                                                  Tag::new("good".to_string(), "1".to_string()),
                                                  Tag::new("nice".to_string(), "2".to_string()),
                                              ]))
-            .is_none());
-        assert!(filter.handle_node(Node::new(1, 1, Coordinate::new(1.0f64, 1.1f64), 1, 1, 1, "a".to_string(), true,
+                    .len(), 0);
+        assert_eq!(filter.handle_node(Node::new(1, 1, Coordinate::new(1.0f64, 1.1f64), 1, 1, 1, "a".to_string(), true,
                                              vec![
                                                  Tag::new("ugly".to_string(), "1".to_string()),
                                                  Tag::new("bad".to_string(), "2".to_string()),
                                              ]))
-            .is_some());
+                    .len(), 1);
     }
 
     #[test]
@@ -1111,69 +1119,69 @@ mod tests {
     fn complex_filter_with_ors_default() {
         let mut filter = ComplexElementsFilter::ors_default();
         // has key to keep and key-value to keep, bad key 'building' should not take effect => should be accepted
-        assert!(filter.handle_way(Way::new(1, 1, 1, 1, 1, "a".to_string(), true, vec![],
+        assert_eq!(filter.handle_way(Way::new(1, 1, 1, 1, 1, "a".to_string(), true, vec![],
                                            vec![
                                                  Tag::new("route".to_string(), "xyz".to_string()),
                                                  Tag::new("railway".to_string(), "platform".to_string()),
                                                  Tag::new("building".to_string(), "x".to_string()),
-                                             ])).is_some());
+                                             ])).len(), 1);
 
         // has key to keep, bad key 'building' should not take effect => should be accepted
-        assert!(filter.handle_way(Way::new(2, 1, 1, 1, 1, "a".to_string(), true, vec![],
+        assert_eq!(filter.handle_way(Way::new(2, 1, 1, 1, 1, "a".to_string(), true, vec![],
                                              vec![
                                                  Tag::new("route".to_string(), "xyz".to_string()),
                                                  Tag::new("building".to_string(), "x".to_string()),
-                                             ])).is_some());
+                                             ])).len(), 1);
 
         // has key-value to keep, bad key 'building' should not take effect => should be accepted
-        assert!(filter.handle_way(Way::new(3, 1, 1, 1, 1, "a".to_string(), true, vec![],
+        assert_eq!(filter.handle_way(Way::new(3, 1, 1, 1, 1, "a".to_string(), true, vec![],
                                              vec![
                                                  Tag::new("railway".to_string(), "platform".to_string()),
                                                  Tag::new("building".to_string(), "x".to_string()),
-                                             ])).is_some());
+                                             ])).len(), 1);
 
         // has no key or key-value to keep, but also no bad key => should be accepted
-        assert!(filter.handle_way(Way::new(4, 1, 1, 1, 1, "a".to_string(), true, vec![],
+        assert_eq!(filter.handle_way(Way::new(4, 1, 1, 1, 1, "a".to_string(), true, vec![],
                                              vec![
                                                  Tag::new("railway".to_string(), "wrong-value".to_string()),
                                                  Tag::new("something".to_string(), "else".to_string()),
-                                             ])).is_some());
+                                             ])).len(), 1);
 
         // has no key or key-value to keep, some other key, but also one bad key => should be filtered
-        assert!(filter.handle_way(Way::new(5, 1, 1, 1, 1, "a".to_string(), true, vec![],
+        assert_eq!(filter.handle_way(Way::new(5, 1, 1, 1, 1, "a".to_string(), true, vec![],
                                              vec![
                                                  Tag::new("railway".to_string(), "wrong-value".to_string()),
                                                  Tag::new("something".to_string(), "else".to_string()),
                                                  Tag::new("building".to_string(), "x".to_string()),
-                                             ])).is_none());
+                                             ])).len(), 0);
 
         // has only one bad key => should be filtered
-        assert!(filter.handle_way(Way::new(6, 1, 1, 1, 1, "a".to_string(), true, vec![],
+        assert_eq!(filter.handle_way(Way::new(6, 1, 1, 1, 1, "a".to_string(), true, vec![],
                                              vec![
                                                  Tag::new("building".to_string(), "x".to_string()),
-                                             ])).is_none());
+                                             ])).len(), 0);
 
         // has only one other key => should be accepted
-        assert!(filter.handle_way(Way::new(7, 1, 1, 1, 1, "a".to_string(), true, vec![],
+        assert_eq!(filter.handle_way(Way::new(7, 1, 1, 1, 1, "a".to_string(), true, vec![],
                                              vec![
                                                  Tag::new("something".to_string(), "x".to_string()),
-                                             ])).is_some());
+                                             ])).len(), 1);
     }
     #[test]
     fn element_printer(){
         let mut printer = ElementPrinter::default().print_node(2);
 
         // has only one bad key => should be filtered
-        assert!(printer.handle_node(Node::new(1, 1, Coordinate::new(1.0f64, 1.1f64), 1, 1, 1, "a".to_string(), true,
+        assert_eq!(printer.handle_node(Node::new(1, 1, Coordinate::new(1.0f64, 1.1f64), 1, 1, 1, "a".to_string(), true,
                                               vec![
                                                  Tag::new("building".to_string(), "x".to_string()),
-                                             ])).is_some());
+                                             ])).len(), 1);
 
         // has only one other key => should be accepted
-        assert!(printer.handle_node(Node::new(2, 1, Coordinate::new(1.0f64, 1.1f64), 1, 1, 1, "a".to_string(), true,
+        assert_eq!(printer.handle_node(Node::new(2, 1, Coordinate::new(1.0f64, 1.1f64), 1, 1, 1, "a".to_string(), true,
                                               vec![
                                                  Tag::new("something".to_string(), "x".to_string()),
-                                             ])).is_some());
+                                             ])).len(), 1);
 
     }
 
@@ -1209,10 +1217,11 @@ mod tests {
     #[test]
     fn metadata_remover_node() {
         let mut metadata_remover = MetadataRemover::default();
-        let node = metadata_remover.handle_node(Node::new(1, 1, Coordinate::new(1.0f64, 1.1f64), 1, 1, 1, "a".to_string(), true,vec![
+        let binding = metadata_remover.handle_node(Node::new(1, 1, Coordinate::new(1.0f64, 1.1f64), 1, 1, 1, "a".to_string(), true,vec![
             Tag::new("a".to_string(), "x".to_string()),
             Tag::new("b".to_string(), "y".to_string()),
-        ])).unwrap();
+        ]));
+        let node = binding.get(0).unwrap();
         assert_eq!(node.id(), 1);
         assert_eq!(node.version(), 0);
         assert_eq!(node.coordinate().lat(), 1.0f64);
@@ -1231,10 +1240,11 @@ mod tests {
     #[test]
     fn metadata_remover_way() {
         let mut metadata_remover = MetadataRemover::default();
-        let way = metadata_remover.handle_way(Way::new(1, 1, 1, 1, 1, "user".to_string(), true, vec![4, 6], vec![
+        let binding = metadata_remover.handle_way(Way::new(1, 1, 1, 1, 1, "user".to_string(), true, vec![4, 6], vec![
             Tag::new("a".to_string(), "x".to_string()),
             Tag::new("b".to_string(), "y".to_string()),
-        ])).unwrap();
+        ]));
+        let way = binding.get(0).unwrap();
         assert_eq!(way.id(), 1);
         assert_eq!(way.version(), 0);
         assert_eq!(way.timestamp(), 0);
@@ -1253,7 +1263,7 @@ mod tests {
     #[test]
     fn metadata_remover_relation() {
         let mut metadata_remover = MetadataRemover::default();
-        let relation = metadata_remover.handle_relation(Relation::new(1, 1, 1, 1, 1, "user".to_string(), true, vec![
+        let binding = metadata_remover.handle_relation(Relation::new(1, 1, 1, 1, 1, "user".to_string(), true, vec![
             Member::Node {member: MemberData::new(5, "a".to_string())},
             Member::Node {member: MemberData::new(6, "b".to_string())},
             Member::Way {member: MemberData::new(10, "b".to_string())},
@@ -1261,7 +1271,8 @@ mod tests {
         ], vec![
             Tag::new("a".to_string(), "x".to_string()),
             Tag::new("b".to_string(), "y".to_string()),
-        ])).unwrap();
+        ]));
+        let relation = binding.get(0).unwrap();
         assert_eq!(relation.id(), 1);
         assert_eq!(relation.version(), 0);
         assert_eq!(relation.timestamp(), 0);

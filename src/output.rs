@@ -34,20 +34,20 @@ impl OutputHandler {
 }
 
 impl Handler for OutputHandler {
-    fn handle_node(&mut self, node: Node) -> Option<Node> {
+    fn handle_node(&mut self, node: Node) -> Vec<Node> {
         self.writer.write_element(Element::Node { node }).expect("Failed to write node");
-        None
+        vec![]
     }
 
-    fn handle_way(&mut self, way: Way) -> Option<Way> {
+    fn handle_way(&mut self, way: Way) -> Vec<Way> {
         self.writer.write_element(Element::Way { way }).expect("Failed to write way");
-        None
+        vec![]
     }
 
 
-    fn handle_relation(&mut self, relation: Relation) -> Option<Relation> {
+    fn handle_relation(&mut self, relation: Relation) -> Vec<Relation> {
         self.writer.write_element(Element::Relation { relation }).expect("Failed to write relation");
-        None
+        vec![]
     }
 
     fn add_result(&mut self, result: HandlerResult) -> HandlerResult {

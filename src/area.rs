@@ -163,10 +163,10 @@ impl AreaHandler {
 }
 
 impl Handler for AreaHandler {
-    fn handle_node(&mut self, node: Node) -> Option<Node> {
+    fn handle_node(&mut self, node: Node) -> Vec<Node> {
         let mut result: Vec<String> = Vec::new();
         if node.coordinate().lat() >= 90.0 || node.coordinate().lat() <= -90.0 {
-            return None;
+            return vec![];
         }
         let grid_index = (node.coordinate().lat() as i32 + 90) * 360 + (node.coordinate().lon() as i32 + 180);
         let coord = Coord {x: node.coordinate().lon(), y: node.coordinate().lat()};
@@ -187,7 +187,7 @@ impl Handler for AreaHandler {
         }
         let mut node = node;
         node.tags_mut().push(Tag::new("country".to_string(), result.join(",")));
-        Some(node)
+        vec![node]
     }
 }
 
