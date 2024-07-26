@@ -19,7 +19,7 @@ pub struct HandlerResult {//todo add HashMap to add results with configurable ke
     pub node_ids: BitVec,
 }
 impl HandlerResult {
-    fn default() -> Self {
+    pub(crate) fn default() -> Self {
         Self::with_capacity(HIGHEST_NODE_ID as usize)
     }
     fn with_capacity(nbits: usize) -> Self {
@@ -129,8 +129,6 @@ pub(crate) enum CountType {
     ALL,
     ACCEPTED,
 }
-
-
 pub(crate) struct ElementCounter {
     pub nodes_count: i32,
     pub ways_count: i32,
