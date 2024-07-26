@@ -306,7 +306,7 @@ mod tests {
     use osm_io::osm::model::coordinate::Coordinate;
     use osm_io::osm::model::element::Element;
     use osm_io::osm::model::node::Node;
-    use osm_io::osm::model::relation::{Member, Relation};
+    use osm_io::osm::model::relation::{Member, MemberData, Relation};
     use osm_io::osm::model::tag::Tag;
     use osm_io::osm::model::way::Way;
     use simple_logger::SimpleLogger;
@@ -314,9 +314,25 @@ mod tests {
 
     fn existing_tag() -> String { "EXISTING_TAG".to_string() }
     fn missing_tag() -> String { "MISSING_TAG".to_string() }
-    fn simple_node_element(id: i64, tags: Vec<(&str,&str)>) -> Element {
+    pub enum MemberType {Node, Way, Relation}
+    fn simple_node_element(id: i64, tags: Vec<(&str, &str)>) -> Element {
         let tags_obj = tags.iter().map(|(k,v)| Tag::new(k.to_string(), v.to_string())).collect();
-        node_element( id, 1, Coordinate::new(1.0f64, 1.1f64), 1, 1, 1, "a".to_string(), true, tags_obj)
+        node_element(id, 1, Coordinate::new(1.0f64, 1.1f64), 1, 1, 1, "a".to_string(), true, tags_obj)
+    }
+    fn simple_way_element(id: i64, refs: Vec<i64>, tags: Vec<(&str, &str)>) -> Element {
+        let tags_obj = tags.iter().map(|(k,v)| Tag::new(k.to_string(), v.to_string())).collect();
+        way_element(id, 1, 1, 1, 1, "a_user".to_string(), true, refs, tags_obj)
+    }
+    fn simple_relation_element(id: i64, members: Vec<(MemberType, i64, &str)>, tags: Vec<(&str, &str)>) -> Element {
+        let members_obj = members.iter().map(|(t, id,role)| {
+            match t {
+                MemberType::Node => {Member::Node {member: MemberData::new(id.clone(), role.to_string())}}
+                MemberType::Way => {Member::Way {member: MemberData::new(id.clone(), role.to_string())}}
+                MemberType::Relation => {Member::Relation {member: MemberData::new(id.clone(), role.to_string())}}
+            }
+        }).collect();
+        let tags_obj = tags.iter().map(|(k,v)| Tag::new(k.to_string(), v.to_string())).collect();
+        relation_element(id, 1, 1, 1, 1, "a_user".to_string(), true, members_obj, tags_obj)
     }
     fn node_element(id: i64, version: i32, coordinate: Coordinate, timestamp: i64, changeset: i64, uid: i32, user: String, visible: bool, tags: Vec<Tag>) -> Element {
         Element::Node { node: Node::new(id, version, coordinate, timestamp, changeset, uid, user, visible, tags) }
@@ -477,7 +493,7 @@ mod tests {
             vec![element]
         }
         fn add_result(&mut self, mut result: HandlerResult) -> HandlerResult {
-            result.other.insert(format!("{}", self.result_key), self.received_ids.join(", "));
+            result.other.insert(format!("{}", self.name()), self.received_ids.join(", "));
             result
         }
     }
@@ -493,10 +509,10 @@ mod tests {
             .add_processor(ElementPrinter::with_prefix("ElementPrinter final: ".to_string()).with_node_ids(hashset! {8}))
             .add_processor(TestOnlyOrderRecorder::new("9_final"))
             ;
-        processor_chain.process(simple_node_element(1,vec![("who", "kasper")]));
-        processor_chain.process(simple_node_element(2,vec![("who", "seppl")]));
-        processor_chain.process(simple_node_element(6,vec![("who", "hotzenplotz")]));
-        processor_chain.process(simple_node_element(8,vec![("who", "großmutter")]));
+        processor_chain.process(simple_node_element(1, vec![("who", "kasper")]));
+        processor_chain.process(simple_node_element(2, vec![("who", "seppl")]));
+        processor_chain.process(simple_node_element(6, vec![("who", "hotzenplotz")]));
+        processor_chain.process(simple_node_element(8, vec![("who", "großmutter")]));
         processor_chain.flush(vec![]);
         let result = processor_chain.collect_result();
         dbg!(result);
@@ -507,27 +523,30 @@ mod tests {
         SimpleLogger::new().init();
         let mut processor_chain = ProcessorChain::default()
             .add_processor(ElementCounter::new("initial"))
-            .add_processor(TestOnlyOrderRecorder::new("1_initial"))
+            .add_processor(TestOnlyOrderRecorder::new("initial"))
             .add_processor(TestOnlyElementBufferingDuplicatingEditingProcessor::default())
             .add_processor(TestOnlyIdCollector::new(200))
             .add_processor(ElementPrinter::with_prefix("final".to_string()).with_node_ids((1..=200).collect()))
-            .add_processor(TestOnlyOrderRecorder::new("9_final"))
+            .add_processor(TestOnlyOrderRecorder::new("final"))
             .add_processor(ElementCounter::new("final"))
             ;
+
+        processor_chain.process(simple_way_element(23, vec![1,2,8,6], vec![("who", "kasper")]));
         processor_chain.process(simple_node_element(1, vec![("who", "kasper")]));
         processor_chain.process(simple_node_element(2, vec![("who", "seppl")]));
         processor_chain.process(simple_node_element(6, vec![("who", "hotzenplotz")]));
         processor_chain.process(simple_node_element(8, vec![("who", "großmutter")]));
+        processor_chain.process(simple_relation_element(66, vec![(MemberType::Way, 23, "kasper&seppl brign großmutter to hotzenplotz")], vec![("who", "großmutter")]));
         processor_chain.flush(vec![]);
         let result = processor_chain.collect_result();
         dbg!(&result);
         assert_eq!(&result.counts.get("nodes count final").unwrap().clone(), &8);
         assert_eq!(&result.counts.get("nodes count initial").unwrap().clone(), &4,);
-        assert_eq!(&result.counts.get("relations count final").unwrap().clone(), &0,);
-        assert_eq!(&result.counts.get("relations count initial").unwrap().clone(), &0,);
-        assert_eq!(&result.counts.get("ways count final").unwrap().clone(), &0,);
-        assert_eq!(&result.counts.get("ways count initial").unwrap().clone(), &0,);
-        assert_eq!(&result.other.get("1_initial").unwrap().clone(), "node#1, node#2, node#6, node#8");
-        assert_eq!(&result.other.get("9_final").unwrap().clone(), "node#1, node#101, node#2, node#102, node#6, node#106, node#8, node#108");
+        assert_eq!(&result.counts.get("relations count final").unwrap().clone(), &1,);
+        assert_eq!(&result.counts.get("relations count initial").unwrap().clone(), &1,);
+        assert_eq!(&result.counts.get("ways count final").unwrap().clone(), &1,);
+        assert_eq!(&result.counts.get("ways count initial").unwrap().clone(), &1,);
+        assert_eq!(&result.other.get("TestOnlyOrderRecorder initial").unwrap().clone(), "way#23, node#1, node#2, node#6, node#8, relation#66");
+        assert_eq!(&result.other.get("TestOnlyOrderRecorder final").unwrap().clone(), "node#1, node#101, node#2, node#102, node#6, node#106, node#8, node#108, way#23, relation#66");
     }
 }
