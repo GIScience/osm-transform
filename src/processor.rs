@@ -350,9 +350,25 @@ mod tests {
     pub(crate) struct ElementModifier; //TODO implement
     ///Return a copy of the element.
     pub(crate) struct ElementExchanger; //TODO implement
-    ///Remove an element / return empty vec.
-    pub(crate) struct ElementFilter; //TODO implement
 
+    ///Remove an element / return empty vec.
+    #[derive(Debug, Default)]
+    pub(crate) struct TestOnlyElementFilter;
+    impl Processor for TestOnlyElementFilter {
+        fn name(&self) -> String { "TestOnlyElementFilter".to_string() }
+        fn handle_element(&mut self, element: Element) -> Vec<Element> {
+            match element {
+                Element::Node { node } => {
+                    if node.id() % 2 == 0 {
+                        vec![]
+                    } else {
+                        vec![Element::Node {node}]
+                    }
+                }
+                _ => vec![element]
+            }
+        }
+    }
     ///Receive one element, return two of the same type.
     #[derive(Debug, Default)]
     pub(crate) struct TestOnlyElementAdder;
@@ -537,12 +553,15 @@ mod tests {
     #[test]
     /// Assert that it is possible to run a chain of processors.
     fn test_chain() {
-        let id_collector = TestOnlyIdCollector::new(10);
         let mut processor_chain = ProcessorChain::default()
-            .add_processor(TestOnlyOrderRecorder::new("1_initial"))
-            .add_processor(id_collector)
-            .add_processor(ElementPrinter::with_prefix("ElementPrinter final: ".to_string()).with_node_ids(hashset! {8}))
-            .add_processor(TestOnlyOrderRecorder::new("9_final"))
+            .add_processor(ElementCounter::new("initial"))
+            .add_processor(TestOnlyOrderRecorder::new("initial"))
+
+            .add_processor(TestOnlyIdCollector::new(10))
+
+            .add_processor(ElementPrinter::with_prefix("final: ".to_string()).with_node_ids(hashset! {8}))
+            .add_processor(TestOnlyOrderRecorder::new("final"))
+            .add_processor(ElementCounter::new("final"))
             ;
         processor_chain.process(simple_node_element(1, vec![("who", "kasper")]));
         processor_chain.process(simple_node_element(2, vec![("who", "seppl")]));
@@ -550,7 +569,20 @@ mod tests {
         processor_chain.process(simple_node_element(8, vec![("who", "großmutter")]));
         processor_chain.flush(vec![]);
         let result = processor_chain.collect_result();
-        dbg!(result);
+
+        assert_eq!(&result.counts.get("nodes count initial").unwrap().clone(), &4,);
+        assert_eq!(&result.counts.get("nodes count final").unwrap().clone(), &4);
+        assert_eq!(&result.counts.get("relations count initial").unwrap().clone(), &0,);
+        assert_eq!(&result.counts.get("relations count final").unwrap().clone(), &0,);
+        assert_eq!(&result.counts.get("ways count initial").unwrap().clone(), &0,);
+        assert_eq!(&result.counts.get("ways count final").unwrap().clone(), &0,);
+        assert_eq!(&result.other.get("TestOnlyOrderRecorder initial").unwrap().clone(), "node#1, node#2, node#6, node#8");
+        assert_eq!(&result.other.get("TestOnlyOrderRecorder final").unwrap().clone(), "node#1, node#2, node#6, node#8");
+        assert!(&result.node_ids.get(1).unwrap());
+        assert!(&result.node_ids.get(2).unwrap());
+        assert!(&result.node_ids.get(6).unwrap());
+        assert!(&result.node_ids.get(8).unwrap());
+        assert!( ! &result.node_ids.get(3).unwrap());
     }
 
     #[test]
@@ -566,8 +598,9 @@ mod tests {
         let mut processor_chain = ProcessorChain::default()
             .add_processor(ElementCounter::new("initial"))
             .add_processor(TestOnlyOrderRecorder::new("initial"))
+
             .add_processor(TestOnlyElementBufferingDuplicatingEditingProcessor::default())
-            .add_processor(TestOnlyIdCollector::new(200))
+
             .add_processor(ElementPrinter::with_prefix("final".to_string()).with_node_ids((1..=200).collect()))
             .add_processor(TestOnlyOrderRecorder::new("final"))
             .add_processor(ElementCounter::new("final"))
@@ -581,13 +614,13 @@ mod tests {
         processor_chain.process(simple_relation_element(66, vec![(MemberType::Way, 23, "kasper&seppl brign großmutter to hotzenplotz")], vec![("who", "großmutter")]));
         processor_chain.flush(vec![]);
         let result = processor_chain.collect_result();
-        dbg!(&result);
-        assert_eq!(&result.counts.get("nodes count final").unwrap().clone(), &8);
+
         assert_eq!(&result.counts.get("nodes count initial").unwrap().clone(), &4,);
-        assert_eq!(&result.counts.get("relations count final").unwrap().clone(), &1,);
+        assert_eq!(&result.counts.get("nodes count final").unwrap().clone(), &8);
         assert_eq!(&result.counts.get("relations count initial").unwrap().clone(), &1,);
-        assert_eq!(&result.counts.get("ways count final").unwrap().clone(), &1,);
+        assert_eq!(&result.counts.get("relations count final").unwrap().clone(), &1,);
         assert_eq!(&result.counts.get("ways count initial").unwrap().clone(), &1,);
+        assert_eq!(&result.counts.get("ways count final").unwrap().clone(), &1,);
         assert_eq!(&result.other.get("TestOnlyOrderRecorder initial").unwrap().clone(), "way#23, node#1, node#2, node#6, node#8, relation#66");
         assert_eq!(&result.other.get("TestOnlyOrderRecorder final").unwrap().clone(), "node#1, node#101, node#2, node#102, node#6, node#106, node#8, node#108, way#23, relation#66");
     }
@@ -601,8 +634,9 @@ mod tests {
         let mut processor_chain = ProcessorChain::default()
             .add_processor(ElementCounter::new("initial"))
             .add_processor(TestOnlyOrderRecorder::new("initial"))
+
             .add_processor(TestOnlyElementMixedAdder::default())
-            .add_processor(TestOnlyIdCollector::new(200))
+
             .add_processor(ElementPrinter::with_prefix("final".to_string()).with_node_ids((1..=200).collect()))
             .add_processor(TestOnlyOrderRecorder::new("final"))
             .add_processor(ElementCounter::new("final"))
@@ -611,15 +645,14 @@ mod tests {
         processor_chain.process(simple_way_element(22, vec![], vec![]));
         processor_chain.process(simple_way_element(23, vec![1, 2, 8, 6], vec![("way", "kasper-hotzenplotz")]));
         processor_chain.flush(vec![]);
-
         let result = processor_chain.collect_result();
-        dbg!(&result);
-        assert_eq!(&result.counts.get("nodes count final").unwrap().clone(), &4);
+
         assert_eq!(&result.counts.get("nodes count initial").unwrap().clone(), &0,);
-        assert_eq!(&result.counts.get("relations count final").unwrap().clone(), &0,);
+        assert_eq!(&result.counts.get("nodes count final").unwrap().clone(), &4);
         assert_eq!(&result.counts.get("relations count initial").unwrap().clone(), &0,);
-        assert_eq!(&result.counts.get("ways count final").unwrap().clone(), &2,);
+        assert_eq!(&result.counts.get("relations count final").unwrap().clone(), &0,);
         assert_eq!(&result.counts.get("ways count initial").unwrap().clone(), &2,);
+        assert_eq!(&result.counts.get("ways count final").unwrap().clone(), &2,);
         assert_eq!(&result.other.get("TestOnlyOrderRecorder initial").unwrap().clone(), "way#22, way#23");
         assert_eq!(&result.other.get("TestOnlyOrderRecorder final").unwrap().clone(), "way#22, node#1, node#2, node#8, node#6, way#23");
     }
@@ -633,8 +666,9 @@ mod tests {
         let mut processor_chain = ProcessorChain::default()
             .add_processor(ElementCounter::new("initial"))
             .add_processor(TestOnlyOrderRecorder::new("initial"))
+
             .add_processor(TestOnlyElementAdder::default())
-            .add_processor(TestOnlyIdCollector::new(200))
+
             .add_processor(ElementPrinter::with_prefix("final".to_string()).with_node_ids((1..=200).collect()))
             .add_processor(TestOnlyOrderRecorder::new("final"))
             .add_processor(ElementCounter::new("final"))
@@ -646,16 +680,47 @@ mod tests {
         processor_chain.process(simple_node_element(6, vec![("who", "hotzenplotz")]));
         processor_chain.process(simple_node_element(8, vec![("who", "großmutter")]));
         processor_chain.flush(vec![]);
-
         let result = processor_chain.collect_result();
-        dbg!(&result);
-        assert_eq!(&result.counts.get("nodes count final").unwrap().clone(), &8);
+
         assert_eq!(&result.counts.get("nodes count initial").unwrap().clone(), &4,);
-        assert_eq!(&result.counts.get("relations count final").unwrap().clone(), &0,);
+        assert_eq!(&result.counts.get("nodes count final").unwrap().clone(), &8);
         assert_eq!(&result.counts.get("relations count initial").unwrap().clone(), &0,);
-        assert_eq!(&result.counts.get("ways count final").unwrap().clone(), &1,);
+        assert_eq!(&result.counts.get("relations count final").unwrap().clone(), &0,);
         assert_eq!(&result.counts.get("ways count initial").unwrap().clone(), &1,);
+        assert_eq!(&result.counts.get("ways count final").unwrap().clone(), &1,);
         assert_eq!(&result.other.get("TestOnlyOrderRecorder initial").unwrap().clone(), "way#23, node#1, node#2, node#6, node#8");
         assert_eq!(&result.other.get("TestOnlyOrderRecorder final").unwrap().clone(), "way#23, node#101, node#1, node#102, node#2, node#106, node#6, node#108, node#8");
+    }
+    #[test]
+    /// Assert that it is possible to run the chain and let processors permanently filter (remove) elements.
+    /// The test uses TestOnlyElementFilter for this, which filters nodes with an even id.
+    fn test_chain_with_element_filter() {
+        SimpleLogger::new().init();
+        let mut processor_chain = ProcessorChain::default()
+            .add_processor(ElementCounter::new("initial"))
+            .add_processor(TestOnlyOrderRecorder::new("initial"))
+
+            .add_processor(TestOnlyElementFilter::default())
+
+            .add_processor(ElementPrinter::with_prefix("final".to_string()).with_node_ids((1..=200).collect()))
+            .add_processor(TestOnlyOrderRecorder::new("final"))
+            .add_processor(ElementCounter::new("final"))
+            ;
+
+        processor_chain.process(simple_node_element(1, vec![("who", "kasper")]));
+        processor_chain.process(simple_node_element(2, vec![("who", "seppl")]));
+        processor_chain.process(simple_node_element(6, vec![("who", "hotzenplotz")]));
+        processor_chain.process(simple_node_element(8, vec![("who", "großmutter")]));
+        processor_chain.flush(vec![]);
+        let result = processor_chain.collect_result();
+
+        assert_eq!(&result.counts.get("nodes count initial").unwrap().clone(), &4,);
+        assert_eq!(&result.counts.get("nodes count final").unwrap().clone(), &1);
+        assert_eq!(&result.counts.get("relations count initial").unwrap().clone(), &0,);
+        assert_eq!(&result.counts.get("relations count final").unwrap().clone(), &0,);
+        assert_eq!(&result.counts.get("ways count initial").unwrap().clone(), &0,);
+        assert_eq!(&result.counts.get("ways count final").unwrap().clone(), &0,);
+        assert_eq!(&result.other.get("TestOnlyOrderRecorder initial").unwrap().clone(), "node#1, node#2, node#6, node#8");
+        assert_eq!(&result.other.get("TestOnlyOrderRecorder final").unwrap().clone(), "node#1");
     }
 }
