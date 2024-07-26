@@ -330,11 +330,17 @@ mod tests {
     fn copy_node_with_new_id(node: &Node, new_id: i64) -> Node {
         Node::new(new_id, node.version(), node.coordinate().clone(), node.timestamp(), node.changeset(), node.uid(), node.user().clone(), node.visible(), node.tags().clone())
     }
-    pub(crate) struct ElementModifier;  //modify element and return same instance
-    pub(crate) struct ElementExchanger; //return a copy of the element
-    pub(crate) struct ElementFilter;    //remove an element / return empty vec
-    pub(crate) struct ElementAdder;     //receive one element, return two
-    pub(crate) struct ElementMixedAdder; //receive one way, return a way and two nodes
+
+    ///Modify element and return same instance.
+    pub(crate) struct ElementModifier;//TODO implement
+    ///Return a copy of the element.
+    pub(crate) struct ElementExchanger;//TODO implement
+    ///Remove an element / return empty vec.
+    pub(crate) struct ElementFilter;//TODO implement
+    ///Receive one element, return two.
+    pub(crate) struct ElementAdder;//TODO implement
+    ///Receive one way, return a way and two nodes.
+    pub(crate) struct ElementMixedAdder;//TODO implement
 
 
     #[derive(Default, Debug)]
