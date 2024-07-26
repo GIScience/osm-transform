@@ -352,8 +352,25 @@ mod tests {
     pub(crate) struct ElementExchanger; //TODO implement
     ///Remove an element / return empty vec.
     pub(crate) struct ElementFilter; //TODO implement
-    ///Receive one element, return two.
-    pub(crate) struct ElementAdder; //TODO implement
+
+    ///Receive one element, return two of the same type.
+    #[derive(Debug, Default)]
+    pub(crate) struct TestOnlyElementAdder;
+    impl Processor for TestOnlyElementAdder {
+        fn name(&self) -> String { "TestOnlyElementAdder".to_string() }
+        fn handle_element(&mut self, element: Element) -> Vec<Element> {
+            match element {
+                Element::Node { node } => {
+                    let mut elements = vec![
+                        Element::Node { node: copy_node_with_new_id(&node, node.id().clone().add(100))}
+                    ];
+                    elements.push(Element::Node{ node});
+                    elements
+                }
+                _ => vec![element]
+            }
+        }
+    }
 
     ///Receive one way, return a way and a new node for each ref of the way.
     #[derive(Debug, Default)]
@@ -518,6 +535,7 @@ mod tests {
 
 
     #[test]
+    /// Assert that it is possible to run a chain of processors.
     fn test_chain() {
         let id_collector = TestOnlyIdCollector::new(10);
         let mut processor_chain = ProcessorChain::default()
@@ -536,6 +554,13 @@ mod tests {
     }
 
     #[test]
+    /// Assert that it is possible to run the chain and let processors buffer elements:
+    /// E.g. keeping received elements and postpone their handling until a specifig number of
+    /// elements are collected. Then process the buffered elements in a batch and pass them
+    /// to downstream processors.
+    /// Assert that after the last element was pusehd into the pipeline, the elements that are
+    /// still buffered will be flushed: handled and passed to downstream processors.
+    /// The test uses TestOnlyElementBufferingDuplicatingEditingProcessor for this.
     fn test_chain_with_buffer() {
         SimpleLogger::new().init();
         let mut processor_chain = ProcessorChain::default()
@@ -567,6 +592,10 @@ mod tests {
         assert_eq!(&result.other.get("TestOnlyOrderRecorder final").unwrap().clone(), "node#1, node#101, node#2, node#102, node#6, node#106, node#8, node#108, way#23, relation#66");
     }
     #[test]
+    /// Assert that it is possible to run the chain and let processors receive one element
+    /// and add additional elements of a different type to the processing chain
+    /// that are processed by downstream processors.
+    /// The test uses TestOnlyElementMixedAdder for this.
     fn test_chain_with_mixed_element_adder() {
         SimpleLogger::new().init();
         let mut processor_chain = ProcessorChain::default()
@@ -579,6 +608,7 @@ mod tests {
             .add_processor(ElementCounter::new("final"))
             ;
 
+        processor_chain.process(simple_way_element(22, vec![], vec![]));
         processor_chain.process(simple_way_element(23, vec![1, 2, 8, 6], vec![("way", "kasper-hotzenplotz")]));
         processor_chain.flush(vec![]);
 
@@ -588,9 +618,44 @@ mod tests {
         assert_eq!(&result.counts.get("nodes count initial").unwrap().clone(), &0,);
         assert_eq!(&result.counts.get("relations count final").unwrap().clone(), &0,);
         assert_eq!(&result.counts.get("relations count initial").unwrap().clone(), &0,);
+        assert_eq!(&result.counts.get("ways count final").unwrap().clone(), &2,);
+        assert_eq!(&result.counts.get("ways count initial").unwrap().clone(), &2,);
+        assert_eq!(&result.other.get("TestOnlyOrderRecorder initial").unwrap().clone(), "way#22, way#23");
+        assert_eq!(&result.other.get("TestOnlyOrderRecorder final").unwrap().clone(), "way#22, node#1, node#2, node#8, node#6, way#23");
+    }
+    #[test]
+    /// Assert that it is possible to run the chain and let processors receive one element
+    /// and add additional elements of the same type to the processing chain
+    /// that are processed by downstream processors.
+    /// The test uses TestOnlyElementAdder for this.
+    fn test_chain_with_element_adder() {
+        SimpleLogger::new().init();
+        let mut processor_chain = ProcessorChain::default()
+            .add_processor(ElementCounter::new("initial"))
+            .add_processor(TestOnlyOrderRecorder::new("initial"))
+            .add_processor(TestOnlyElementAdder::default())
+            .add_processor(TestOnlyIdCollector::new(200))
+            .add_processor(ElementPrinter::with_prefix("final".to_string()).with_node_ids((1..=200).collect()))
+            .add_processor(TestOnlyOrderRecorder::new("final"))
+            .add_processor(ElementCounter::new("final"))
+            ;
+
+        processor_chain.process(simple_way_element(23, vec![1, 2, 8, 6], vec![("who", "kasper")]));
+        processor_chain.process(simple_node_element(1, vec![("who", "kasper")]));
+        processor_chain.process(simple_node_element(2, vec![("who", "seppl")]));
+        processor_chain.process(simple_node_element(6, vec![("who", "hotzenplotz")]));
+        processor_chain.process(simple_node_element(8, vec![("who", "großmutter")]));
+        processor_chain.flush(vec![]);
+
+        let result = processor_chain.collect_result();
+        dbg!(&result);
+        assert_eq!(&result.counts.get("nodes count final").unwrap().clone(), &8);
+        assert_eq!(&result.counts.get("nodes count initial").unwrap().clone(), &4,);
+        assert_eq!(&result.counts.get("relations count final").unwrap().clone(), &0,);
+        assert_eq!(&result.counts.get("relations count initial").unwrap().clone(), &0,);
         assert_eq!(&result.counts.get("ways count final").unwrap().clone(), &1,);
         assert_eq!(&result.counts.get("ways count initial").unwrap().clone(), &1,);
-        assert_eq!(&result.other.get("TestOnlyOrderRecorder initial").unwrap().clone(), "way#23");
-        assert_eq!(&result.other.get("TestOnlyOrderRecorder final").unwrap().clone(), "node#1, node#2, node#8, node#6, way#23");
+        assert_eq!(&result.other.get("TestOnlyOrderRecorder initial").unwrap().clone(), "way#23, node#1, node#2, node#6, node#8");
+        assert_eq!(&result.other.get("TestOnlyOrderRecorder final").unwrap().clone(), "way#23, node#101, node#1, node#102, node#2, node#106, node#6, node#108, node#8");
     }
 }
