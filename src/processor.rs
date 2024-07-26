@@ -346,10 +346,32 @@ mod tests {
     fn copy_node_with_new_id(node: &Node, new_id: i64) -> Node {
         Node::new(new_id, node.version(), node.coordinate().clone(), node.timestamp(), node.changeset(), node.uid(), node.user().clone(), node.visible(), node.tags().clone())
     }
+    fn into_node_element(node: Node) -> Element {
+        Element::Node {node}
+    }
     ///Modify element and return same instance.
-    pub(crate) struct ElementModifier; //TODO implement
-    ///Return a copy of the element.
-    pub(crate) struct ElementExchanger; //TODO implement
+    pub(crate) struct ElementModifier;
+
+    ///Return a copy of the element, e.g. a different instance.
+    #[derive(Debug, Default)]
+    pub(crate) struct TestOnlyElementReplacer;
+    impl Processor for TestOnlyElementReplacer {
+        fn name(&self) -> String { "TestOnlyElementReplacer".to_string() }
+        fn handle_element(&mut self, element: Element) -> Vec<Element> {
+            match element {
+                Element::Node { node} => {
+                    if node.id() == 6 {
+                        vec![
+                            simple_node_element(66, vec![("who", "dimpfelmoser")])
+                        ]
+                    } else {
+                        vec![into_node_element(node)]
+                    }
+                }
+                _ => vec![element]
+            }
+        }
+    }
 
     ///Remove an element / return empty vec.
     #[derive(Debug, Default)]
@@ -369,6 +391,7 @@ mod tests {
             }
         }
     }
+
     ///Receive one element, return two of the same type.
     #[derive(Debug, Default)]
     pub(crate) struct TestOnlyElementAdder;
@@ -406,7 +429,6 @@ mod tests {
             }
         }
     }
-
 
     #[derive(Default, Debug)]
     pub(crate) struct TestOnlyElementBufferingDuplicatingEditingProcessor { //store received elements, when receiving the 5th, emit all 5 and start buffering again. flush: emit currently buffered. handling the elements (changing) happens before emitting
@@ -624,6 +646,7 @@ mod tests {
         assert_eq!(&result.other.get("TestOnlyOrderRecorder initial").unwrap().clone(), "way#23, node#1, node#2, node#6, node#8, relation#66");
         assert_eq!(&result.other.get("TestOnlyOrderRecorder final").unwrap().clone(), "node#1, node#101, node#2, node#102, node#6, node#106, node#8, node#108, way#23, relation#66");
     }
+
     #[test]
     /// Assert that it is possible to run the chain and let processors receive one element
     /// and add additional elements of a different type to the processing chain
@@ -656,6 +679,7 @@ mod tests {
         assert_eq!(&result.other.get("TestOnlyOrderRecorder initial").unwrap().clone(), "way#22, way#23");
         assert_eq!(&result.other.get("TestOnlyOrderRecorder final").unwrap().clone(), "way#22, node#1, node#2, node#8, node#6, way#23");
     }
+
     #[test]
     /// Assert that it is possible to run the chain and let processors receive one element
     /// and add additional elements of the same type to the processing chain
@@ -691,6 +715,7 @@ mod tests {
         assert_eq!(&result.other.get("TestOnlyOrderRecorder initial").unwrap().clone(), "way#23, node#1, node#2, node#6, node#8");
         assert_eq!(&result.other.get("TestOnlyOrderRecorder final").unwrap().clone(), "way#23, node#101, node#1, node#102, node#2, node#106, node#6, node#108, node#8");
     }
+
     #[test]
     /// Assert that it is possible to run the chain and let processors permanently filter (remove) elements.
     /// The test uses TestOnlyElementFilter for this, which filters nodes with an even id.
@@ -722,5 +747,39 @@ mod tests {
         assert_eq!(&result.counts.get("ways count final").unwrap().clone(), &0,);
         assert_eq!(&result.other.get("TestOnlyOrderRecorder initial").unwrap().clone(), "node#1, node#2, node#6, node#8");
         assert_eq!(&result.other.get("TestOnlyOrderRecorder final").unwrap().clone(), "node#1");
+    }
+
+    #[test]
+    /// Assert that it is possible to run the chain and let processors return new instances,
+    /// e.g. copies of received elements.
+    /// The test uses TestOnlyElementReplacer for this, which replaces node#6 with a new instance.
+    fn test_chain_with_element_exchanger() {
+        SimpleLogger::new().init();
+        let mut processor_chain = ProcessorChain::default()
+            .add_processor(ElementCounter::new("initial"))
+            .add_processor(TestOnlyOrderRecorder::new("initial"))
+
+            .add_processor(TestOnlyElementReplacer::default())
+
+            .add_processor(ElementPrinter::with_prefix("final".to_string()).with_node_ids((1..=200).collect()))
+            .add_processor(TestOnlyOrderRecorder::new("final"))
+            .add_processor(ElementCounter::new("final"))
+            ;
+
+        processor_chain.process(simple_node_element(1, vec![("who", "kasper")]));
+        processor_chain.process(simple_node_element(2, vec![("who", "seppl")]));
+        processor_chain.process(simple_node_element(6, vec![("who", "hotzenplotz")]));
+        processor_chain.process(simple_node_element(8, vec![("who", "großmutter")]));
+        processor_chain.flush(vec![]);
+        let result = processor_chain.collect_result();
+
+        assert_eq!(&result.counts.get("nodes count initial").unwrap().clone(), &4,);
+        assert_eq!(&result.counts.get("nodes count final").unwrap().clone(), &4);
+        assert_eq!(&result.counts.get("relations count initial").unwrap().clone(), &0,);
+        assert_eq!(&result.counts.get("relations count final").unwrap().clone(), &0,);
+        assert_eq!(&result.counts.get("ways count initial").unwrap().clone(), &0,);
+        assert_eq!(&result.counts.get("ways count final").unwrap().clone(), &0,);
+        assert_eq!(&result.other.get("TestOnlyOrderRecorder initial").unwrap().clone(), "node#1, node#2, node#6, node#8");
+        assert_eq!(&result.other.get("TestOnlyOrderRecorder final").unwrap().clone(), "node#1, node#2, node#66, node#8");
     }
 }
