@@ -4,9 +4,10 @@ use bit_vec::BitVec;
 use osm_io::osm::model::element::Element;
 use osm_io::osm::model::node::Node;
 use osm_io::osm::model::relation::Relation;
+use osm_io::osm::model::tag::Tag;
 use osm_io::osm::model::way::Way;
 
-use crate::handler::OsmElementTypeSelection;
+use crate::handler::{FilterType, OsmElementTypeSelection};
 
 const HIGHEST_NODE_ID: i64 = 50_000_000_000; //todo make configurable
 
@@ -18,6 +19,10 @@ pub fn format_element_id(element: &Element) -> String {
         Element::Sentinel => {"sentinel#!".to_string()}
     }
 }
+pub fn into_node_element(node: Node) -> Element { Element::Node {node} }
+pub fn into_way_element(way: Way) -> Element { Element::Way { way } }
+pub fn into_relation_element(relation: Relation) -> Element { Element::Relation { relation } }
+
 pub trait Processor {
 
     fn name(&self) -> String;
@@ -57,7 +62,7 @@ impl HandlerResult {
             node_ids: BitVec::from_elem(nbits, false),
         }
     }
-    pub fn to_string(&mut self) -> String {
+    pub fn to_string(&self) -> String {
         format!("HandlerResult:\n  {:?}\n  {:?}", &self.counts, &self.other)
     }
 }
@@ -298,6 +303,76 @@ impl Processor for ElementPrinter {
 }
 
 
+
+
+struct TagKeyBasedOsmElementsFilter {
+    pub handle_types: OsmElementTypeSelection,
+    pub tag_keys: Vec<String>,
+    pub filter_type: FilterType,
+}
+impl TagKeyBasedOsmElementsFilter {
+    fn new(handle_types: OsmElementTypeSelection, tag_keys: Vec<String>, filter_type: FilterType) -> Self {
+        Self {
+            handle_types,
+            tag_keys,
+            filter_type,
+        }
+    }
+    fn accept_by_tags(&mut self, tags: &Vec<Tag>) -> bool {
+        let contains_any_key = tags.iter().any(|tag| self.tag_keys.contains(tag.k()));
+        match self.filter_type {
+            FilterType::AcceptMatching => {
+                return contains_any_key
+            }
+            FilterType::RemoveMatching => {
+                return !contains_any_key
+            }
+        }
+    }
+}
+impl Processor for TagKeyBasedOsmElementsFilter {
+    fn name(&self) -> String { "TagKeyBasedOsmElementsFilter".to_string() }
+    fn handle_element(&mut self, element: Element) -> Vec<Element> {
+        match element {
+            Element::Node { node } => self.handle_node(node),
+            Element::Way { way } => self.handle_way(way),
+            Element::Relation { relation } => self.handle_relation(relation),
+            Element::Sentinel => vec![]
+        }
+    }
+}
+impl TagKeyBasedOsmElementsFilter {
+    fn handle_node(&mut self, node: Node) -> Vec<Element> {
+        if ! self.handle_types.node {
+            return vec![into_node_element(node)]
+        }
+        match self.accept_by_tags(&node.tags()) {
+            true => {vec![into_node_element(node)]}
+            false => {vec![]}
+        }
+    }
+    fn handle_way(&mut self, way: Way) -> Vec<Element> {
+        if !self.handle_types.way  {
+            return vec![into_way_element(way)]
+        }
+        match self.accept_by_tags(&way.tags()) {
+            true => {vec![into_way_element(way)]}
+            false => {vec![]}
+        }
+    }
+    fn handle_relation(&mut self, relation: Relation) -> Vec<Element> {
+        if !self.handle_types.relation  {
+            return vec![into_relation_element(relation)]
+        }
+        match self.accept_by_tags(&relation.tags()) {
+            true => {vec![into_relation_element(relation)]}
+            false => {vec![]}
+        }
+    }
+}
+
+
+
 #[cfg(test)]
 mod tests {
     use std::ops::Add;
@@ -310,7 +385,8 @@ mod tests {
     use osm_io::osm::model::tag::Tag;
     use osm_io::osm::model::way::Way;
     use simple_logger::SimpleLogger;
-    use crate::processor::{ElementCounter, ElementPrinter, format_element_id, HandlerResult, Processor, ProcessorChain};
+    use crate::handler::{FilterType, OsmElementTypeSelection};
+    use crate::processor::{ElementCounter, ElementPrinter, format_element_id, HandlerResult, into_node_element, Processor, ProcessorChain, TagKeyBasedOsmElementsFilter};
 
     fn existing_tag() -> String { "EXISTING_TAG".to_string() }
     fn missing_tag() -> String { "MISSING_TAG".to_string() }
@@ -346,11 +422,30 @@ mod tests {
     fn copy_node_with_new_id(node: &Node, new_id: i64) -> Node {
         Node::new(new_id, node.version(), node.coordinate().clone(), node.timestamp(), node.changeset(), node.uid(), node.user().clone(), node.visible(), node.tags().clone())
     }
-    fn into_node_element(node: Node) -> Element {
-        Element::Node {node}
-    }
+
     ///Modify element and return same instance.
-    pub(crate) struct ElementModifier;
+    #[derive(Debug, Default)]
+    pub(crate) struct TestOnlyElementModifier;
+    impl Processor for TestOnlyElementModifier {
+        fn name(&self) -> String { "TestOnlyElementModifier".to_string() }
+        fn handle_element(&mut self, element: Element) -> Vec<Element> {
+            match element {
+                Element::Node { mut node} => {
+                    let id = node.id().clone();
+                    let tags = node.tags_mut();
+                    if id % 2 == 0 {
+                        tags.push(Tag::new("added".to_string(), "yes".to_string()));
+                    }
+                    if let Some(tag_to_modify_pos) = tags.iter().position(|tag| tag.k() == "who"){
+                        let tag_to_modify = tags.remove(tag_to_modify_pos);
+                        tags.push(Tag::new(tag_to_modify.k().clone(), tag_to_modify.v().to_string().to_uppercase()));
+                    }
+                    vec![into_node_element(node)]
+                }
+                _ => vec![element]
+            }
+        }
+    }
 
     ///Return a copy of the element, e.g. a different instance.
     #[derive(Debug, Default)]
@@ -753,7 +848,7 @@ mod tests {
     /// Assert that it is possible to run the chain and let processors return new instances,
     /// e.g. copies of received elements.
     /// The test uses TestOnlyElementReplacer for this, which replaces node#6 with a new instance.
-    fn test_chain_with_element_exchanger() {
+    fn test_chain_with_element_replacer() {
         SimpleLogger::new().init();
         let mut processor_chain = ProcessorChain::default()
             .add_processor(ElementCounter::new("initial"))
@@ -781,5 +876,45 @@ mod tests {
         assert_eq!(&result.counts.get("ways count final").unwrap().clone(), &0,);
         assert_eq!(&result.other.get("TestOnlyOrderRecorder initial").unwrap().clone(), "node#1, node#2, node#6, node#8");
         assert_eq!(&result.other.get("TestOnlyOrderRecorder final").unwrap().clone(), "node#1, node#2, node#66, node#8");
+    }
+
+    #[test]
+    /// Assert that it is possible to run the chain and let processors modify received instances,
+    /// e.g. without cloning.
+    /// The test uses
+    /// - TestOnlyElementModifier, which adds a tag "added"="yes" to nodes with even id and
+    /// - TagKeyBasedOsmElementsFilter, which only accepts elements with this tag.
+    /// The TestOnlyElementModifier also changes values of tags "who" to upper case,
+    /// which is not explicitly asserted.
+    fn test_chain_with_element_modifier() {
+        SimpleLogger::new().init();
+        let mut processor_chain = ProcessorChain::default()
+            .add_processor(ElementCounter::new("initial"))
+            .add_processor(TestOnlyOrderRecorder::new("initial"))
+
+            .add_processor(TestOnlyElementModifier::default())
+            .add_processor(TagKeyBasedOsmElementsFilter::new(OsmElementTypeSelection::node_only(), vec!["added".to_string()], FilterType::AcceptMatching))
+
+            .add_processor(ElementPrinter::with_prefix("final".to_string()).with_node_ids((1..=200).collect()))
+            .add_processor(TestOnlyOrderRecorder::new("final"))
+            .add_processor(ElementCounter::new("final"))
+            ;
+
+        processor_chain.process(simple_node_element(1, vec![("who", "kasper")]));
+        processor_chain.process(simple_node_element(2, vec![("who", "seppl")]));
+        processor_chain.process(simple_node_element(6, vec![("who", "hotzenplotz")]));
+        processor_chain.process(simple_node_element(8, vec![("who", "großmutter")]));
+        processor_chain.flush(vec![]);
+        let result = processor_chain.collect_result();
+
+        assert_eq!(&result.counts.get("nodes count initial").unwrap().clone(), &4,);
+        //kasper with odd id was not modified and later filtered:
+        assert_eq!(&result.counts.get("nodes count final").unwrap().clone(), &3);
+        assert_eq!(&result.counts.get("relations count initial").unwrap().clone(), &0,);
+        assert_eq!(&result.counts.get("relations count final").unwrap().clone(), &0,);
+        assert_eq!(&result.counts.get("ways count initial").unwrap().clone(), &0,);
+        assert_eq!(&result.counts.get("ways count final").unwrap().clone(), &0,);
+        assert_eq!(&result.other.get("TestOnlyOrderRecorder initial").unwrap().clone(), "node#1, node#2, node#6, node#8");
+        assert_eq!(&result.other.get("TestOnlyOrderRecorder final").unwrap().clone(), "node#2, node#6, node#8");
     }
 }
