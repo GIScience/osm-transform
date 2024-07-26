@@ -10,13 +10,28 @@ use crate::handler::OsmElementTypeSelection;
 
 const HIGHEST_NODE_ID: i64 = 50_000_000_000; //todo make configurable
 
+pub fn format_element_id(element: &Element) -> String {
+    match &element {
+        Element::Node { node } => { format!("node#{}", node.id().to_string()) }
+        Element::Way { way } => { format!("way#{}", way.id().to_string()) }
+        Element::Relation { relation } => { format!("relation#{}", relation.id().to_string()) }
+        Element::Sentinel => {"sentinel#!".to_string()}
+    }
+}
 pub trait Processor {
-    fn handle(&mut self, element: Element) -> Vec<Element> {
+
+    fn name(&self) -> String;
+
+    fn handle_element(&mut self, element: Element) -> Vec<Element> {
         vec![element]
     }
 
-    fn flush(&mut self, elements: Vec<Element>) -> Vec<Element> {
-        elements
+    fn handle_and_flush_elements(&mut self, elements: Vec<Element>) -> Vec<Element> {
+        let mut handeled = vec![];
+        for element in elements {
+            handeled.append(&mut self.handle_element(element));
+        }
+        handeled
     }
 
     fn add_result(&mut self, result: HandlerResult) -> HandlerResult {
@@ -58,19 +73,39 @@ impl ProcessorChain {
         self
     }
     pub(crate) fn process(&mut self, element: Element) {
+        log::trace!("######");
+        log::trace!("###### Processing {}", format_element_id(&element));
+        log::trace!("######");
         let mut elements = vec![element];
+        let mut indent = "".to_string();
         for processor in &mut self.processors {
-            let mut new_collected = vec![];
-            for node in elements {
-                new_collected.append(&mut processor.handle(node));
+            if (elements.len() == 0) {
+                log::trace!("{indent}Skipping processor chain, elements were filtered or buffered?");
+                break
             }
+            let mut new_collected = vec![];
+            for inner_element in elements {
+                log::trace!("{indent}Passing {} to processor {}", format_element_id(&inner_element), processor.name());
+                let handled_elements = &mut processor.handle_element(inner_element);
+                log::trace!("{indent}{} returned {} elements", processor.name(), handled_elements.len());
+                new_collected.append(handled_elements);
+            }
+            log::trace!("{indent}{} returned {} elements in total", processor.name(), new_collected.len());
             elements = new_collected;
+            indent += "    ";
         }
     }
 
     pub(crate) fn flush(&mut self, mut elements: Vec<Element>) {
         for processor in &mut self.processors {
-            let new_collected = processor.flush(elements.clone());
+            log::trace!("######");
+            log::trace!("###### Flushing {} with {} elements flushed by upstream processors", processor.name(), elements.len());
+            log::trace!("######");
+            //todo find solution without clone. but flushing is done only once, so it's not THAT important
+            let new_collected = processor.handle_and_flush_elements(elements.clone());
+            if new_collected.len() > 0 {
+                log::trace!("  {} returned {} flushed elements", processor.name(), new_collected.len())
+            }
             elements = new_collected;
         }
     }
@@ -108,7 +143,8 @@ impl ElementCounter {
     }
 }
 impl Processor for ElementCounter {
-    fn handle(&mut self, element: Element) -> Vec<Element> {
+    fn name(&self) -> String { format!("ElementCounter {}", self.result_key) }
+    fn handle_element(&mut self, element: Element) -> Vec<Element> {
         match element {
             Element::Node { .. } => { self.nodes_count += 1; }
             Element::Way { .. } => { self.ways_count += 1; }
@@ -190,7 +226,7 @@ impl ElementPrinter {
 
     fn handle_node(&mut self, node: &Node) {
         if self.handle_types.node && self.node_ids.contains(&node.id()) {
-            println!("{}node {} visible: {}", &self.prefix, &node.id(), &node.visible());
+            println!("{}: node {} visible: {}", &self.prefix, &node.id(), &node.visible());
             println!("  version:    {}", &node.version());
             println!("  coordinate: lat,lon = {},{}", &node.coordinate().lat(), &node.coordinate().lon());
             println!("  changeset:  {}", &node.changeset());
@@ -205,7 +241,7 @@ impl ElementPrinter {
     }
     fn handle_way(&mut self, way: &Way) {
         if self.handle_types.way && self.way_ids.contains(&way.id()) {
-            println!("{}way {} visible: {}", &self.prefix, &way.id(), &way.visible());
+            println!("{}: way {} visible: {}", &self.prefix, &way.id(), &way.visible());
             println!("  version:   {}", &way.version());
             println!("  changeset: {}", &way.changeset());
             println!("  timestamp: {}", &way.timestamp());
@@ -223,7 +259,7 @@ impl ElementPrinter {
     }
     fn handle_relation(&mut self, relation: &Relation) {
         if self.handle_types.relation && self.relation_ids.contains(&relation.id()) {
-            println!("{}relation {} visible: {}", &self.prefix, &relation.id(), &relation.visible());
+            println!("{}: relation {} visible: {}", &self.prefix, &relation.id(), &relation.visible());
             println!("  version:   {}", &relation.version());
             println!("  changeset: {}", &relation.changeset());
             println!("  timestamp: {}", &relation.timestamp());
@@ -241,7 +277,8 @@ impl ElementPrinter {
     }
 }
 impl Processor for ElementPrinter {
-    fn handle(&mut self, element: Element) -> Vec<Element> {
+    fn name(&self) -> String { format!("ElementPrinter {}", self.prefix) }
+    fn handle_element(&mut self, element: Element) -> Vec<Element> {
         match element {
             Element::Node { node } => {
                 self.handle_node(&node);
@@ -263,15 +300,17 @@ impl Processor for ElementPrinter {
 
 #[cfg(test)]
 mod tests {
+    use std::ops::Add;
     use bit_vec::BitVec;
+    use log4rs::append::Append;
     use osm_io::osm::model::coordinate::Coordinate;
     use osm_io::osm::model::element::Element;
     use osm_io::osm::model::node::Node;
     use osm_io::osm::model::relation::Relation;
     use osm_io::osm::model::tag::Tag;
     use osm_io::osm::model::way::Way;
-
-    use crate::processor::{ElementCounter, ElementPrinter, HandlerResult, Processor, ProcessorChain};
+    use simple_logger::SimpleLogger;
+    use crate::processor::{ElementCounter, ElementPrinter, format_element_id, HandlerResult, Processor, ProcessorChain};
 
     fn existing_tag() -> String { "EXISTING_TAG".to_string() }
     fn missing_tag() -> String { "MISSING_TAG".to_string() }
@@ -288,7 +327,9 @@ mod tests {
     ) -> Element {
         Element::Node { node: Node::new(id, version, coordinate, timestamp, changeset, uid, user, visible, tags) }
     }
-
+    fn copy_node_with_new_id(node: &Node, new_id: i64) -> Node {
+        Node::new(new_id, node.version(), node.coordinate().clone(), node.timestamp(), node.changeset(), node.uid(), node.user().clone(), node.visible(), node.tags().clone())
+    }
     pub(crate) struct ElementModifier;  //modify element and return same instance
     pub(crate) struct ElementExchanger; //return a copy of the element
     pub(crate) struct ElementFilter;    //remove an element / return empty vec
@@ -297,60 +338,73 @@ mod tests {
 
 
     #[derive(Default, Debug)]
-    pub(crate) struct TestOnlyElementBuffer { //store received elements, when receiving the 5th, emit all 5 and start buffering again. flush: emit currently buffered. handling the elements (changing) happens before emitting
+    pub(crate) struct TestOnlyElementBufferingDuplicatingEditingProcessor { //store received elements, when receiving the 5th, emit all 5 and start buffering again. flush: emit currently buffered. handling the elements (changing) happens before emitting
         nodes: Vec<Node>,
         ways: Vec<Way>,
         relations: Vec<Relation>,
     }
-    impl TestOnlyElementBuffer {
-        fn flush_nodes(&mut self) -> Vec<Element> {
-            let result = self.nodes.iter().map(|node| Element::Node {node: node.clone()}).collect();
+    impl TestOnlyElementBufferingDuplicatingEditingProcessor {
+        fn handle_and_flush_nodes(&mut self) -> Vec<Element> {
+            let mut handled_nodes = vec![];
+            for node in &self.nodes {
+                handled_nodes.extend(self.handle_node(node.clone()));
+            }
+            let mut flush_nodes = vec![];
+            for node in handled_nodes {
+                flush_nodes.push(Element::Node {node})
+            }
             self.nodes.clear();
-            result
+            flush_nodes
         }
-        fn flush_ways(&mut self) -> Vec<Element> {
+        fn handle_and_flush_ways(&mut self) -> Vec<Element> {
+            //TODO add the tricky part to also change, duplicate, etc. the buffered elements (at this point, elevation processor would do its job
             let result = self.ways.iter().map(|way| Element::Way {way: way.clone()}).collect();
             self.ways.clear();
             result
         }
-        fn flush_relations(&mut self) -> Vec<Element> {
+        fn handle_and_flush_relations(&mut self) -> Vec<Element> {
+            //TODO add the tricky part to also change, duplicate, etc. the buffered elements (at this point, elevation processor would do its job
             let result = self.relations.iter().map(|relation| Element::Relation {relation: relation.clone()}).collect();
             self.relations.clear();
             result
         }
-        fn handle_node(&mut self, node: Node) -> Node {
+        fn handle_node(&self, node: Node) -> Vec<Node> {
             //todo pass to configured fn/closure or something
-            node
+            let mut node_clone = copy_node_with_new_id(&node, node.id().clone().add(100));
+            node_clone.tags_mut().push(Tag::new("elevation".to_string(), "default-elevation".to_string()));
+            vec![node, node_clone]//todo remove the clone, thats just an experiment
         }
     }
-    impl Processor for TestOnlyElementBuffer {
-        fn handle(&mut self, element: Element) -> Vec<Element> {
+    impl Processor for TestOnlyElementBufferingDuplicatingEditingProcessor {
+        // fn struct_name() -> &'static str { "TestOnlyElementBuffer" }
+        fn name(&self) -> String { "TestOnlyElementBuffer".to_string() }
+        fn handle_element(&mut self, element: Element) -> Vec<Element> {
             match element {
                 Element::Node { node } => {
                     self.nodes.push(node);
                     if self.nodes.len() >= 3 {
-                        return self.flush_nodes();
+                        return self.handle_and_flush_nodes();
                     }
                     vec![]
                 }
                 Element::Way { way } => {
                     self.ways.push(way);
                     if self.ways.len() >= 3 {
-                        return self.flush_ways();
+                        return self.handle_and_flush_ways();
                     }
                     vec![]
                 }
                 Element::Relation { relation } => {
                     self.relations.push(relation);
                     if self.relations.len() >= 3 {
-                        return self.flush_relations();
+                        return self.handle_and_flush_relations();
                     }
                     vec![]
                 }
                 Element::Sentinel => { vec![] }
             }
         }
-        fn flush(&mut self, elements: Vec<Element>) -> Vec<Element> {
+        fn handle_and_flush_elements(&mut self, elements: Vec<Element>) -> Vec<Element> {
             for element in elements {
                 match element {
                     Element::Node { node } => { self.nodes.push(node); }
@@ -360,9 +414,9 @@ mod tests {
                 }
             }
             let mut flushed = vec![];
-            flushed.append(&mut self.flush_nodes());
-            flushed.append(&mut self.flush_ways());
-            flushed.append(&mut self.flush_relations());
+            flushed.append(&mut self.handle_and_flush_nodes());
+            flushed.append(&mut self.handle_and_flush_ways());
+            flushed.append(&mut self.handle_and_flush_relations());
             flushed
         }
     }
@@ -382,7 +436,8 @@ mod tests {
         }
     }
     impl Processor for TestOnlyIdCollector {
-        fn handle(&mut self, element: Element) -> Vec<Element> {
+        fn name(&self) -> String { "TestOnlyIdCollector".to_string() }
+        fn handle_element(&mut self, element: Element) -> Vec<Element> {
             match element {
                 Element::Node { ref node } => { self.node_ids.set(node.id() as usize, true); }
                 Element::Way { ref way } => { self.node_ids.set(way.id() as usize, true); }
@@ -411,13 +466,9 @@ mod tests {
         }
     }
     impl Processor for TestOnlyOrderRecorder {
-        fn handle(&mut self, element: Element) -> Vec<Element> {
-            match &element {
-                Element::Node { node } => { self.received_ids.push(format!("node#{}", node.id().to_string())); }
-                Element::Way { way } => { self.received_ids.push(format!("way#{}", way.id().to_string())); }
-                Element::Relation { relation } => { self.received_ids.push(format!("relation#{}", relation.id().to_string())); }
-                Element::Sentinel => {}
-            }
+        fn name(&self) -> String { format!("TestOnlyOrderRecorder {}", self.result_key) }
+        fn handle_element(&mut self, element: Element) -> Vec<Element> {
+            self.received_ids.push(format_element_id(&element));
             vec![element]
         }
         fn add_result(&mut self, mut result: HandlerResult) -> HandlerResult {
@@ -429,7 +480,7 @@ mod tests {
 
     #[test]
     fn test_chain() {
-        let captor = TestOnlyElementBuffer::default();
+        let captor = TestOnlyElementBufferingDuplicatingEditingProcessor::default();
         let id_collector = TestOnlyIdCollector::new(10);
         let mut processor_chain = ProcessorChain::default()
             .add_processor(TestOnlyOrderRecorder::new("1_initial"))
@@ -448,14 +499,15 @@ mod tests {
 
     #[test]
     fn test_chain_with_buffer() {
-        let captor = TestOnlyElementBuffer::default();
-        let id_collector = TestOnlyIdCollector::new(10);
+        SimpleLogger::new().init();
         let mut processor_chain = ProcessorChain::default()
+            .add_processor(ElementCounter::new("initial"))
             .add_processor(TestOnlyOrderRecorder::new("1_initial"))
-            .add_processor(TestOnlyElementBuffer::default())
-            .add_processor(id_collector)
-            .add_processor(ElementPrinter::with_prefix("ElementPrinter final: ".to_string()).with_node_ids(hashset! {1,2,6,8}))
+            .add_processor(TestOnlyElementBufferingDuplicatingEditingProcessor::default())
+            .add_processor(TestOnlyIdCollector::new(200))
+            .add_processor(ElementPrinter::with_prefix("final".to_string()).with_node_ids((1..=200).collect()))
             .add_processor(TestOnlyOrderRecorder::new("9_final"))
+            .add_processor(ElementCounter::new("final"))
             ;
         processor_chain.process(node_element(1, 1, Coordinate::new(1.0f64, 1.1f64), 1, 1, 1, "a".to_string(), true, vec![Tag::new(existing_tag(), "kasper".to_string())]));
         processor_chain.process(node_element(2, 1, Coordinate::new(2.0f64, 1.2f64), 1, 1, 1, "a".to_string(), true, vec![Tag::new(existing_tag(), "seppl".to_string())]));
@@ -463,6 +515,14 @@ mod tests {
         processor_chain.process(node_element(8, 1, Coordinate::new(4.0f64, 1.4f64), 1, 1, 1, "a".to_string(), true, vec![Tag::new(existing_tag(), "großmutter".to_string())]));
         processor_chain.flush(vec![]);
         let result = processor_chain.collect_result();
-        dbg!(result);
+        dbg!(&result);
+        assert_eq!(&result.counts.get("nodes count final").unwrap().clone(), &8);
+        assert_eq!(&result.counts.get("nodes count initial").unwrap().clone(), &4,);
+        assert_eq!(&result.counts.get("relations count final").unwrap().clone(), &0,);
+        assert_eq!(&result.counts.get("relations count initial").unwrap().clone(), &0,);
+        assert_eq!(&result.counts.get("ways count final").unwrap().clone(), &0,);
+        assert_eq!(&result.counts.get("ways count initial").unwrap().clone(), &0,);
+        assert_eq!(&result.other.get("1_initial").unwrap().clone(), "node#1, node#2, node#6, node#8");
+        assert_eq!(&result.other.get("9_final").unwrap().clone(), "node#1, node#101, node#2, node#102, node#6, node#106, node#8, node#108");
     }
 }
