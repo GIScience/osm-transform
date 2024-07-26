@@ -441,6 +441,7 @@ mod tests {
             flushed
         }
     }
+
     #[derive(Debug)]
     pub(crate) struct TestOnlyIdCollector {
         pub node_ids: BitVec,
@@ -501,7 +502,6 @@ mod tests {
 
     #[test]
     fn test_chain() {
-        let captor = TestOnlyElementBufferingDuplicatingEditingProcessor::default();
         let id_collector = TestOnlyIdCollector::new(10);
         let mut processor_chain = ProcessorChain::default()
             .add_processor(TestOnlyOrderRecorder::new("1_initial"))
