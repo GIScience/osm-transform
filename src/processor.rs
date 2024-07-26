@@ -314,24 +314,24 @@ mod tests {
 
     fn existing_tag() -> String { "EXISTING_TAG".to_string() }
     fn missing_tag() -> String { "MISSING_TAG".to_string() }
-    pub enum MemberType {Node, Way, Relation}
+    pub enum MemberType { Node, Way, Relation }
     fn simple_node_element(id: i64, tags: Vec<(&str, &str)>) -> Element {
-        let tags_obj = tags.iter().map(|(k,v)| Tag::new(k.to_string(), v.to_string())).collect();
+        let tags_obj = tags.iter().map(|(k, v)| Tag::new(k.to_string(), v.to_string())).collect();
         node_element(id, 1, Coordinate::new(1.0f64, 1.1f64), 1, 1, 1, "a".to_string(), true, tags_obj)
     }
     fn simple_way_element(id: i64, refs: Vec<i64>, tags: Vec<(&str, &str)>) -> Element {
-        let tags_obj = tags.iter().map(|(k,v)| Tag::new(k.to_string(), v.to_string())).collect();
+        let tags_obj = tags.iter().map(|(k, v)| Tag::new(k.to_string(), v.to_string())).collect();
         way_element(id, 1, 1, 1, 1, "a_user".to_string(), true, refs, tags_obj)
     }
     fn simple_relation_element(id: i64, members: Vec<(MemberType, i64, &str)>, tags: Vec<(&str, &str)>) -> Element {
-        let members_obj = members.iter().map(|(t, id,role)| {
+        let members_obj = members.iter().map(|(t, id, role)| {
             match t {
-                MemberType::Node => {Member::Node {member: MemberData::new(id.clone(), role.to_string())}}
-                MemberType::Way => {Member::Way {member: MemberData::new(id.clone(), role.to_string())}}
-                MemberType::Relation => {Member::Relation {member: MemberData::new(id.clone(), role.to_string())}}
+                MemberType::Node => { Member::Node { member: MemberData::new(id.clone(), role.to_string()) } }
+                MemberType::Way => { Member::Way { member: MemberData::new(id.clone(), role.to_string()) } }
+                MemberType::Relation => { Member::Relation { member: MemberData::new(id.clone(), role.to_string()) } }
             }
         }).collect();
-        let tags_obj = tags.iter().map(|(k,v)| Tag::new(k.to_string(), v.to_string())).collect();
+        let tags_obj = tags.iter().map(|(k, v)| Tag::new(k.to_string(), v.to_string())).collect();
         relation_element(id, 1, 1, 1, 1, "a_user".to_string(), true, members_obj, tags_obj)
     }
     fn node_element(id: i64, version: i32, coordinate: Coordinate, timestamp: i64, changeset: i64, uid: i32, user: String, visible: bool, tags: Vec<Tag>) -> Element {
@@ -347,15 +347,32 @@ mod tests {
         Node::new(new_id, node.version(), node.coordinate().clone(), node.timestamp(), node.changeset(), node.uid(), node.user().clone(), node.visible(), node.tags().clone())
     }
     ///Modify element and return same instance.
-    pub(crate) struct ElementModifier;//TODO implement
+    pub(crate) struct ElementModifier; //TODO implement
     ///Return a copy of the element.
-    pub(crate) struct ElementExchanger;//TODO implement
+    pub(crate) struct ElementExchanger; //TODO implement
     ///Remove an element / return empty vec.
-    pub(crate) struct ElementFilter;//TODO implement
+    pub(crate) struct ElementFilter; //TODO implement
     ///Receive one element, return two.
-    pub(crate) struct ElementAdder;//TODO implement
-    ///Receive one way, return a way and two nodes.
-    pub(crate) struct ElementMixedAdder;//TODO implement
+    pub(crate) struct ElementAdder; //TODO implement
+
+    ///Receive one way, return a way and a new node for each ref of the way.
+    #[derive(Debug, Default)]
+    pub(crate) struct TestOnlyElementMixedAdder;
+    impl Processor for TestOnlyElementMixedAdder {
+        fn name(&self) -> String { "TestOnlyElementMixedAdder".to_string() }
+        fn handle_element(&mut self, element: Element) -> Vec<Element> {
+            match element {
+                Element::Node { .. } => { vec![element] }
+                Element::Way { way } => {
+                    let mut elements: Vec<Element> = way.refs().iter().map(|id| simple_node_element(id.clone(), vec![("added", "by processor")])).collect();
+                    elements.push(Element::Way { way });
+                    elements
+                }
+                Element::Relation { .. } => { vec![element] }
+                Element::Sentinel => { vec![] }
+            }
+        }
+    }
 
 
     #[derive(Default, Debug)]
@@ -372,20 +389,20 @@ mod tests {
             }
             let mut flush_nodes = vec![];
             for node in handled_nodes {
-                flush_nodes.push(Element::Node {node})
+                flush_nodes.push(Element::Node { node })
             }
             self.nodes.clear();
             flush_nodes
         }
         fn handle_and_flush_ways(&mut self) -> Vec<Element> {
             //TODO add the tricky part to also change, duplicate, etc. the buffered elements (at this point, elevation processor would do its job
-            let result = self.ways.iter().map(|way| Element::Way {way: way.clone()}).collect();
+            let result = self.ways.iter().map(|way| Element::Way { way: way.clone() }).collect();
             self.ways.clear();
             result
         }
         fn handle_and_flush_relations(&mut self) -> Vec<Element> {
             //TODO add the tricky part to also change, duplicate, etc. the buffered elements (at this point, elevation processor would do its job
-            let result = self.relations.iter().map(|relation| Element::Relation {relation: relation.clone()}).collect();
+            let result = self.relations.iter().map(|relation| Element::Relation { relation: relation.clone() }).collect();
             self.relations.clear();
             result
         }
@@ -393,7 +410,7 @@ mod tests {
             //todo pass to configured fn/closure or something
             let mut node_clone = copy_node_with_new_id(&node, node.id().clone().add(100));
             node_clone.tags_mut().push(Tag::new("elevation".to_string(), "default-elevation".to_string()));
-            vec![node, node_clone]//todo remove the clone, thats just an experiment
+            vec![node, node_clone] //todo remove the clone, thats just an experiment
         }
     }
     impl Processor for TestOnlyElementBufferingDuplicatingEditingProcessor {
@@ -531,7 +548,7 @@ mod tests {
             .add_processor(ElementCounter::new("final"))
             ;
 
-        processor_chain.process(simple_way_element(23, vec![1,2,8,6], vec![("who", "kasper")]));
+        processor_chain.process(simple_way_element(23, vec![1, 2, 8, 6], vec![("who", "kasper")]));
         processor_chain.process(simple_node_element(1, vec![("who", "kasper")]));
         processor_chain.process(simple_node_element(2, vec![("who", "seppl")]));
         processor_chain.process(simple_node_element(6, vec![("who", "hotzenplotz")]));
@@ -548,5 +565,32 @@ mod tests {
         assert_eq!(&result.counts.get("ways count initial").unwrap().clone(), &1,);
         assert_eq!(&result.other.get("TestOnlyOrderRecorder initial").unwrap().clone(), "way#23, node#1, node#2, node#6, node#8, relation#66");
         assert_eq!(&result.other.get("TestOnlyOrderRecorder final").unwrap().clone(), "node#1, node#101, node#2, node#102, node#6, node#106, node#8, node#108, way#23, relation#66");
+    }
+    #[test]
+    fn test_chain_with_mixed_element_adder() {
+        SimpleLogger::new().init();
+        let mut processor_chain = ProcessorChain::default()
+            .add_processor(ElementCounter::new("initial"))
+            .add_processor(TestOnlyOrderRecorder::new("initial"))
+            .add_processor(TestOnlyElementMixedAdder::default())
+            .add_processor(TestOnlyIdCollector::new(200))
+            .add_processor(ElementPrinter::with_prefix("final".to_string()).with_node_ids((1..=200).collect()))
+            .add_processor(TestOnlyOrderRecorder::new("final"))
+            .add_processor(ElementCounter::new("final"))
+            ;
+
+        processor_chain.process(simple_way_element(23, vec![1, 2, 8, 6], vec![("way", "kasper-hotzenplotz")]));
+        processor_chain.flush(vec![]);
+
+        let result = processor_chain.collect_result();
+        dbg!(&result);
+        assert_eq!(&result.counts.get("nodes count final").unwrap().clone(), &4);
+        assert_eq!(&result.counts.get("nodes count initial").unwrap().clone(), &0,);
+        assert_eq!(&result.counts.get("relations count final").unwrap().clone(), &0,);
+        assert_eq!(&result.counts.get("relations count initial").unwrap().clone(), &0,);
+        assert_eq!(&result.counts.get("ways count final").unwrap().clone(), &1,);
+        assert_eq!(&result.counts.get("ways count initial").unwrap().clone(), &1,);
+        assert_eq!(&result.other.get("TestOnlyOrderRecorder initial").unwrap().clone(), "way#23");
+        assert_eq!(&result.other.get("TestOnlyOrderRecorder final").unwrap().clone(), "node#1, node#2, node#8, node#6, way#23");
     }
 }
