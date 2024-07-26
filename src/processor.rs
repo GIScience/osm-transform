@@ -306,7 +306,7 @@ mod tests {
     use osm_io::osm::model::coordinate::Coordinate;
     use osm_io::osm::model::element::Element;
     use osm_io::osm::model::node::Node;
-    use osm_io::osm::model::relation::Relation;
+    use osm_io::osm::model::relation::{Member, Relation};
     use osm_io::osm::model::tag::Tag;
     use osm_io::osm::model::way::Way;
     use simple_logger::SimpleLogger;
@@ -314,23 +314,22 @@ mod tests {
 
     fn existing_tag() -> String { "EXISTING_TAG".to_string() }
     fn missing_tag() -> String { "MISSING_TAG".to_string() }
-    fn node_element(
-        id: i64,
-        version: i32,
-        coordinate: Coordinate,
-        timestamp: i64,
-        changeset: i64,
-        uid: i32,
-        user: String,
-        visible: bool,
-        tags: Vec<Tag>,
-    ) -> Element {
+    fn simple_node_element(id: i64, tags: Vec<(&str,&str)>) -> Element {
+        let tags_obj = tags.iter().map(|(k,v)| Tag::new(k.to_string(), v.to_string())).collect();
+        node_element( id, 1, Coordinate::new(1.0f64, 1.1f64), 1, 1, 1, "a".to_string(), true, tags_obj)
+    }
+    fn node_element(id: i64, version: i32, coordinate: Coordinate, timestamp: i64, changeset: i64, uid: i32, user: String, visible: bool, tags: Vec<Tag>) -> Element {
         Element::Node { node: Node::new(id, version, coordinate, timestamp, changeset, uid, user, visible, tags) }
+    }
+    fn way_element(id: i64, version: i32, timestamp: i64, changeset: i64, uid: i32, user: String, visible: bool, refs: Vec<i64>, tags: Vec<Tag>) -> Element {
+        Element::Way { way: Way::new(id, version, timestamp, changeset, uid, user, visible, refs, tags) }
+    }
+    fn relation_element(id: i64, version: i32, timestamp: i64, changeset: i64, uid: i32, user: String, visible: bool, members: Vec<Member>, tags: Vec<Tag>) -> Element {
+        Element::Relation { relation: Relation::new(id, version, timestamp, changeset, uid, user, visible, members, tags) }
     }
     fn copy_node_with_new_id(node: &Node, new_id: i64) -> Node {
         Node::new(new_id, node.version(), node.coordinate().clone(), node.timestamp(), node.changeset(), node.uid(), node.user().clone(), node.visible(), node.tags().clone())
     }
-
     ///Modify element and return same instance.
     pub(crate) struct ElementModifier;//TODO implement
     ///Return a copy of the element.
@@ -494,10 +493,10 @@ mod tests {
             .add_processor(ElementPrinter::with_prefix("ElementPrinter final: ".to_string()).with_node_ids(hashset! {8}))
             .add_processor(TestOnlyOrderRecorder::new("9_final"))
             ;
-        processor_chain.process(node_element(1, 1, Coordinate::new(1.0f64, 1.1f64), 1, 1, 1, "a".to_string(), true, vec![Tag::new(existing_tag(), "kasper".to_string())]));
-        processor_chain.process(node_element(2, 1, Coordinate::new(2.0f64, 1.2f64), 1, 1, 1, "a".to_string(), true, vec![Tag::new(existing_tag(), "seppl".to_string())]));
-        processor_chain.process(node_element(6, 1, Coordinate::new(3.0f64, 1.3f64), 1, 1, 1, "a".to_string(), true, vec![Tag::new(existing_tag(), "hotzenplotz".to_string())]));
-        processor_chain.process(node_element(8, 1, Coordinate::new(4.0f64, 1.4f64), 1, 1, 1, "a".to_string(), true, vec![Tag::new(existing_tag(), "großmutter".to_string())]));
+        processor_chain.process(simple_node_element(1,vec![("who", "kasper")]));
+        processor_chain.process(simple_node_element(2,vec![("who", "seppl")]));
+        processor_chain.process(simple_node_element(6,vec![("who", "hotzenplotz")]));
+        processor_chain.process(simple_node_element(8,vec![("who", "großmutter")]));
         processor_chain.flush(vec![]);
         let result = processor_chain.collect_result();
         dbg!(result);
@@ -515,10 +514,10 @@ mod tests {
             .add_processor(TestOnlyOrderRecorder::new("9_final"))
             .add_processor(ElementCounter::new("final"))
             ;
-        processor_chain.process(node_element(1, 1, Coordinate::new(1.0f64, 1.1f64), 1, 1, 1, "a".to_string(), true, vec![Tag::new(existing_tag(), "kasper".to_string())]));
-        processor_chain.process(node_element(2, 1, Coordinate::new(2.0f64, 1.2f64), 1, 1, 1, "a".to_string(), true, vec![Tag::new(existing_tag(), "seppl".to_string())]));
-        processor_chain.process(node_element(6, 1, Coordinate::new(3.0f64, 1.3f64), 1, 1, 1, "a".to_string(), true, vec![Tag::new(existing_tag(), "hotzenplotz".to_string())]));
-        processor_chain.process(node_element(8, 1, Coordinate::new(4.0f64, 1.4f64), 1, 1, 1, "a".to_string(), true, vec![Tag::new(existing_tag(), "großmutter".to_string())]));
+        processor_chain.process(simple_node_element(1, vec![("who", "kasper")]));
+        processor_chain.process(simple_node_element(2, vec![("who", "seppl")]));
+        processor_chain.process(simple_node_element(6, vec![("who", "hotzenplotz")]));
+        processor_chain.process(simple_node_element(8, vec![("who", "großmutter")]));
         processor_chain.flush(vec![]);
         let result = processor_chain.collect_result();
         dbg!(&result);
