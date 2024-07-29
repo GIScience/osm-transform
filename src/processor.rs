@@ -1,3 +1,9 @@
+mod collect;
+mod filter;
+mod predicate;
+mod info;
+mod modify;
+
 use std::collections::{BTreeMap, HashMap, HashSet};
 
 use bit_vec::BitVec;
@@ -7,7 +13,6 @@ use osm_io::osm::model::relation::Relation;
 use osm_io::osm::model::tag::Tag;
 use osm_io::osm::model::way::Way;
 
-use crate::handler::{FilterType, OsmElementTypeSelection};
 
 const HIGHEST_NODE_ID: i64 = 50_000_000_000; //todo make configurable
 
@@ -42,6 +47,19 @@ pub trait Processor {
     fn add_result(&mut self, result: HandlerResult) -> HandlerResult {
         result
     }
+}
+
+pub(crate) struct OsmElementTypeSelection {
+    pub node: bool,
+    pub way: bool,
+    pub relation: bool,
+}
+impl OsmElementTypeSelection {
+    pub(crate) fn all() -> Self { Self { node: true, way: true, relation: true } }
+    pub(crate) fn node_only() -> Self { Self { node: true, way: false, relation: false } }
+    pub(crate) fn way_only() -> Self { Self { node: false, way: true, relation: false } }
+    pub(crate) fn relation_only() -> Self { Self { node: false, way: false, relation: true } }
+    pub(crate) fn none() -> Self { Self { node: false, way: false, relation: false } }
 }
 
 
@@ -124,252 +142,10 @@ impl ProcessorChain {
 }
 
 
-#[derive(Debug)]
-pub(crate) enum CountType {
-    ALL,
-    ACCEPTED,
-}
-
-
-pub(crate) struct ElementCounter {
-    pub nodes_count: i32,
-    pub ways_count: i32,
-    pub relations_count: i32,
-    pub result_key: String,
-}
-impl ElementCounter {
-    pub fn new(result_key: &str) -> Self {
-        Self {
-            nodes_count: 0,
-            ways_count: 0,
-            relations_count: 0,
-            result_key: result_key.to_string(),
-        }
-    }
-}
-impl Processor for ElementCounter {
-    fn name(&self) -> String { format!("ElementCounter {}", self.result_key) }
-    fn handle_element(&mut self, element: Element) -> Vec<Element> {
-        match element {
-            Element::Node { .. } => { self.nodes_count += 1; }
-            Element::Way { .. } => { self.ways_count += 1; }
-            Element::Relation { .. } => { self.relations_count += 1; }
-            Element::Sentinel => {}
-        }
-        vec![element]
-    }
-    fn add_result(&mut self, mut result: HandlerResult) -> HandlerResult {
-        result.counts.insert(format!("nodes count {}", self.result_key), self.nodes_count);
-        result.counts.insert(format!("ways count {}", self.result_key), self.ways_count);
-        result.counts.insert(format!("relations count {}", self.result_key), self.relations_count);
-        result
-    }
-}
-
-
-pub(crate) struct ElementPrinter {
-    pub prefix: String,
-    pub node_ids: HashSet<i64>,
-    pub way_ids: HashSet<i64>,
-    pub relation_ids: HashSet<i64>,
-    pub handle_types: OsmElementTypeSelection,
-}
-impl Default for ElementPrinter {
-    fn default() -> Self {
-        Self {
-            prefix: "".to_string(),
-            node_ids: HashSet::new(),
-            way_ids: HashSet::new(),
-            relation_ids: HashSet::new(),
-            handle_types: OsmElementTypeSelection::none(),
-        }
-    }
-}
-impl ElementPrinter {
-    pub fn with_prefix(prefix: String) -> Self {
-        Self {
-            prefix: prefix,
-            ..Self::default()
-        }
-    }
-    pub(crate) fn with_node_ids(mut self, node_ids: HashSet<i64>) -> Self {
-        for id in node_ids {
-            self.node_ids.insert(id);
-            self.handle_types.node = true;
-        }
-        self
-    }
-    pub(crate) fn with_way_ids(mut self, way_ids: HashSet<i64>) -> Self {
-        for id in way_ids {
-            self.way_ids.insert(id);
-            self.handle_types.way = true;
-        }
-        self
-    }
-    pub(crate) fn with_relation_ids(mut self, relation_ids: HashSet<i64>) -> Self {
-        for id in relation_ids {
-            self.relation_ids.insert(id);
-            self.handle_types.relation = true;
-        }
-        self
-    }
-    pub(crate) fn print_node(mut self, id: i64) -> Self {
-        self.handle_types.node = true;
-        self.node_ids.insert(id);
-        self
-    }
-    pub(crate) fn print_way(mut self, id: i64) -> Self {
-        self.handle_types.way = true;
-        self.way_ids.insert(id);
-        self
-    }
-    pub(crate) fn print_relation(mut self, id: i64) -> Self {
-        self.handle_types.relation = true;
-        self.relation_ids.insert(id);
-        self
-    }
-
-    fn handle_node(&mut self, node: &Node) {
-        if self.handle_types.node && self.node_ids.contains(&node.id()) {
-            println!("{}: node {} visible: {}", &self.prefix, &node.id(), &node.visible());
-            println!("  version:    {}", &node.version());
-            println!("  coordinate: lat,lon = {},{}", &node.coordinate().lat(), &node.coordinate().lon());
-            println!("  changeset:  {}", &node.changeset());
-            println!("  timestamp:  {}", &node.timestamp());
-            println!("  uid:        {}", &node.uid());
-            println!("  user:       {}", &node.user());
-            println!("  tags:");
-            for tag in node.tags() {
-                println!("   '{}' = '{}'", &tag.k(), &tag.v())
-            }
-        }
-    }
-    fn handle_way(&mut self, way: &Way) {
-        if self.handle_types.way && self.way_ids.contains(&way.id()) {
-            println!("{}: way {} visible: {}", &self.prefix, &way.id(), &way.visible());
-            println!("  version:   {}", &way.version());
-            println!("  changeset: {}", &way.changeset());
-            println!("  timestamp: {}", &way.timestamp());
-            println!("  uid:       {}", &way.uid());
-            println!("  user:      {}", &way.user());
-            println!("  tags:");
-            for tag in way.tags() {
-                println!("   '{}' = '{}'", &tag.k(), &tag.v())
-            }
-            println!("  refs:");
-            for id in way.refs() {
-                println!("   {}", &id)
-            }
-        }
-    }
-    fn handle_relation(&mut self, relation: &Relation) {
-        if self.handle_types.relation && self.relation_ids.contains(&relation.id()) {
-            println!("{}: relation {} visible: {}", &self.prefix, &relation.id(), &relation.visible());
-            println!("  version:   {}", &relation.version());
-            println!("  changeset: {}", &relation.changeset());
-            println!("  timestamp: {}", &relation.timestamp());
-            println!("  uid:       {}", &relation.uid());
-            println!("  user:      {}", &relation.user());
-            println!("  tags:");
-            for tag in relation.tags() {
-                println!("   '{}' = '{}'", &tag.k(), &tag.v())
-            }
-            println!("  members:");
-            for member in relation.members() {
-                println!("   {:?}", &member)
-            }
-        }
-    }
-}
-impl Processor for ElementPrinter {
-    fn name(&self) -> String { format!("ElementPrinter {}", self.prefix) }
-    fn handle_element(&mut self, element: Element) -> Vec<Element> {
-        match element {
-            Element::Node { node } => {
-                self.handle_node(&node);
-                vec![Element::Node { node }]
-            }
-            Element::Way { way } => {
-                self.handle_way(&way);
-                vec![Element::Way { way }]
-            }
-            Element::Relation { relation } => {
-                self.handle_relation(&relation);
-                vec![Element::Relation { relation }]
-            }
-            Element::Sentinel => { vec![] }
-        }
-    }
-}
 
 
 
 
-struct TagKeyBasedOsmElementsFilter {
-    pub handle_types: OsmElementTypeSelection,
-    pub tag_keys: Vec<String>,
-    pub filter_type: FilterType,
-}
-impl TagKeyBasedOsmElementsFilter {
-    fn new(handle_types: OsmElementTypeSelection, tag_keys: Vec<String>, filter_type: FilterType) -> Self {
-        Self {
-            handle_types,
-            tag_keys,
-            filter_type,
-        }
-    }
-    fn accept_by_tags(&mut self, tags: &Vec<Tag>) -> bool {
-        let contains_any_key = tags.iter().any(|tag| self.tag_keys.contains(tag.k()));
-        match self.filter_type {
-            FilterType::AcceptMatching => {
-                return contains_any_key
-            }
-            FilterType::RemoveMatching => {
-                return !contains_any_key
-            }
-        }
-    }
-}
-impl Processor for TagKeyBasedOsmElementsFilter {
-    fn name(&self) -> String { "TagKeyBasedOsmElementsFilter".to_string() }
-    fn handle_element(&mut self, element: Element) -> Vec<Element> {
-        match element {
-            Element::Node { node } => self.handle_node(node),
-            Element::Way { way } => self.handle_way(way),
-            Element::Relation { relation } => self.handle_relation(relation),
-            Element::Sentinel => vec![]
-        }
-    }
-}
-impl TagKeyBasedOsmElementsFilter {
-    fn handle_node(&mut self, node: Node) -> Vec<Element> {
-        if ! self.handle_types.node {
-            return vec![into_node_element(node)]
-        }
-        match self.accept_by_tags(&node.tags()) {
-            true => {vec![into_node_element(node)]}
-            false => {vec![]}
-        }
-    }
-    fn handle_way(&mut self, way: Way) -> Vec<Element> {
-        if !self.handle_types.way  {
-            return vec![into_way_element(way)]
-        }
-        match self.accept_by_tags(&way.tags()) {
-            true => {vec![into_way_element(way)]}
-            false => {vec![]}
-        }
-    }
-    fn handle_relation(&mut self, relation: Relation) -> Vec<Element> {
-        if !self.handle_types.relation  {
-            return vec![into_relation_element(relation)]
-        }
-        match self.accept_by_tags(&relation.tags()) {
-            true => {vec![into_relation_element(relation)]}
-            false => {vec![]}
-        }
-    }
-}
 
 
 
@@ -384,22 +160,24 @@ mod tests {
     use osm_io::osm::model::relation::{Member, MemberData, Relation};
     use osm_io::osm::model::tag::Tag;
     use osm_io::osm::model::way::Way;
+    use regex::Regex;
     use simple_logger::SimpleLogger;
-    use crate::handler::{FilterType, OsmElementTypeSelection};
-    use crate::processor::{ElementCounter, ElementPrinter, format_element_id, HandlerResult, into_node_element, Processor, ProcessorChain, TagKeyBasedOsmElementsFilter};
+    use crate::processor::*;
+    use crate::processor::filter::*;
+    use crate::processor::info::*;
 
     fn existing_tag() -> String { "EXISTING_TAG".to_string() }
     fn missing_tag() -> String { "MISSING_TAG".to_string() }
     pub enum MemberType { Node, Way, Relation }
-    fn simple_node_element(id: i64, tags: Vec<(&str, &str)>) -> Element {
+    pub fn simple_node_element(id: i64, tags: Vec<(&str, &str)>) -> Element {
         let tags_obj = tags.iter().map(|(k, v)| Tag::new(k.to_string(), v.to_string())).collect();
         node_element(id, 1, Coordinate::new(1.0f64, 1.1f64), 1, 1, 1, "a".to_string(), true, tags_obj)
     }
-    fn simple_way_element(id: i64, refs: Vec<i64>, tags: Vec<(&str, &str)>) -> Element {
+    pub fn simple_way_element(id: i64, refs: Vec<i64>, tags: Vec<(&str, &str)>) -> Element {
         let tags_obj = tags.iter().map(|(k, v)| Tag::new(k.to_string(), v.to_string())).collect();
         way_element(id, 1, 1, 1, 1, "a_user".to_string(), true, refs, tags_obj)
     }
-    fn simple_relation_element(id: i64, members: Vec<(MemberType, i64, &str)>, tags: Vec<(&str, &str)>) -> Element {
+    pub fn simple_relation_element(id: i64, members: Vec<(MemberType, i64, &str)>, tags: Vec<(&str, &str)>) -> Element {
         let members_obj = members.iter().map(|(t, id, role)| {
             match t {
                 MemberType::Node => { Member::Node { member: MemberData::new(id.clone(), role.to_string()) } }
@@ -410,16 +188,16 @@ mod tests {
         let tags_obj = tags.iter().map(|(k, v)| Tag::new(k.to_string(), v.to_string())).collect();
         relation_element(id, 1, 1, 1, 1, "a_user".to_string(), true, members_obj, tags_obj)
     }
-    fn node_element(id: i64, version: i32, coordinate: Coordinate, timestamp: i64, changeset: i64, uid: i32, user: String, visible: bool, tags: Vec<Tag>) -> Element {
+    pub fn node_element(id: i64, version: i32, coordinate: Coordinate, timestamp: i64, changeset: i64, uid: i32, user: String, visible: bool, tags: Vec<Tag>) -> Element {
         Element::Node { node: Node::new(id, version, coordinate, timestamp, changeset, uid, user, visible, tags) }
     }
-    fn way_element(id: i64, version: i32, timestamp: i64, changeset: i64, uid: i32, user: String, visible: bool, refs: Vec<i64>, tags: Vec<Tag>) -> Element {
+    pub fn way_element(id: i64, version: i32, timestamp: i64, changeset: i64, uid: i32, user: String, visible: bool, refs: Vec<i64>, tags: Vec<Tag>) -> Element {
         Element::Way { way: Way::new(id, version, timestamp, changeset, uid, user, visible, refs, tags) }
     }
-    fn relation_element(id: i64, version: i32, timestamp: i64, changeset: i64, uid: i32, user: String, visible: bool, members: Vec<Member>, tags: Vec<Tag>) -> Element {
+    pub fn relation_element(id: i64, version: i32, timestamp: i64, changeset: i64, uid: i32, user: String, visible: bool, members: Vec<Member>, tags: Vec<Tag>) -> Element {
         Element::Relation { relation: Relation::new(id, version, timestamp, changeset, uid, user, visible, members, tags) }
     }
-    fn copy_node_with_new_id(node: &Node, new_id: i64) -> Node {
+    pub fn copy_node_with_new_id(node: &Node, new_id: i64) -> Node {
         Node::new(new_id, node.version(), node.coordinate().clone(), node.timestamp(), node.changeset(), node.uid(), node.user().clone(), node.visible(), node.tags().clone())
     }
 
@@ -916,5 +694,65 @@ mod tests {
         assert_eq!(&result.counts.get("ways count final").unwrap().clone(), &0,);
         assert_eq!(&result.other.get("TestOnlyOrderRecorder initial").unwrap().clone(), "node#1, node#2, node#6, node#8");
         assert_eq!(&result.other.get("TestOnlyOrderRecorder final").unwrap().clone(), "node#2, node#6, node#8");
+    }
+
+
+
+
+
+
+
+    #[test]
+    fn handler_chain() {
+        SimpleLogger::new().init();
+        let chain = ProcessorChain::default()
+            .add_processor(ElementCounter::new("initial"))
+            .add_processor(TagValueBasedOsmElementsFilter::new(
+                OsmElementTypeSelection::node_only(),
+                existing_tag(),
+                Regex::new(".*p.*").unwrap(),
+                FilterType::AcceptMatching))
+            .add_processor(TagValueBasedOsmElementsFilter::new(
+                OsmElementTypeSelection::node_only(),
+                existing_tag(),
+                Regex::new(".*z.*").unwrap(),
+                FilterType::RemoveMatching))
+            .add_processor(ElementCounter::new("final"))
+            .add_processor(TestOnlyIdCollector::new(100));
+
+        handle_test_nodes_and_verify_result(chain);
+    }
+
+    #[test]
+    fn handler_chain_with_node_id_filter() {
+        SimpleLogger::new().init();
+        let mut node_ids = BitVec::from_elem(10usize, false);
+        node_ids.set(1usize, true);
+        node_ids.set(2usize, true);
+        let chain = ProcessorChain::default()
+            .add_processor(ElementCounter::new("initial"))
+            .add_processor(NodeIdFilter { node_ids: node_ids.clone() })
+            .add_processor(ElementCounter::new("final"))
+            .add_processor(TestOnlyIdCollector::new(100));
+
+        handle_test_nodes_and_verify_result(chain);
+    }
+
+    fn handle_test_nodes_and_verify_result(mut handler_chain: ProcessorChain) {
+        handler_chain.process(simple_node_element(1, vec![(existing_tag().as_str(), "kasper")]));
+        handler_chain.process(simple_node_element(2, vec![(existing_tag().as_str(), "seppl")]));
+        handler_chain.process(simple_node_element(3, vec![(existing_tag().as_str(), "hotzenplotz")]));
+        handler_chain.process(simple_node_element(4, vec![(existing_tag().as_str(), "großmutter")]));
+
+        handler_chain.flush(vec![]);
+        let result = handler_chain.collect_result();
+
+        assert_eq!(&result.counts.get("nodes count initial").unwrap().clone(), &4,);
+        assert_eq!(&result.counts.get("nodes count final").unwrap().clone(), &2);
+        assert_eq!(result.node_ids[0], false);
+        assert_eq!(result.node_ids[1], true);
+        assert_eq!(result.node_ids[2], true);
+        assert_eq!(result.node_ids[3], false);
+        assert_eq!(result.node_ids[4], false);
     }
 }
