@@ -27,7 +27,9 @@ pub fn format_element_id(element: &Element) -> String {
 pub fn into_node_element(node: Node) -> Element { Element::Node {node} }
 pub fn into_way_element(way: Way) -> Element { Element::Way { way } }
 pub fn into_relation_element(relation: Relation) -> Element { Element::Relation { relation } }
-
+pub fn into_vec_node_element(node: Node) -> Vec<Element> { vec![into_node_element(node)]}
+pub fn into_vec_way_element(way: Way) -> Vec<Element> { vec![into_way_element(way)]}
+pub fn into_vec_relation_element(relation: Relation) -> Vec<Element> { vec![into_relation_element(relation)]}
 pub trait Processor {
 
     fn name(&self) -> String;

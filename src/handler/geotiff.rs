@@ -6,11 +6,13 @@ use bit_vec::BitVec;
 use georaster::geotiff::{GeoTiffReader, RasterValue};
 use glob::glob;
 use log::error;
+use osm_io::osm::model::element::Element;
 use osm_io::osm::model::node::Node;
+use osm_io::osm::model::tag::Tag;
 use proj4rs::Proj;
 use rstar::{RTree, RTreeObject, AABB, Point, PointDistance, Envelope};
-use crate::handler::{Handler, HIGHEST_NODE_ID};
-use crate::srs::SrsResolver;
+use crate::processor::{format_element_id, into_node_element, into_vec_node_element, into_vec_relation_element, into_vec_way_element, into_way_element, Processor};
+use crate::srs::{DynamicSrsResolver, SrsResolver};
 
 pub struct GeoTiff {
     file_path: String,
@@ -121,7 +123,7 @@ impl GeoTiffLoader {//todo rename to GeoTiffManager
             index: Box::new(RSGeoTiffIndex::new())
         }
     }
-    pub fn load_geotiffs(&mut self, files_pattern: &str, srs_resolver: &SrsResolver) {//todo rename to load_and_index o.ä.
+    pub fn load_geotiffs(&mut self, files_pattern: &str, srs_resolver: &DynamicSrsResolver) {//todo rename to load_and_index o.ä.
         match glob(files_pattern) {
             Ok(paths) => {
                 for entry in paths {
@@ -148,7 +150,7 @@ impl GeoTiffLoader {//todo rename to GeoTiffManager
         }
     }
 
-    pub fn load_geotiff(&mut self, file_path: &str, srs_resolver: &SrsResolver) -> Result<GeoTiff, Box<dyn Error>> {
+    pub fn load_geotiff(&mut self, file_path: &str, srs_resolver: &DynamicSrsResolver) -> Result<GeoTiff, Box<dyn Error>> {
         let img_file = BufReader::new(File::open(file_path).expect("Could not open input file"));
         let mut geotiffreader = GeoTiffReader::open(img_file).expect("Could not read input file as tiff");
 
@@ -158,7 +160,7 @@ impl GeoTiffLoader {//todo rename to GeoTiffManager
         let dimensions = geotiffreader.images().get(0).expect("no image in tiff").dimensions.unwrap();
 
         let geo_params : Vec<&str> = geo_params.split("|").collect();
-        let proj_tiff = srs_resolver.get_epsg(geo_params[0]).expect("not found");
+        let proj_tiff = srs_resolver.get_epsg(geo_params[0].to_string()).expect("not found");
 
         let proj_wgs84 = Proj::from_epsg_code(4326).unwrap();
         let proj_tiff = Proj::from_epsg_code(proj_tiff as u16).unwrap(); //as u16 should not be necessary, SrsResolver should return u16
@@ -177,6 +179,16 @@ impl GeoTiffLoader {//todo rename to GeoTiffManager
         };
         Ok(geo_tiff)
     }
+    fn find_geotiff_id_for_wgs84_coord(&mut self, lon: f64, lat: f64) -> Vec<String> {
+        self.index.find_geotiff_id_for_wgs84_coord(lon, lat)
+    }
+    fn get_geotiff_by_id(&mut self, geotiff_id: &str) -> Option<String> {
+        self.index.get_geotiff_by_id(geotiff_id)
+    }
+    fn get_geotiff_count(&mut self) -> usize {
+        self.index.get_geotiff_count()
+    }
+
 }
 
 
@@ -298,35 +310,165 @@ impl PointDistance for RSBoundingBox {
 
 pub(crate) struct BufferingElevationEnricher {
     geotiff_loader: GeoTiffLoader,
-    nodes_for_geotiffs: HashMap<String,Vec<Node>>,
+    nodes_for_geotiffs: HashMap<String,Vec<Node>>,//TODO change to references &Node ?
+    node_counts_for_geotiffs: HashMap<String, usize>,
+    srs_resolver: DynamicSrsResolver,
+    max_buffer_len: usize,
+    max_buffered_nodes: usize,
 }
 impl BufferingElevationEnricher {
-    fn new() -> Self {
+    fn default() -> Self {
+        Self::new(100000, 5_000_000)
+    }
+    fn new(max_buffer_len: usize, max_buffered_nodes: usize) -> Self {
         Self {
             geotiff_loader: GeoTiffLoader::new(),
             nodes_for_geotiffs: HashMap::new(),
+            node_counts_for_geotiffs: HashMap::new(),
+            srs_resolver: DynamicSrsResolver::new(),
+            max_buffer_len,
+            max_buffered_nodes,
         }
     }
-    fn init(mut self, file_pattern: &str, srs_resolver: &SrsResolver) -> BufferingElevationEnricher {
-        self.geotiff_loader.load_geotiffs(file_pattern, srs_resolver);
+    fn init(mut self, file_pattern: &str) -> BufferingElevationEnricher {
+        self.geotiff_loader.load_geotiffs(file_pattern, &self.srs_resolver);
         self
     }
-}
-impl Handler for BufferingElevationEnricher {
-    fn handle_node(&mut self, node: Node) -> Vec<Node> {
-        //get geotiff_id for node coords
-        //add node to map nodes_for_geotiffs
-        //check if one map entry vector has configured flush size,
-        // if yes: load the geotiff for this id and handle all nodes and return as vector?
-        // Problem: Handlers are not chained. Interface Handler needs to be changed: Return Vec<Node> instead of Option<Node>?
-        todo!()
+
+    /// only add node to (new) buffer, nothing else.
+    /// handling and flushing is triggered by the trait methods
+    fn buffer_node(&mut self, node: Node) -> (Option<String>, Option<Node>) {
+        let geotiffs = self.geotiff_loader.find_geotiff_id_for_wgs84_coord(node.coordinate().lon(), node.coordinate().lat());
+        if geotiffs.is_empty() {
+            return (None, Some(node))
+        }
+
+        let geotiff_name = geotiffs.first().unwrap().to_string();
+        // let mut buffer_option: Option<&Vec<Node>> = self.nodes_for_geotiffs.get(&geotiff_name);
+        // let mut buffer_vec;
+        self.nodes_for_geotiffs.entry(geotiff_name.clone()).or_insert_with(Vec::new).push(node);//todo remove clone
+        // match buffer_option {
+        //     None => {
+        //         buffer_vec = vec![node];
+        //         self.nodes_for_geotiffs.insert(geotiff_name.clone(), buffer_vec);
+        //         self.node_counts_for_geotiffs.insert(geotiff_name.clone(), 1);
+        //     }
+        //     Some(buffer) => {
+        //         buffer.push(node);
+        //
+        //         let current_count = self.node_counts_for_geotiffs.get(&geotiff_name).unwrap_or(&0usize);
+        //         self.node_counts_for_geotiffs.insert(geotiff_name, current_count + 1);
+        //     }
+        // }
+        //
+        (Some(geotiff_name), None)
     }
-    fn flush_nodes(&mut self) -> Vec<Node> {
-        // this function is called when no more nodes are received
-        // handle all remaining nodes from all modes_for_geotiffs vectors
-        // Problem: Handlers are not chained. Instead of finish() add a boolean isLast to handle_node()?
-        println!("+++++++++++++++++++++++++++++++++ flush_nodes called +++++++++++++++++++++++++++++++++");
-        todo!()
+
+    // load geotiff for this buffer and add elevation to all nodes in buffer,
+    // return enriched nodes for downstream prociessing and empty the buffer.
+    fn handle_and_flush_buffer(&mut self, buffer_name: String) -> Vec<Element> {
+        let mut result_elements = vec![];
+        // let geotiff = self.geotiff_loader.get_geotiff_by_id(buffer_name.as_str()).expect("could not load geotiff");
+        let mut geotiff = self.geotiff_loader.load_geotiff(buffer_name.as_str(), &self.srs_resolver).expect("could not load geotiff");
+        let buffer_vec = self.nodes_for_geotiffs.remove(&buffer_name).expect("buffer not found");
+        for mut node in buffer_vec {
+            let result = &geotiff.get_string_value_for_wgs_84(node.coordinate().lon(), node.coordinate().lat());
+            match result {
+                None => {
+                    log::warn!("no elevation value for node#{}", node.id());
+                }
+                Some(value) => {
+                    node.tags_mut().push(Tag::new("ele".to_string(), value.clone()));//todo avoid clone
+                }
+            }
+            result_elements.push(into_node_element(node.clone()));//todo avoid clone
+        }
+        self.nodes_for_geotiffs.insert(buffer_name, vec![]);
+        result_elements
+    }
+
+}
+impl Processor for BufferingElevationEnricher {
+    fn name(&self) -> String { "BufferingElevationEnricher".to_string() }
+    fn handle_element(&mut self, element: Element) -> Vec<Element> {
+        match element {
+            Element::Node { node } => {
+                let node_id = node.id();
+                let (buffer_option, node_option) = self.buffer_node(node); //nur puffern, nichts tun
+                match buffer_option {
+                    None => {
+                        log::warn!("node#{} was not buffered - no geotiff found for it?", &node_id);
+                        match node_option {
+                            None => {
+                                log::error!("buffer_node returned no buffer name and also no node");
+                                vec![]
+                            },
+                            Some(node) => {vec![into_node_element(node)]}
+                        }
+                    }
+                    Some(buffer_name) => {
+                        match self.nodes_for_geotiffs.get(&buffer_name) {
+                            None => {
+                                log::error!("the map nodes_for_geotiffs contained key {} but no value!", &node_id);
+                                match node_option {
+                                    None => vec![],
+                                    Some(node) => {vec![into_node_element(node)]}
+                                }
+                            }
+                            Some(buffer_vec) => {
+                                if buffer_vec.len() > self.max_buffer_len {
+                                    self.handle_and_flush_buffer(buffer_name) //elevation setzen, zrückgeben
+                                } else {
+                                    vec![]
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            Element::Way { .. } => { vec![element] }
+            Element::Relation { .. } => { vec![element] }
+            Element::Sentinel => {vec![]}
+        }
+    }
+    fn handle_and_flush_elements(&mut self, elements: Vec<Element>) -> Vec<Element> {
+        let mut handeled = vec![];
+        for element in elements {
+            match element {
+                Element::Node { node } => {
+                    let node_id = node.id();
+                    let (buffer_option, node_option) = self.buffer_node(node); //nur puffern, nichts tun
+                    match buffer_option {
+                        None => {
+                            match node_option {
+                                None => {
+                                    log::error!("buffer_node returned no buffer name and also no node");
+                                },
+                                Some(node) => {
+                                    log::warn!("node was not buffered for some reason, but will be sent to downstream processing");
+                                    let _ = handeled.push(into_node_element(node.clone()));}//todo avoid clone?
+                            }
+                        }
+                        Some(_) => {
+                            //buffering is ok for now, no action needed her, node will be flushed a few lines below
+                        }
+                    }
+                }
+                Element::Way { .. } => {
+                    //element sent to downstream processors
+                    handeled.push(element)
+                }
+                Element::Relation { .. } => { handeled.push(element) }
+                Element::Sentinel => {}
+            }
+        }
+        let mut buffers: Vec<String> = self.nodes_for_geotiffs.iter()
+            .map(|(k, v)| k.to_string())
+            .collect();
+        for buffer_name in buffers {
+            handeled.append(&mut self.handle_and_flush_buffer(buffer_name));
+        }
+        handeled
     }
 }
 
@@ -345,15 +487,16 @@ mod tests {
     use proj4rs::Proj;
     use simple_logger::SimpleLogger;
     use crate::handler::geotiff::{GeoTiff, GeoTiffLoader, SrsResolver, transform, round_f32, round_f64, format_as_elevation_string, RSBoundingBox};
+    use crate::srs::DynamicSrsResolver;
 
     fn create_geotiff_limburg() -> GeoTiff {
         let mut tiff_loader = GeoTiffLoader::new();
-        let mut geotiff = tiff_loader.load_geotiff("test/limburg_an_der_lahn.tif", &SrsResolver::new()).expect("got error");
+        let mut geotiff = tiff_loader.load_geotiff("test/limburg_an_der_lahn.tif", &DynamicSrsResolver::new()).expect("got error");
         geotiff
     }
     fn create_geotiff_srtm_38_03() -> GeoTiff {
         let mut tiff_loader = GeoTiffLoader::new();
-        let mut geotiff = tiff_loader.load_geotiff("test/srtm_38_03.tif", &SrsResolver::new()).expect("got error");
+        let mut geotiff = tiff_loader.load_geotiff("test/srtm_38_03.tif", &DynamicSrsResolver::new()).expect("got error");
         geotiff
     }
     fn create_fake_geotiff(proj_tiff: Proj, file_path: &str) -> GeoTiff {
@@ -389,7 +532,7 @@ mod tests {
     #[test]
     fn test_load_geotiffs() {
         SimpleLogger::new().init();
-        let srs_resolver = SrsResolver::new();
+        let srs_resolver = DynamicSrsResolver::new();
         let mut geotiff_loader = GeoTiffLoader::new();
         geotiff_loader.load_geotiffs("test/*.tif", &srs_resolver);
         assert_eq!(1, geotiff_loader.index.get_geotiff_count());
@@ -399,7 +542,7 @@ mod tests {
     #[test]
     fn test_find_geotiff_id_for_wgs84_coord() {
         SimpleLogger::new().init();
-        let srs_resolver = SrsResolver::new();
+        let srs_resolver = DynamicSrsResolver::new();
         let mut geotiff_loader = GeoTiffLoader::new();
         geotiff_loader.load_geotiffs("test/*.tif", &srs_resolver);
         assert_eq!(1, geotiff_loader.index.get_geotiff_count());
@@ -411,7 +554,7 @@ mod tests {
     #[ignore]
     fn test_find_geotiff_id_for_wgs84_coord_srtm_38_03() {
         SimpleLogger::new().init();
-        let srs_resolver = SrsResolver::new();
+        let srs_resolver = DynamicSrsResolver::new();
         let mut geotiff_loader = GeoTiffLoader::new();
         geotiff_loader.load_geotiffs("/home/jh/data/elevation/srtm/*.tif", &srs_resolver);
         assert_eq!(7, geotiff_loader.index.get_geotiff_count());
