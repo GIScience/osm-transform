@@ -12,7 +12,7 @@ use osm_io::osm::model::tag::Tag;
 use proj4rs::Proj;
 use rstar::{RTree, RTreeObject, AABB, Point, PointDistance, Envelope};
 use crate::processor::{format_element_id, into_node_element, into_vec_node_element, into_vec_relation_element, into_vec_way_element, into_way_element, Processor};
-use crate::srs::{DynamicSrsResolver, SrsResolver};
+use crate::srs::{DynamicSrsResolver};
 
 pub struct GeoTiff {
     file_path: String,
@@ -486,7 +486,7 @@ mod tests {
     use georaster::geotiff::{GeoTiffReader, RasterValue};
     use proj4rs::Proj;
     use simple_logger::SimpleLogger;
-    use crate::handler::geotiff::{GeoTiff, GeoTiffLoader, SrsResolver, transform, round_f32, round_f64, format_as_elevation_string, RSBoundingBox};
+    use crate::handler::geotiff::{GeoTiff, GeoTiffLoader, transform, round_f32, round_f64, format_as_elevation_string, RSBoundingBox};
     use crate::srs::DynamicSrsResolver;
 
     fn create_geotiff_limburg() -> GeoTiff {
@@ -595,7 +595,7 @@ mod tests {
 
     #[test]
     fn experiment_from_user_string() {
-        let mut srs_resolver = SrsResolver::new();
+        let mut srs_resolver = DynamicSrsResolver::new();
         proj_methods("ETRS89 / UTM zone 32N|ETRS89|",
                      "geotiffreader.geo_params", &srs_resolver);
         proj_methods("ETRS89 / UTM zone 32N",
@@ -613,13 +613,13 @@ mod tests {
         proj_methods("proj4.defs(\"EPSG:25832\",\"+proj=utm +zone=32 +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs +type=crs\");",
                      "proj4js von https://epsg.io/25832", &srs_resolver);
     }
-    fn proj_methods(value: &str, source: &str, srs_resolver: &SrsResolver) {
+    fn proj_methods(value: &str, source: &str, srs_resolver: &DynamicSrsResolver) {
         println!("\n{value} ({source}):");
         dbg!(Proj::from_proj_string(value));
         dbg!(Proj::from_user_string(value));
         dbg!(CRS::try_from(value.to_string()));
         dbg!(epsg::references::get_name(value));
-        dbg!(srs_resolver.get_epsg(value));
+        dbg!(srs_resolver.get_epsg(value.to_string()));
     }
 
     #[test]
