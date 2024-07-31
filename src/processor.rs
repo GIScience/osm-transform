@@ -91,11 +91,11 @@ impl HandlerResult {
 
 
 #[derive(Default)]
-pub(crate) struct ProcessorChain {
+pub(crate) struct HandlerChain {
     pub processors: Vec<Box<dyn Processor>>,
 }
-impl ProcessorChain {
-    pub(crate) fn add(mut self, processor: impl Processor + Sized + 'static) -> ProcessorChain {
+impl HandlerChain {
+    pub(crate) fn add(mut self, processor: impl Processor + Sized + 'static) -> HandlerChain {
         self.processors.push(Box::new(processor));
         self
     }
@@ -452,7 +452,7 @@ pub(crate) mod tests {
     #[test]
     /// Assert that it is possible to run a chain of processors.
     fn test_chain() {
-        let mut processor_chain = ProcessorChain::default()
+        let mut processor_chain = HandlerChain::default()
             .add(ElementCounter::new("initial"))
             .add(TestOnlyOrderRecorder::new("initial"))
 
@@ -494,7 +494,7 @@ pub(crate) mod tests {
     /// The test uses TestOnlyElementBufferingDuplicatingEditingProcessor for this.
     fn test_chain_with_buffer() {
         SimpleLogger::new().init();
-        let mut processor_chain = ProcessorChain::default()
+        let mut processor_chain = HandlerChain::default()
             .add(ElementCounter::new("initial"))
             .add(TestOnlyOrderRecorder::new("initial"))
 
@@ -531,7 +531,7 @@ pub(crate) mod tests {
     /// The test uses TestOnlyElementMixedAdder for this.
     fn test_chain_with_mixed_element_adder() {
         SimpleLogger::new().init();
-        let mut processor_chain = ProcessorChain::default()
+        let mut processor_chain = HandlerChain::default()
             .add(ElementCounter::new("initial"))
             .add(TestOnlyOrderRecorder::new("initial"))
 
@@ -564,7 +564,7 @@ pub(crate) mod tests {
     /// The test uses TestOnlyElementAdder for this.
     fn test_chain_with_element_adder() {
         SimpleLogger::new().init();
-        let mut processor_chain = ProcessorChain::default()
+        let mut processor_chain = HandlerChain::default()
             .add(ElementCounter::new("initial"))
             .add(TestOnlyOrderRecorder::new("initial"))
 
@@ -598,7 +598,7 @@ pub(crate) mod tests {
     /// The test uses TestOnlyElementFilter for this, which filters nodes with an even id.
     fn test_chain_with_element_filter() {
         SimpleLogger::new().init();
-        let mut processor_chain = ProcessorChain::default()
+        let mut processor_chain = HandlerChain::default()
             .add(ElementCounter::new("initial"))
             .add(TestOnlyOrderRecorder::new("initial"))
 
@@ -632,7 +632,7 @@ pub(crate) mod tests {
     /// The test uses TestOnlyElementReplacer for this, which replaces node#6 with a new instance.
     fn test_chain_with_element_replacer() {
         SimpleLogger::new().init();
-        let mut processor_chain = ProcessorChain::default()
+        let mut processor_chain = HandlerChain::default()
             .add(ElementCounter::new("initial"))
             .add(TestOnlyOrderRecorder::new("initial"))
 
@@ -670,7 +670,7 @@ pub(crate) mod tests {
     /// which is not explicitly asserted.
     fn test_chain_with_element_modifier() {
         SimpleLogger::new().init();
-        let mut processor_chain = ProcessorChain::default()
+        let mut processor_chain = HandlerChain::default()
             .add(ElementCounter::new("initial"))
             .add(TestOnlyOrderRecorder::new("initial"))
 
@@ -709,7 +709,7 @@ pub(crate) mod tests {
     #[test]
     fn handler_chain() {
         SimpleLogger::new().init();
-        let chain = ProcessorChain::default()
+        let chain = HandlerChain::default()
             .add(ElementCounter::new("initial"))
             .add(TagValueBasedOsmElementsFilter::new(
                 OsmElementTypeSelection::node_only(),
@@ -733,7 +733,7 @@ pub(crate) mod tests {
         let mut node_ids = BitVec::from_elem(10usize, false);
         node_ids.set(1usize, true);
         node_ids.set(2usize, true);
-        let chain = ProcessorChain::default()
+        let chain = HandlerChain::default()
             .add(ElementCounter::new("initial"))
             .add(NodeIdFilter { node_ids: node_ids.clone() })
             .add(ElementCounter::new("final"))
@@ -742,7 +742,7 @@ pub(crate) mod tests {
         handle_test_nodes_and_verify_result(chain);
     }
 
-    fn handle_test_nodes_and_verify_result(mut handler_chain: ProcessorChain) {
+    fn handle_test_nodes_and_verify_result(mut handler_chain: HandlerChain) {
         handler_chain.process(simple_node_element(1, vec![(existing_tag().as_str(), "kasper")]));
         handler_chain.process(simple_node_element(2, vec![(existing_tag().as_str(), "seppl")]));
         handler_chain.process(simple_node_element(3, vec![(existing_tag().as_str(), "hotzenplotz")]));
