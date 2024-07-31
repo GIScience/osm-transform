@@ -458,13 +458,33 @@ mod tests {
     use crate::processor::geotiff::{BufferingElevationEnricher, format_as_elevation_string, GeoTiff, GeoTiffLoader, round_f32, round_f64, transform};
     use crate::processor::Processor;
     use crate::srs::DynamicSrsResolver;
-
-    fn wgs84_coord_hd_mountain() -> Coordinate {Coordinate::new(49.397500, 8.726878)}
-    fn wgs84_coordinate_hd_river() -> Coordinate { Coordinate::new(49.411029, 8.682461)}
-    fn wgs84_coordinate_limburg_1() -> Coordinate { Coordinate::new(50.39, 8.06)}
-    fn wgs84_coordinate_limburg_traffic_circle() -> Coordinate { Coordinate::new(50.38536322, 8.06185930)}
+    struct TestPoint {
+        lon: f64,
+        lat: f64,
+    }
+    impl TestPoint {
+        fn new(lon: f64, lat: f64) -> Self {
+            Self { lon, lat }
+        }
+        fn from_coordinate(coordinate: Coordinate) -> Self {
+            Self { lon: coordinate.lon(), lat: coordinate.lat() }
+        }
+        fn as_coordinate(&self) -> Coordinate {
+            Coordinate::new(self.lat, self.lon)
+        }
+        fn as_tuple_lon_lat(&self) -> (f64, f64) {
+            (self.lon, self.lat)
+        }
+        fn lon(&self) -> f64 { self.lon }
+        fn lat(&self) -> f64 { self.lat }
+    }
     fn as_coord(tup: (f64, f64)) -> Coordinate {Coordinate::new(tup.1, tup.0)}
-    fn as_lon_lat(coordinate: Coordinate) -> (f64, f64) { (coordinate.lon(), coordinate.lat()) }
+    fn as_tuple_lon_lat(coordinate: Coordinate) -> (f64, f64) { (coordinate.lon(), coordinate.lat()) }
+    fn wgs84_coord_hd_mountain() -> TestPoint {TestPoint::new(8.726878, 49.397500)}
+    fn wgs84_coordinate_hd_river() -> TestPoint {TestPoint::new(8.682461, 49.411029)}
+    fn wgs84_coordinate_limburg_vienna_house() -> TestPoint {TestPoint::new(8.06, 50.39)}
+    fn wgs84_coordinate_limburg_traffic_circle() -> TestPoint {TestPoint::new(8.06185930, 50.38536322)}
+
     fn create_geotiff_limburg() -> GeoTiff {
         let mut tiff_loader = GeoTiffLoader::new();
         let mut geotiff = tiff_loader.load_geotiff("test/limburg_an_der_lahn.tif", &DynamicSrsResolver::new()).expect("got error");
@@ -501,11 +521,11 @@ mod tests {
 
     pub fn simple_node_element_limburg(id: i64, tags: Vec<(&str, &str)>) -> Element {
         let tags_obj = tags.iter().map(|(k, v)| Tag::new(k.to_string(), v.to_string())).collect();
-        crate::processor::tests::node_element(id, 1, wgs84_coordinate_limburg_1(), 1, 1, 1, "a".to_string(), true, tags_obj)
+        crate::processor::tests::node_element(id, 1, wgs84_coordinate_limburg_vienna_house().as_coordinate(), 1, 1, 1, "a".to_string(), true, tags_obj)
     }
     pub fn simple_node_element_hd_ma(id: i64, tags: Vec<(&str, &str)>) -> Element {
         let tags_obj = tags.iter().map(|(k, v)| Tag::new(k.to_string(), v.to_string())).collect();
-        crate::processor::tests::node_element(id, 1, wgs84_coordinate_hd_river(), 1, 1, 1, "a".to_string(), true, tags_obj)
+        crate::processor::tests::node_element(id, 1, wgs84_coordinate_hd_river().as_coordinate(), 1, 1, 1, "a".to_string(), true, tags_obj)
     }
     fn validate_node_id(id: i64, element_option: &Option<&Element>) {
         if element_option.is_none() {
@@ -562,8 +582,8 @@ mod tests {
         let mut geotiff_loader = GeoTiffLoader::new();
         geotiff_loader.load_geotiffs("test/*.tif", &srs_resolver);
         assert_eq!(2, geotiff_loader.index.get_geotiff_count());
-        let limburg_1 = wgs84_coordinate_limburg_1();
-        let geotiffs = geotiff_loader.index.find_geotiff_id_for_wgs84_coord(limburg_1.lon(), limburg_1.lat());
+        let test_point = wgs84_coordinate_limburg_vienna_house();
+        let geotiffs = geotiff_loader.index.find_geotiff_id_for_wgs84_coord(test_point.lon(), test_point.lat());
         assert_eq!(1, geotiffs.len());
         assert_eq!("test/limburg_an_der_lahn.tif", geotiffs[0]);
     }
@@ -574,7 +594,8 @@ mod tests {
         let mut geotiff_loader = GeoTiffLoader::new();
         geotiff_loader.load_geotiffs("test/*.tif", &srs_resolver);
         assert_eq!(2, geotiff_loader.index.get_geotiff_count());
-        let geotiffs = geotiff_loader.index.find_geotiff_id_for_wgs84_coord(wgs84_coordinate_hd_river().lon(), wgs84_coordinate_hd_river().lat());
+        let test_point = wgs84_coordinate_hd_river();
+        let geotiffs = geotiff_loader.index.find_geotiff_id_for_wgs84_coord(test_point.lon(), test_point.lat());
         assert_eq!(1, geotiffs.len());
         assert_eq!("test/heidelberg_mannheim_dsm.tif", geotiffs[0]);
     }
@@ -595,7 +616,8 @@ mod tests {
     #[test]
     fn geotiff_limburg_get_value_for_wgs_84() {
         let mut geotiff = create_geotiff_limburg();
-        let value = geotiff.get_value_for_wgs_84(wgs84_coordinate_limburg_traffic_circle().lon(), wgs84_coordinate_limburg_traffic_circle().lat());
+        let test_point = wgs84_coordinate_limburg_traffic_circle();
+        let value = geotiff.get_value_for_wgs_84(test_point.lon(), test_point.lat());
         dbg!(&value);
         assert_eq!(&value, &RasterValue::F32(121.21507));
     }
@@ -603,7 +625,8 @@ mod tests {
     #[test]
     fn geotiff_ma_hd_get_value_for_wgs_84() {
         let mut geotiff = create_geotiff_ma_hd();
-        let value = geotiff.get_value_for_wgs_84(wgs84_coordinate_hd_river().lon(), wgs84_coordinate_hd_river().lat());
+        let test_point = wgs84_coordinate_hd_river();
+        let value = geotiff.get_value_for_wgs_84(test_point.lon(), test_point.lat());
         dbg!(&value);
         assert_eq!(&value, &RasterValue::I16(107));
     }
@@ -732,8 +755,8 @@ mod tests {
     fn geotiff_ma_hd_to_pixel_coord_and_get_value_for_pixel_coord() {
         //Values and expected results picket from QGIS
         let mut geotiff = create_geotiff_ma_hd();
-        check_tiff_to_pixel_coord_and_get_value_for_pixel_coord(&mut geotiff, as_lon_lat(wgs84_coord_hd_mountain()), (425u32, 342u32), RasterValue::I16(573));
-        check_tiff_to_pixel_coord_and_get_value_for_pixel_coord(&mut geotiff, as_lon_lat(wgs84_coordinate_hd_river()), (372u32, 326u32), RasterValue::I16(107));
+        check_tiff_to_pixel_coord_and_get_value_for_pixel_coord(&mut geotiff, wgs84_coord_hd_mountain().as_tuple_lon_lat(), (425u32, 342u32), RasterValue::I16(573));
+        check_tiff_to_pixel_coord_and_get_value_for_pixel_coord(&mut geotiff, wgs84_coordinate_hd_river().as_tuple_lon_lat(), (372u32, 326u32), RasterValue::I16(107));
     }
     fn check_tiff_to_pixel_coord_and_get_value_for_pixel_coord(geotiff: &mut GeoTiff, tiff_coord: (f64, f64), expected_pixel_coord: (u32, u32), expected_value: RasterValue) {
         let pixel_coord = geotiff.tiff_to_pixel_coord(tiff_coord.0, tiff_coord.1);
