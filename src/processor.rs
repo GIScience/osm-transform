@@ -94,7 +94,7 @@ pub(crate) struct ProcessorChain {
     pub processors: Vec<Box<dyn Processor>>,
 }
 impl ProcessorChain {
-    pub(crate) fn add_processor(mut self, processor: impl Processor + Sized + 'static) -> ProcessorChain {
+    pub(crate) fn add(mut self, processor: impl Processor + Sized + 'static) -> ProcessorChain {
         self.processors.push(Box::new(processor));
         self
     }
@@ -452,14 +452,14 @@ pub(crate) mod tests {
     /// Assert that it is possible to run a chain of processors.
     fn test_chain() {
         let mut processor_chain = ProcessorChain::default()
-            .add_processor(ElementCounter::new("initial"))
-            .add_processor(TestOnlyOrderRecorder::new("initial"))
+            .add(ElementCounter::new("initial"))
+            .add(TestOnlyOrderRecorder::new("initial"))
 
-            .add_processor(TestOnlyIdCollector::new(10))
+            .add(TestOnlyIdCollector::new(10))
 
-            .add_processor(ElementPrinter::with_prefix("final: ".to_string()).with_node_ids(hashset! {8}))
-            .add_processor(TestOnlyOrderRecorder::new("final"))
-            .add_processor(ElementCounter::new("final"))
+            .add(ElementPrinter::with_prefix("final: ".to_string()).with_node_ids(hashset! {8}))
+            .add(TestOnlyOrderRecorder::new("final"))
+            .add(ElementCounter::new("final"))
             ;
         processor_chain.process(simple_node_element(1, vec![("who", "kasper")]));
         processor_chain.process(simple_node_element(2, vec![("who", "seppl")]));
@@ -494,14 +494,14 @@ pub(crate) mod tests {
     fn test_chain_with_buffer() {
         SimpleLogger::new().init();
         let mut processor_chain = ProcessorChain::default()
-            .add_processor(ElementCounter::new("initial"))
-            .add_processor(TestOnlyOrderRecorder::new("initial"))
+            .add(ElementCounter::new("initial"))
+            .add(TestOnlyOrderRecorder::new("initial"))
 
-            .add_processor(TestOnlyElementBufferingDuplicatingEditingProcessor::default())
+            .add(TestOnlyElementBufferingDuplicatingEditingProcessor::default())
 
-            .add_processor(ElementPrinter::with_prefix("final".to_string()).with_node_ids((1..=200).collect()))
-            .add_processor(TestOnlyOrderRecorder::new("final"))
-            .add_processor(ElementCounter::new("final"))
+            .add(ElementPrinter::with_prefix("final".to_string()).with_node_ids((1..=200).collect()))
+            .add(TestOnlyOrderRecorder::new("final"))
+            .add(ElementCounter::new("final"))
             ;
 
         processor_chain.process(simple_way_element(23, vec![1, 2, 8, 6], vec![("who", "kasper")]));
@@ -531,14 +531,14 @@ pub(crate) mod tests {
     fn test_chain_with_mixed_element_adder() {
         SimpleLogger::new().init();
         let mut processor_chain = ProcessorChain::default()
-            .add_processor(ElementCounter::new("initial"))
-            .add_processor(TestOnlyOrderRecorder::new("initial"))
+            .add(ElementCounter::new("initial"))
+            .add(TestOnlyOrderRecorder::new("initial"))
 
-            .add_processor(TestOnlyElementMixedAdder::default())
+            .add(TestOnlyElementMixedAdder::default())
 
-            .add_processor(ElementPrinter::with_prefix("final".to_string()).with_node_ids((1..=200).collect()))
-            .add_processor(TestOnlyOrderRecorder::new("final"))
-            .add_processor(ElementCounter::new("final"))
+            .add(ElementPrinter::with_prefix("final".to_string()).with_node_ids((1..=200).collect()))
+            .add(TestOnlyOrderRecorder::new("final"))
+            .add(ElementCounter::new("final"))
             ;
 
         processor_chain.process(simple_way_element(22, vec![], vec![]));
@@ -564,14 +564,14 @@ pub(crate) mod tests {
     fn test_chain_with_element_adder() {
         SimpleLogger::new().init();
         let mut processor_chain = ProcessorChain::default()
-            .add_processor(ElementCounter::new("initial"))
-            .add_processor(TestOnlyOrderRecorder::new("initial"))
+            .add(ElementCounter::new("initial"))
+            .add(TestOnlyOrderRecorder::new("initial"))
 
-            .add_processor(TestOnlyElementAdder::default())
+            .add(TestOnlyElementAdder::default())
 
-            .add_processor(ElementPrinter::with_prefix("final".to_string()).with_node_ids((1..=200).collect()))
-            .add_processor(TestOnlyOrderRecorder::new("final"))
-            .add_processor(ElementCounter::new("final"))
+            .add(ElementPrinter::with_prefix("final".to_string()).with_node_ids((1..=200).collect()))
+            .add(TestOnlyOrderRecorder::new("final"))
+            .add(ElementCounter::new("final"))
             ;
 
         processor_chain.process(simple_way_element(23, vec![1, 2, 8, 6], vec![("who", "kasper")]));
@@ -598,14 +598,14 @@ pub(crate) mod tests {
     fn test_chain_with_element_filter() {
         SimpleLogger::new().init();
         let mut processor_chain = ProcessorChain::default()
-            .add_processor(ElementCounter::new("initial"))
-            .add_processor(TestOnlyOrderRecorder::new("initial"))
+            .add(ElementCounter::new("initial"))
+            .add(TestOnlyOrderRecorder::new("initial"))
 
-            .add_processor(TestOnlyElementFilter::default())
+            .add(TestOnlyElementFilter::default())
 
-            .add_processor(ElementPrinter::with_prefix("final".to_string()).with_node_ids((1..=200).collect()))
-            .add_processor(TestOnlyOrderRecorder::new("final"))
-            .add_processor(ElementCounter::new("final"))
+            .add(ElementPrinter::with_prefix("final".to_string()).with_node_ids((1..=200).collect()))
+            .add(TestOnlyOrderRecorder::new("final"))
+            .add(ElementCounter::new("final"))
             ;
 
         processor_chain.process(simple_node_element(1, vec![("who", "kasper")]));
@@ -632,14 +632,14 @@ pub(crate) mod tests {
     fn test_chain_with_element_replacer() {
         SimpleLogger::new().init();
         let mut processor_chain = ProcessorChain::default()
-            .add_processor(ElementCounter::new("initial"))
-            .add_processor(TestOnlyOrderRecorder::new("initial"))
+            .add(ElementCounter::new("initial"))
+            .add(TestOnlyOrderRecorder::new("initial"))
 
-            .add_processor(TestOnlyElementReplacer::default())
+            .add(TestOnlyElementReplacer::default())
 
-            .add_processor(ElementPrinter::with_prefix("final".to_string()).with_node_ids((1..=200).collect()))
-            .add_processor(TestOnlyOrderRecorder::new("final"))
-            .add_processor(ElementCounter::new("final"))
+            .add(ElementPrinter::with_prefix("final".to_string()).with_node_ids((1..=200).collect()))
+            .add(TestOnlyOrderRecorder::new("final"))
+            .add(ElementCounter::new("final"))
             ;
 
         processor_chain.process(simple_node_element(1, vec![("who", "kasper")]));
@@ -670,15 +670,15 @@ pub(crate) mod tests {
     fn test_chain_with_element_modifier() {
         SimpleLogger::new().init();
         let mut processor_chain = ProcessorChain::default()
-            .add_processor(ElementCounter::new("initial"))
-            .add_processor(TestOnlyOrderRecorder::new("initial"))
+            .add(ElementCounter::new("initial"))
+            .add(TestOnlyOrderRecorder::new("initial"))
 
-            .add_processor(TestOnlyElementModifier::default())
-            .add_processor(TagKeyBasedOsmElementsFilter::new(OsmElementTypeSelection::node_only(), vec!["added".to_string()], FilterType::AcceptMatching))
+            .add(TestOnlyElementModifier::default())
+            .add(TagKeyBasedOsmElementsFilter::new(OsmElementTypeSelection::node_only(), vec!["added".to_string()], FilterType::AcceptMatching))
 
-            .add_processor(ElementPrinter::with_prefix("final".to_string()).with_node_ids((1..=200).collect()))
-            .add_processor(TestOnlyOrderRecorder::new("final"))
-            .add_processor(ElementCounter::new("final"))
+            .add(ElementPrinter::with_prefix("final".to_string()).with_node_ids((1..=200).collect()))
+            .add(TestOnlyOrderRecorder::new("final"))
+            .add(ElementCounter::new("final"))
             ;
 
         processor_chain.process(simple_node_element(1, vec![("who", "kasper")]));
@@ -709,19 +709,19 @@ pub(crate) mod tests {
     fn handler_chain() {
         SimpleLogger::new().init();
         let chain = ProcessorChain::default()
-            .add_processor(ElementCounter::new("initial"))
-            .add_processor(TagValueBasedOsmElementsFilter::new(
+            .add(ElementCounter::new("initial"))
+            .add(TagValueBasedOsmElementsFilter::new(
                 OsmElementTypeSelection::node_only(),
                 existing_tag(),
                 Regex::new(".*p.*").unwrap(),
                 FilterType::AcceptMatching))
-            .add_processor(TagValueBasedOsmElementsFilter::new(
+            .add(TagValueBasedOsmElementsFilter::new(
                 OsmElementTypeSelection::node_only(),
                 existing_tag(),
                 Regex::new(".*z.*").unwrap(),
                 FilterType::RemoveMatching))
-            .add_processor(ElementCounter::new("final"))
-            .add_processor(TestOnlyIdCollector::new(100));
+            .add(ElementCounter::new("final"))
+            .add(TestOnlyIdCollector::new(100));
 
         handle_test_nodes_and_verify_result(chain);
     }
@@ -733,10 +733,10 @@ pub(crate) mod tests {
         node_ids.set(1usize, true);
         node_ids.set(2usize, true);
         let chain = ProcessorChain::default()
-            .add_processor(ElementCounter::new("initial"))
-            .add_processor(NodeIdFilter { node_ids: node_ids.clone() })
-            .add_processor(ElementCounter::new("final"))
-            .add_processor(TestOnlyIdCollector::new(100));
+            .add(ElementCounter::new("initial"))
+            .add(NodeIdFilter { node_ids: node_ids.clone() })
+            .add(ElementCounter::new("final"))
+            .add(TestOnlyIdCollector::new(100));
 
         handle_test_nodes_and_verify_result(chain);
     }
