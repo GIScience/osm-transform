@@ -4,6 +4,7 @@ mod predicate;
 mod info;
 mod modify;
 pub mod geotiff;
+mod interpolate;
 
 use std::collections::{BTreeMap, HashMap, HashSet};
 
