@@ -10,7 +10,7 @@ use osm_io::osm::pbf;
 use osm_io::osm::pbf::compression_type::CompressionType;
 use osm_io::osm::pbf::file_info::FileInfo;
 use crate::Config;
-use crate::handler::HandlerChain;
+use crate::processor::HandlerChain;
 
 pub fn process_with_handler(config: &Config, handler_chain: &mut HandlerChain) -> Result<(), anyhow::Error> {
     log::info!("Starting pbf io pipeline...");
@@ -19,18 +19,7 @@ pub fn process_with_handler(config: &Config, handler_chain: &mut HandlerChain) -
     let reader = pbf::reader::Reader::new(&config.input_pbf)?;
 
     for element in reader.elements()? {
-        match element {
-            Element::Node { node } => {
-                handler_chain.process_node(node)
-            },
-            Element::Way { way } => {
-                handler_chain.process_way(way)
-            },
-            Element::Relation { relation } => {
-                handler_chain.process_relation(relation)
-            },
-            _ => (),
-        }
+        handler_chain.process(element);
     }
     // handler_chain.flush_nodes();
     log::info!("Finished pbf io pipeline, time: {}", stopwatch);

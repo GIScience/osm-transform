@@ -9,6 +9,7 @@ use btreemultimap::BTreeMultiMap;
 use csv::{ReaderBuilder, WriterBuilder};
 use geo::{BoundingRect, Contains, Coord, coord, Intersects, MultiPolygon, Rect};
 use geo::BooleanOps;
+use osm_io::osm::model::element::Element;
 use osm_io::osm::model::node::Node;
 use osm_io::osm::model::tag::Tag;
 use serde::Deserialize;
@@ -16,7 +17,7 @@ use wkt::{Geometry, ToWkt};
 use wkt::Wkt;
 
 use crate::Config;
-use crate::handler::Handler;
+use crate::processor::{Handler, into_node_element};
 
 const GRID_SIZE: usize = 64800;
 const AREA_ID_MULTIPLE: u16 = u16::MAX;
@@ -160,10 +161,7 @@ impl AreaHandler {
         }
         wtr.flush().expect("failed to flush");
     }
-}
-
-impl Handler for AreaHandler {
-    fn handle_node(&mut self, node: Node) -> Vec<Node> {
+    fn handle_node(&mut self, node: Node) -> Vec<Element> {
         let mut result: Vec<String> = Vec::new();
         if node.coordinate().lat() >= 90.0 || node.coordinate().lat() <= -90.0 {
             return vec![];
@@ -187,7 +185,17 @@ impl Handler for AreaHandler {
         }
         let mut node = node;
         node.tags_mut().push(Tag::new("country".to_string(), result.join(",")));
-        vec![node]
+        vec![into_node_element(node)]
+    }
+}
+
+impl Handler for AreaHandler {
+    fn name(&self) -> String { "AreaHandler".to_string() }
+    fn handle_element(&mut self, element: Element) -> Vec<Element> {
+        match element {
+            Element::Node { node } => self.handle_node(node),
+            _ => vec![element]
+        }
     }
 }
 
@@ -195,7 +203,8 @@ impl Handler for AreaHandler {
 mod tests {
     use std::collections::HashSet;
     use crate::area::AreaHandler;
-    use crate::handler::{CountType, ElementCounter, HandlerChain, OsmElementTypeSelection};
+    use crate::processor::{HandlerChain, OsmElementTypeSelection};
+    use crate::processor::info::{CountType, ElementCounter};
     use crate::io::process_with_handler;
 
     use super::*;
@@ -219,9 +228,9 @@ mod tests {
         area_handler.load(config.country_csv.clone().unwrap()).expect("Area handler failed to load CSV file");
 
         let mut handler_chain = HandlerChain::default()
-            .add(ElementCounter::new(OsmElementTypeSelection {node:true, way:false, relation:false}, CountType::ALL))
+            .add(ElementCounter::new("initial"))
             .add(area_handler)
-            .add(ElementCounter::new(OsmElementTypeSelection {node:true, way:false, relation:false}, CountType::ACCEPTED));
+            .add(ElementCounter::new("final"));
 
         let _ = process_with_handler(&config, &mut handler_chain).expect("process_with_handler failed");
         let result = handler_chain.collect_result();

@@ -1,10 +1,10 @@
-mod collect;
-mod filter;
-mod predicate;
-mod info;
-mod modify;
+pub(crate) mod collect;
+pub(crate) mod filter;
+pub(crate) mod predicate;
+pub(crate) mod info;
+pub(crate) mod modify;
 pub mod geotiff;
-mod interpolate;
+pub(crate) mod interpolate;
 
 use std::collections::{BTreeMap, HashMap, HashSet};
 

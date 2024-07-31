@@ -18,7 +18,13 @@ use log::LevelFilter;
 use regex::Regex;
 use crate::io::process_with_handler;
 use area::AreaHandler;
-use crate::handler::{AllElementsFilter, ComplexElementsFilter, CountType, ElementCounter, ElementPrinter, FilterType, HandlerChain, HandlerResult, MetadataRemover, NodeIdFilter, OsmElementTypeSelection, ReferencedNodeIdCollector, TagFilterByKey};
+use crate::processor::{HandlerChain, HandlerResult, OsmElementTypeSelection};
+use crate::processor::collect::{ReferencedNodeIdCollector};
+use crate::processor::filter::{AllElementsFilter, ComplexElementsFilter, FilterType, NodeIdFilter, TagFilterByKey};
+use crate::processor::geotiff::{BufferingElevationEnricher};
+use crate::processor::info::{CountType, ElementCounter, ElementPrinter};
+use crate::processor::modify::MetadataRemover;
+
 use crate::output::OutputHandler;
 
 
@@ -49,11 +55,11 @@ pub fn run(config: &Config) -> HandlerResult{
 }
 fn extract_referenced_nodes(config: &Config) -> HandlerResult {
     let mut handler_chain = HandlerChain::default()
-        .add(ElementCounter::new(OsmElementTypeSelection::all(), CountType::ALL))
+        .add(ElementCounter::new("initial"))
         .add(AllElementsFilter{handle_types: OsmElementTypeSelection::node_only()})
         .add(ComplexElementsFilter::ors_default())
         .add(ReferencedNodeIdCollector::default())
-        .add(ElementCounter::new(OsmElementTypeSelection::all(), CountType::ACCEPTED))
+        .add(ElementCounter::new("final"))
         ;
 
     log::info!("Starting extraction of referenced node ids...");
@@ -73,7 +79,7 @@ fn process(config: &Config, node_filter_result: Option<HandlerResult>) -> Handle
             .with_node_ids(config.print_node_ids.clone())
             .with_way_ids(config.print_way_ids.clone())
             .with_relation_ids(config.print_relation_ids.clone()))
-        .add(ElementCounter::new(OsmElementTypeSelection::all(), CountType::ALL));
+        .add(ElementCounter::new("initial"));
 
     if config.remove_metadata {
         handler_chain = handler_chain.add(MetadataRemover::default())
@@ -113,7 +119,7 @@ fn process(config: &Config, node_filter_result: Option<HandlerResult>) -> Handle
         Regex::new("(.*:)?source(:.*)?|(.*:)?note(:.*)?|url|created_by|fixme|wikipedia").unwrap(),
         FilterType::RemoveMatching));
 
-    handler_chain = handler_chain.add(ElementCounter::new(OsmElementTypeSelection::all(), CountType::ACCEPTED));
+    handler_chain = handler_chain.add(ElementCounter::new("final"));
 
     handler_chain = handler_chain.add(ElementPrinter::with_prefix("output:----------------\n".to_string())
         .with_node_ids(config.print_node_ids.clone())
