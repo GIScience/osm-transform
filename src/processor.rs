@@ -152,7 +152,7 @@ impl ProcessorChain {
 
 
 #[cfg(test)]
-mod tests {
+pub(crate) mod tests {
     use std::ops::Add;
     use bit_vec::BitVec;
     use log4rs::append::Append;
