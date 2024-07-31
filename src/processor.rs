@@ -3,6 +3,7 @@ mod filter;
 mod predicate;
 mod info;
 mod modify;
+pub mod geotiff;
 
 use std::collections::{BTreeMap, HashMap, HashSet};
 

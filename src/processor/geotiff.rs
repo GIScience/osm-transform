@@ -455,7 +455,7 @@ mod tests {
     use proj4rs::Proj;
     use simple_logger::SimpleLogger;
 
-    use crate::handler::geotiff::{BufferingElevationEnricher, format_as_elevation_string, GeoTiff, GeoTiffLoader, round_f32, round_f64, transform};
+    use crate::processor::geotiff::{BufferingElevationEnricher, format_as_elevation_string, GeoTiff, GeoTiffLoader, round_f32, round_f64, transform};
     use crate::processor::Processor;
     use crate::srs::DynamicSrsResolver;
 
