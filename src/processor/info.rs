@@ -5,7 +5,7 @@ use osm_io::osm::model::node::Node;
 use osm_io::osm::model::relation::Relation;
 use osm_io::osm::model::way::Way;
 
-use crate::processor::{HandlerResult, OsmElementTypeSelection, Processor};
+use crate::processor::{HandlerResult, OsmElementTypeSelection, Handler};
 
 #[derive(Debug)]
 pub(crate) enum CountType {
@@ -28,7 +28,7 @@ impl ElementCounter {
         }
     }
 }
-impl Processor for ElementCounter {
+impl Handler for ElementCounter {
     fn name(&self) -> String { format!("ElementCounter {}", self.result_key) }
     fn handle_element(&mut self, element: Element) -> Vec<Element> {
         match element {
@@ -162,7 +162,7 @@ impl ElementPrinter {
         }
     }
 }
-impl Processor for ElementPrinter {
+impl Handler for ElementPrinter {
     fn name(&self) -> String { format!("ElementPrinter {}", self.prefix) }
     fn handle_element(&mut self, element: Element) -> Vec<Element> {
         match element {
@@ -186,7 +186,7 @@ impl Processor for ElementPrinter {
 #[cfg(test)]
 mod test {
     use crate::processor::info::ElementPrinter;
-    use crate::processor::Processor;
+    use crate::processor::Handler;
     use crate::processor::tests::simple_node_element;
 
     #[test]

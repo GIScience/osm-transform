@@ -32,7 +32,7 @@ pub fn into_relation_element(relation: Relation) -> Element { Element::Relation 
 pub fn into_vec_node_element(node: Node) -> Vec<Element> { vec![into_node_element(node)]}
 pub fn into_vec_way_element(way: Way) -> Vec<Element> { vec![into_way_element(way)]}
 pub fn into_vec_relation_element(relation: Relation) -> Vec<Element> { vec![into_relation_element(relation)]}
-pub trait Processor {
+pub trait Handler {
 
     fn name(&self) -> String;
 
@@ -92,10 +92,10 @@ impl HandlerResult {
 
 #[derive(Default)]
 pub(crate) struct HandlerChain {
-    pub processors: Vec<Box<dyn Processor>>,
+    pub processors: Vec<Box<dyn Handler>>,
 }
 impl HandlerChain {
-    pub(crate) fn add(mut self, processor: impl Processor + Sized + 'static) -> HandlerChain {
+    pub(crate) fn add(mut self, processor: impl Handler + Sized + 'static) -> HandlerChain {
         self.processors.push(Box::new(processor));
         self
     }
@@ -208,7 +208,7 @@ pub(crate) mod tests {
     ///Modify element and return same instance.
     #[derive(Debug, Default)]
     pub(crate) struct TestOnlyElementModifier;
-    impl Processor for TestOnlyElementModifier {
+    impl Handler for TestOnlyElementModifier {
         fn name(&self) -> String { "TestOnlyElementModifier".to_string() }
         fn handle_element(&mut self, element: Element) -> Vec<Element> {
             match element {
@@ -232,7 +232,7 @@ pub(crate) mod tests {
     ///Return a copy of the element, e.g. a different instance.
     #[derive(Debug, Default)]
     pub(crate) struct TestOnlyElementReplacer;
-    impl Processor for TestOnlyElementReplacer {
+    impl Handler for TestOnlyElementReplacer {
         fn name(&self) -> String { "TestOnlyElementReplacer".to_string() }
         fn handle_element(&mut self, element: Element) -> Vec<Element> {
             match element {
@@ -253,7 +253,7 @@ pub(crate) mod tests {
     ///Remove an element / return empty vec.
     #[derive(Debug, Default)]
     pub(crate) struct TestOnlyElementFilter;
-    impl Processor for TestOnlyElementFilter {
+    impl Handler for TestOnlyElementFilter {
         fn name(&self) -> String { "TestOnlyElementFilter".to_string() }
         fn handle_element(&mut self, element: Element) -> Vec<Element> {
             match element {
@@ -272,7 +272,7 @@ pub(crate) mod tests {
     ///Receive one element, return two of the same type.
     #[derive(Debug, Default)]
     pub(crate) struct TestOnlyElementAdder;
-    impl Processor for TestOnlyElementAdder {
+    impl Handler for TestOnlyElementAdder {
         fn name(&self) -> String { "TestOnlyElementAdder".to_string() }
         fn handle_element(&mut self, element: Element) -> Vec<Element> {
             match element {
@@ -291,7 +291,7 @@ pub(crate) mod tests {
     ///Receive one way, return a way and a new node for each ref of the way.
     #[derive(Debug, Default)]
     pub(crate) struct TestOnlyElementMixedAdder;
-    impl Processor for TestOnlyElementMixedAdder {
+    impl Handler for TestOnlyElementMixedAdder {
         fn name(&self) -> String { "TestOnlyElementMixedAdder".to_string() }
         fn handle_element(&mut self, element: Element) -> Vec<Element> {
             match element {
@@ -345,7 +345,7 @@ pub(crate) mod tests {
             vec![node, node_clone] //todo remove the clone, thats just an experiment
         }
     }
-    impl Processor for TestOnlyElementBufferingDuplicatingEditingProcessor {
+    impl Handler for TestOnlyElementBufferingDuplicatingEditingProcessor {
         // fn struct_name() -> &'static str { "TestOnlyElementBuffer" }
         fn name(&self) -> String { "TestOnlyElementBuffer".to_string() }
         fn handle_element(&mut self, element: Element) -> Vec<Element> {
@@ -406,7 +406,7 @@ pub(crate) mod tests {
             }
         }
     }
-    impl Processor for TestOnlyIdCollector {
+    impl Handler for TestOnlyIdCollector {
         fn name(&self) -> String { "TestOnlyIdCollector".to_string() }
         fn handle_element(&mut self, element: Element) -> Vec<Element> {
             match element {
@@ -436,7 +436,7 @@ pub(crate) mod tests {
             }
         }
     }
-    impl Processor for TestOnlyOrderRecorder {
+    impl Handler for TestOnlyOrderRecorder {
         fn name(&self) -> String { format!("TestOnlyOrderRecorder {}", self.result_key) }
         fn handle_element(&mut self, element: Element) -> Vec<Element> {
             self.received_ids.push(format_element_id(&element));

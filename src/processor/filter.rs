@@ -7,7 +7,7 @@ use osm_io::osm::model::relation::Relation;
 use osm_io::osm::model::tag::Tag;
 use osm_io::osm::model::way::Way;
 use regex::Regex;
-use crate::processor::{HIGHEST_NODE_ID, into_node_element, into_relation_element, into_way_element, OsmElementTypeSelection, Processor};
+use crate::processor::{HIGHEST_NODE_ID, into_node_element, into_relation_element, into_way_element, OsmElementTypeSelection, Handler};
 use crate::processor::predicate::{HasOneOfTagKeysPredicate, HasTagKeyValuePredicate, HasNoneOfTagKeysPredicate};
 
 #[derive(Debug)]
@@ -84,7 +84,7 @@ impl TagValueBasedOsmElementsFilter {
     }
 
 }
-impl Processor for TagValueBasedOsmElementsFilter {
+impl Handler for TagValueBasedOsmElementsFilter {
     fn name(&self) -> String { "TagValueBasedOsmElementsFilter".to_string() }
     fn handle_element(&mut self, element: Element) -> Vec<Element> {
         match element {
@@ -123,7 +123,7 @@ impl TagKeyBasedOsmElementsFilter {
         }
     }
 }
-impl Processor for TagKeyBasedOsmElementsFilter {
+impl Handler for TagKeyBasedOsmElementsFilter {
     fn name(&self) -> String { "TagKeyBasedOsmElementsFilter".to_string() }
     fn handle_element(&mut self, element: Element) -> Vec<Element> {
         match element {
@@ -207,7 +207,7 @@ impl TagFilterByKey {
         }
     }
 }
-impl Processor for TagFilterByKey {
+impl Handler for TagFilterByKey {
     fn name(&self) -> String {
         "TagFilterByKey".to_string()
     }
@@ -248,7 +248,7 @@ impl AllElementsFilter {
         }
     }
 }
-impl Processor for AllElementsFilter {
+impl Handler for AllElementsFilter {
     fn name(&self) -> String {
         "AllElementsFilter".to_string()
     }
@@ -289,7 +289,7 @@ impl NodeIdFilter {
     }
 
 }
-impl Processor for NodeIdFilter {
+impl Handler for NodeIdFilter {
     fn name(&self) -> String {
         "NodeIdFilter".to_string()
     }
@@ -376,7 +376,7 @@ impl ComplexElementsFilter {
         }
     }
 }
-impl Processor for ComplexElementsFilter {
+impl Handler for ComplexElementsFilter {
     fn name(&self) -> String {
         "ComplexElementsFilter".to_string()
     }

@@ -2,7 +2,7 @@ use osm_io::osm::model::element::Element;
 use osm_io::osm::model::node::Node;
 use osm_io::osm::model::relation::Relation;
 use osm_io::osm::model::way::Way;
-use crate::processor::{into_node_element, into_relation_element, into_way_element, Processor};
+use crate::processor::{into_node_element, into_relation_element, into_way_element, Handler};
 
 #[derive(Default)]
 pub(crate) struct MetadataRemover;
@@ -19,7 +19,7 @@ impl MetadataRemover {
         vec![into_relation_element(Relation::new(relation.id(), 0, 0, 0, 0, String::default(), relation.visible(), relation.members().clone(), relation.tags().clone()))]
     }
 }
-impl Processor for MetadataRemover {
+impl Handler for MetadataRemover {
     fn name(&self) -> String {
         "MetadataRemover".to_string()
     }

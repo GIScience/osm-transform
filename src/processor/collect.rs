@@ -3,7 +3,7 @@ use osm_io::osm::model::element::Element;
 use osm_io::osm::model::relation::{Member, Relation};
 use osm_io::osm::model::way::Way;
 
-use crate::processor::{HandlerResult, HIGHEST_NODE_ID, into_node_element, into_relation_element, into_way_element, Processor};
+use crate::processor::{HandlerResult, HIGHEST_NODE_ID, into_node_element, into_relation_element, into_way_element, Handler};
 
 pub(crate) struct ReferencedNodeIdCollector {
     referenced_node_ids: BitVec
@@ -41,7 +41,7 @@ impl ReferencedNodeIdCollector {
         vec![into_relation_element(relation)]
     }
 }
-impl Processor for ReferencedNodeIdCollector {
+impl Handler for ReferencedNodeIdCollector {
     fn name(&self) -> String {
         "ReferencedNodeIdCollector".to_string()
     }
@@ -62,7 +62,7 @@ impl Processor for ReferencedNodeIdCollector {
 
 #[cfg(test)]
 mod test {
-    use crate::processor::{HIGHEST_NODE_ID, Processor};
+    use crate::processor::{HIGHEST_NODE_ID, Handler};
     use crate::processor::tests::{simple_node_element, TestOnlyIdCollector};
 
     #[test]

@@ -14,7 +14,7 @@ use osm_io::osm::model::tag::Tag;
 use proj4rs::Proj;
 use rstar::{AABB, Envelope, Point, PointDistance, RTree, RTreeObject};
 
-use crate::processor::{format_element_id, into_node_element, into_vec_node_element, into_vec_relation_element, into_vec_way_element, into_way_element, Processor};
+use crate::processor::{format_element_id, into_node_element, into_vec_node_element, into_vec_relation_element, into_vec_way_element, into_way_element, Handler};
 use crate::srs::DynamicSrsResolver;
 
 pub struct GeoTiff {
@@ -356,7 +356,7 @@ impl BufferingElevationEnricher {
         result_elements
     }
 }
-impl Processor for BufferingElevationEnricher {
+impl Handler for BufferingElevationEnricher {
     fn name(&self) -> String { "BufferingElevationEnricher".to_string() }
     fn handle_element(&mut self, element: Element) -> Vec<Element> {
         match element {
@@ -456,7 +456,7 @@ mod tests {
     use simple_logger::SimpleLogger;
 
     use crate::processor::geotiff::{BufferingElevationEnricher, format_as_elevation_string, GeoTiff, GeoTiffLoader, round_f32, round_f64, transform};
-    use crate::processor::Processor;
+    use crate::processor::Handler;
     use crate::srs::DynamicSrsResolver;
     struct TestPoint {
         lon: f64,
