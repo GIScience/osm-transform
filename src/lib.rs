@@ -118,7 +118,18 @@ fn process(config: &Config, node_filter_result: Option<HandlerResult>) -> Handle
         None => ()
     }
 
-    //todo add elevation processing
+    match &config.elevation_tiffs {
+        None => (),
+        Some(file_pattern) => {
+            log::info!("Initializing elevation enricher");
+            stopwatch.start();
+            let mut elevation_enricher = BufferingElevationEnricher::default();
+            elevation_enricher.init(&config.elevation_tiffs.clone().unwrap()).expect("Elevation enricher failed to initialize");
+            log::info!("Finished initializing elevation enricher, time: {}", stopwatch);
+            handler_chain = handler_chain.add(elevation_enricher);
+            stopwatch.reset();
+        }
+    }
 
     handler_chain = handler_chain.add(TagFilterByKey::new(
         OsmElementTypeSelection::all(),
@@ -160,6 +171,7 @@ pub struct Config {
     pub input_pbf: PathBuf,
     pub country_csv: Option<PathBuf>,
     pub output_pbf: Option<PathBuf>,
+    pub elevation_tiffs: Option<String>,
     pub with_node_filtering: bool,
     pub debug: u8,
     pub print_node_ids: HashSet<i64>,

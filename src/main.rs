@@ -31,6 +31,10 @@ pub struct Args {
     #[arg(short = 'c', long, value_name = "FILE")]
     pub(crate) country_csv: Option<PathBuf>,
 
+    /// Elevation GeoTiff Files (glob pattern allowed) to enrich nodes with elevation data.
+    #[arg(short = 'e', long, value_name = "PATTERN")]
+    pub(crate) elevation_tiffs: Option<String>,
+
     /// Turn debugging information on.
     #[arg(short = 'd', long, action = clap::ArgAction::Count)]
     pub debug: u8,
@@ -62,6 +66,7 @@ impl Args {
             input_pbf: self.input_pbf,
             country_csv: self.country_csv,
             output_pbf: self.output_pbf,
+            elevation_tiffs: self.elevation_tiffs,
             debug: self.debug,
             with_node_filtering: ! self.suppress_node_filtering,
             print_node_ids: HashSet::from_iter(self.print_node_ids),

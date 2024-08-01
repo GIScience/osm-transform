@@ -21,7 +21,7 @@ pub fn process_with_handler(config: &Config, handler_chain: &mut HandlerChain) -
     for element in reader.elements()? {
         handler_chain.process(element);
     }
-    // handler_chain.flush_nodes();
+    handler_chain.flush(vec![]);
     log::info!("Finished pbf io pipeline, time: {}", stopwatch);
     Ok(())
 }

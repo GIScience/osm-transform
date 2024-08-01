@@ -216,6 +216,7 @@ mod tests {
             input_pbf: PathBuf::from("test/baarle_small.pbf"),
             output_pbf:  Some(PathBuf::from("output.pbf")),
             country_csv: Some(PathBuf::from("test/mapping_test.csv")),
+            elevation_tiffs: None,
             debug: 0,
             with_node_filtering: false,
             print_node_ids: HashSet::new(),

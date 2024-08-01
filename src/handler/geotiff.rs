@@ -299,7 +299,7 @@ pub(crate) struct BufferingElevationEnricher {
 }
 impl BufferingElevationEnricher {
     pub fn default() -> Self {
-        Self::new(100_000, 5_000_000)
+        Self::new(1_000_000, 5_000_000)
     }
     pub fn new(max_buffer_len: usize, max_buffered_nodes: usize) -> Self {
         Self {
@@ -311,9 +311,9 @@ impl BufferingElevationEnricher {
             max_buffered_nodes,
         }
     }
-    pub fn init(mut self, file_pattern: &str) -> BufferingElevationEnricher {
+    pub fn init(&mut self, file_pattern: &str) -> Result<(), Box<dyn Error>> {
         self.geotiff_loader.load_geotiffs(file_pattern, &self.srs_resolver);
-        self
+        Ok(())
     }
     fn use_loader(mut self, geo_tiff_loader: GeoTiffLoader) -> Self {
         self.geotiff_loader = geo_tiff_loader;
@@ -340,11 +340,14 @@ impl BufferingElevationEnricher {
         let mut result_elements = vec![];
         let mut geotiff = self.geotiff_loader.load_geotiff(buffer_name.as_str(), &self.srs_resolver).expect("could not load geotiff");
         let buffer_vec = self.nodes_for_geotiffs.remove(&buffer_name).expect("buffer not found");
+        log::debug!("Handling and flushing buffer with {} buffered nodes for geotiff '{}'", buffer_vec.len(), buffer_name);
         for mut node in buffer_vec {
             let result = &geotiff.get_string_value_for_wgs_84(node.coordinate().lon(), node.coordinate().lat());
             match result {
                 None => {
-                    log::warn!("no elevation value for node#{}", node.id());
+                    if log::log_enabled!(log::Level::Trace) {
+                        log::warn!("no elevation value for node#{}", node.id());
+                    }
                 }
                 Some(value) => {
                     node.tags_mut().push(Tag::new("ele".to_string(), value.clone())); //todo avoid clone
@@ -365,7 +368,9 @@ impl Handler for BufferingElevationEnricher {
                 let (buffer_option, node_option) = self.buffer_node(node); //nur puffern, nichts tun
                 match buffer_option {
                     None => {
-                        log::warn!("node#{} was not buffered - no geotiff found for it?", &node_id);
+                        if log::log_enabled!(log::Level::Trace) {
+                            log::warn!("node#{} was not buffered - no geotiff found for it?", &node_id);
+                        }
                         match node_option {
                             None => {
                                 log::error!("buffer_node returned no buffer name and also no node");
@@ -400,6 +405,7 @@ impl Handler for BufferingElevationEnricher {
         }
     }
     fn handle_and_flush_elements(&mut self, elements: Vec<Element>) -> Vec<Element> {
+        log::debug!("{}: handle_and_flush_elements called", self.name());
         let mut handeled = vec![];
         for element in elements {
             match element {
@@ -822,7 +828,7 @@ mod tests {
     fn buffering_elevation_enricher_test() {
         SimpleLogger::new().init();
         let mut handler = BufferingElevationEnricher::new(3, 5);
-        handler = handler.init("test/*.tif");
+        handler.init("test/*.tif");
 
         // The first elements should be buffered in the buffer for their tiff
         assert_eq!(0usize, handler.handle_element(simple_node_element_limburg(1, vec![])).len());
