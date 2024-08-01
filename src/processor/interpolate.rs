@@ -1,4 +1,4 @@
-use std::collections::{HashMap};
+use std::collections::HashMap;
 use osm_io::osm::model::coordinate::Coordinate;
 use osm_io::osm::model::node::Node;
 
@@ -27,15 +27,17 @@ impl WaySplitter {
     fn compute_intermediate_points(&mut self, a: Coordinate, b: Coordinate, resolution: (f64, f64)) -> Vec<Coordinate> {
         let dx = b.lat() - a.lat();
         let dy = b.lon() - a.lon();
-        let n = f64::max(dx.abs() / resolution.0, dy.abs() / resolution.1).ceil();
+        let n = f64::max(dx.abs() / resolution.0, dy.abs() / resolution.1).max(1.0).ceil();
+
         let sx = dx / n;
         let sy = dy / n;
 
         let mut x = a.lat();
         let mut y = a.lon();
-        let mut v = Vec::new();
+        let n = (n - 1.0) as usize;
+        let mut v = Vec::with_capacity(n);
 
-        for i in 1..(n as i32) {
+        for i in 0..n {
             x += sx;
             y += sy;
             v.push(Coordinate::new(x, y));
