@@ -64,12 +64,14 @@ fn test_intermediate_points() {
     let mut way_splitter = WaySplitter::new();
     let point_a = Coordinate::new(-1., 0.0);
     let point_b = Coordinate::new(0.0, 1.0);
+    let point_c = Coordinate::new(1.0, 0.0);
+    let point_d = Coordinate::new(0.0, -1.);
 
     // test no intermediate points necessary
     let points = way_splitter.compute_intermediate_points(point_a.clone(), point_b.clone(), (1.0, 1.0));
     assert_eq!(points.len(), 0);
 
-    // test one intermediate points necessary
+    // test one intermediate point necessary
     let points = way_splitter.compute_intermediate_points(point_a.clone(), point_b.clone(), (0.5, 0.5));
     assert_eq!(points.len(), 1);
     assert_eq!(points[0], Coordinate::new(-0.5, 0.5));
@@ -80,4 +82,16 @@ fn test_intermediate_points() {
     assert_eq!(points[0], Coordinate::new(-0.75, 0.25));
     assert_eq!(points[1], Coordinate::new(-0.50, 0.50));
     assert_eq!(points[2], Coordinate::new(-0.25, 0.75));
+
+    // test longitude lines perpendicular to the Equator
+    let points = way_splitter.compute_intermediate_points(point_a.clone(), point_c.clone(), (1.0, 1.0));
+    assert_eq!(points[0], Coordinate::new(0.0, 0.0));
+
+    // test latitude lines parallel to the Equator
+    let points = way_splitter.compute_intermediate_points(point_b.clone(), point_d.clone(), (2.0, 1.0));
+    assert_eq!(points[0], Coordinate::new(0.0, 0.0));
+
+    // test attempt to split zero length way
+    let points = way_splitter.compute_intermediate_points(point_a.clone(), point_a.clone(), (1.0, 1.0));
+    assert_eq!(points.len(), 0);
 }
