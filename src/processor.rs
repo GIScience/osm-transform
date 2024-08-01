@@ -85,7 +85,7 @@ impl HandlerResult {
         }
     }
     pub fn to_string(&self) -> String {
-        format!("HandlerResult:\n  {:?}\n  {:?}", &self.counts, &self.other)
+        format!("HandlerResult:\n  counts:{:?}\n  other:{:?}", &self.counts, &self.other)
     }
     pub fn to_string_with_node_ids(&self) -> String {
         let node_ids_len = self.node_ids.len();

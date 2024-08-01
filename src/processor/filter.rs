@@ -296,7 +296,7 @@ impl Handler for NodeIdFilter {
     fn handle_element(&mut self, element: Element) -> Vec<Element> {
         match element {
             Element::Node { node } => { self.handle_node(node) }
-            _ => vec![]
+            _ => vec![element]
         }
     }
 }

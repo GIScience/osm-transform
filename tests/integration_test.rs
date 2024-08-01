@@ -22,9 +22,8 @@ fn run_all() {
     let mut config = base_config();
     rusty_routes_transformer::init(&config);
     let result = rusty_routes_transformer::run(&config);
-    dbg!(&result);
     assert_eq!(result.counts.get("nodes count initial").unwrap(), &3964i32);
-    assert_eq!(result.counts.get("final").unwrap(), &299i32);
+    assert_eq!(result.counts.get("nodes count final").unwrap(), &299i32);
 }
 
 #[test]
@@ -32,8 +31,8 @@ fn run_no_output_pbf() {
     let mut config = base_config();
     config.output_pbf = None;
     let result = rusty_routes_transformer::run(&config);
-    assert_eq!(result.counts.get("initial").unwrap(), &3964i32);
-    assert_eq!(result.counts.get("final").unwrap(), &299i32);
+    assert_eq!(result.counts.get("nodes count initial").unwrap(), &3964i32);
+    assert_eq!(result.counts.get("nodes count final").unwrap(), &299i32);
 }
 
 #[test]
@@ -42,6 +41,6 @@ fn run_no_country_csv() {
     config.country_csv = None;
     rusty_routes_transformer::init(&config);
     let result = rusty_routes_transformer::run(&config);
-    assert_eq!(result.counts.get("initial").unwrap(), &3964i32);
-    assert_eq!(result.counts.get("final").unwrap(), &299i32);
+    assert_eq!(result.counts.get("nodes count initial").unwrap(), &3964i32);
+    assert_eq!(result.counts.get("nodes count final").unwrap(), &299i32);
 }

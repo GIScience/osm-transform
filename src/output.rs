@@ -55,7 +55,7 @@ impl Handler for OutputHandler {
             Element::Node { node } => self.handle_node(node),
             Element::Way { way } => self.handle_way(way),
             Element::Relation { relation } => self.handle_relation(relation),
-            Element::Sentinel => vec![element]
+            Element::Sentinel => vec![]
         }
     }
 
