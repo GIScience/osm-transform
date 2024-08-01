@@ -154,7 +154,7 @@ impl GeoTiffLoader { //todo rename to GeoTiffManager
 
     fn index_geotiff(&mut self, path: PathBuf, geotiff: GeoTiff) {
         self.index.add_geotiff(geotiff, path.to_str().unwrap());
-        log::debug!("Successfully indexed geotiff file '{:?}'", path);
+        log::debug!("Successfully indexed geotiff file {:?}", path);
     }
 
     pub fn load_geotiff(&mut self, file_path: &str, srs_resolver: &DynamicSrsResolver) -> Result<GeoTiff, Box<dyn Error>> {
@@ -296,6 +296,7 @@ pub(crate) struct BufferingElevationEnricher {
     srs_resolver: DynamicSrsResolver,
     max_buffer_len: usize,
     max_buffered_nodes: usize,
+    all_buffers_flushed: bool,
 }
 impl BufferingElevationEnricher {
     pub fn default() -> Self {
@@ -309,6 +310,7 @@ impl BufferingElevationEnricher {
             srs_resolver: DynamicSrsResolver::new(),
             max_buffer_len,
             max_buffered_nodes,
+            all_buffers_flushed: false,
         }
     }
     pub fn init(&mut self, file_pattern: &str) -> Result<(), Box<dyn Error>> {
@@ -338,9 +340,9 @@ impl BufferingElevationEnricher {
     /// return nodes for downstream processing and empty the buffer.
     fn handle_and_flush_buffer(&mut self, buffer_name: String) -> Vec<Element> {
         let mut result_elements = vec![];
-        let mut geotiff = self.geotiff_loader.load_geotiff(buffer_name.as_str(), &self.srs_resolver).expect("could not load geotiff");
         let buffer_vec = self.nodes_for_geotiffs.remove(&buffer_name).expect("buffer not found");
         log::debug!("Handling and flushing buffer with {} buffered nodes for geotiff '{}'", buffer_vec.len(), buffer_name);
+        let mut geotiff = self.geotiff_loader.load_geotiff(buffer_name.as_str(), &self.srs_resolver).expect("could not load geotiff");
         for mut node in buffer_vec {
             let result = &geotiff.get_string_value_for_wgs_84(node.coordinate().lon(), node.coordinate().lat());
             match result {
@@ -357,6 +359,15 @@ impl BufferingElevationEnricher {
         }
         self.nodes_for_geotiffs.insert(buffer_name, vec![]);
         result_elements
+    }
+
+    fn flush_all_buffers(&mut self, handeled_nodes: &mut Vec<Element>) {
+        let mut buffers: Vec<String> = self.nodes_for_geotiffs.iter()
+            .map(|(k, v)| k.to_string())
+            .collect();
+        for buffer_name in buffers {
+            handeled_nodes.append(&mut self.handle_and_flush_buffer(buffer_name));
+        }
     }
 }
 impl Handler for BufferingElevationEnricher {
@@ -389,7 +400,7 @@ impl Handler for BufferingElevationEnricher {
                                 }
                             }
                             Some(buffer_vec) => {
-                                if buffer_vec.len() > self.max_buffer_len {
+                                if buffer_vec.len() >= self.max_buffer_len {
                                     self.handle_and_flush_buffer(buffer_name) //elevation setzen, zrückgeben
                                 } else {
                                     vec![]
@@ -399,19 +410,27 @@ impl Handler for BufferingElevationEnricher {
                     }
                 }
             }
-            Element::Way { .. } => { vec![element] }
-            Element::Relation { .. } => { vec![element] }
-            Element::Sentinel => { vec![] }
+            _ => {
+                // When the element is not a node, we need to flush all (node-) buffers first and _then_ handle the element
+                let mut elements = vec![];
+                if ! self.all_buffers_flushed {
+                    self.flush_all_buffers(&mut elements);
+                    self.all_buffers_flushed = true;
+                }
+                elements.push(element);
+                elements
+            }
         }
     }
     fn handle_and_flush_elements(&mut self, elements: Vec<Element>) -> Vec<Element> {
         log::debug!("{}: handle_and_flush_elements called", self.name());
-        let mut handeled = vec![];
+        let mut handeled_nodes = vec![];
+        let mut handeled_ways = vec![];
+        let mut handeled_relations = vec![];
         for element in elements {
             match element {
                 Element::Node { node } => {
-                    let node_id = node.id();
-                    let (buffer_option, node_option) = self.buffer_node(node); //nur puffern, nichts tun
+                    let (buffer_option, node_option) = self.buffer_node(node);
                     match buffer_option {
                         None => {
                             match node_option {
@@ -420,7 +439,7 @@ impl Handler for BufferingElevationEnricher {
                                 }
                                 Some(node) => {
                                     log::warn!("node was not buffered for some reason, but will be sent to downstream processing");
-                                    let _ = handeled.push(into_node_element(node.clone()));
+                                    let _ = handeled_nodes.push(into_node_element(node.clone()));
                                 } //todo avoid clone?
                             }
                         }
@@ -429,21 +448,15 @@ impl Handler for BufferingElevationEnricher {
                         }
                     }
                 }
-                Element::Way { .. } => {
-                    //element sent to downstream processors
-                    handeled.push(element)
-                }
-                Element::Relation { .. } => { handeled.push(element) }
+                Element::Way { .. } => { handeled_ways.push(element) },
+                Element::Relation { .. } => { handeled_relations.push(element) }
                 Element::Sentinel => {}
             }
         }
-        let mut buffers: Vec<String> = self.nodes_for_geotiffs.iter()
-            .map(|(k, v)| k.to_string())
-            .collect();
-        for buffer_name in buffers {
-            handeled.append(&mut self.handle_and_flush_buffer(buffer_name));
-        }
-        handeled
+        self.flush_all_buffers(&mut handeled_nodes);
+        handeled_nodes.extend(handeled_ways);
+        handeled_nodes.extend(handeled_relations);
+        handeled_nodes
     }
 }
 
@@ -827,7 +840,7 @@ mod tests {
     #[test]
     fn buffering_elevation_enricher_test() {
         SimpleLogger::new().init();
-        let mut handler = BufferingElevationEnricher::new(3, 5);
+        let mut handler = BufferingElevationEnricher::new(4, 5);
         handler.init("test/*.tif");
 
         // The first elements should be buffered in the buffer for their tiff
@@ -837,7 +850,7 @@ mod tests {
         assert_eq!(0usize, handler.handle_element(simple_node_element_limburg(2, vec![])).len());
         assert_eq!(0usize, handler.handle_element(simple_node_element_limburg(3, vec![])).len());
 
-        // When receiving the max_buffer_len+1 st element for tiff limburg, this buffer should be flushed
+        // When receiving the max_buffer_len st element for tiff limburg, this buffer should be flushed
         // and all 4 elements should be returned.
         // But the 2 elements for tiff hd_ma should remain in their buffer.
         let probably_4_limburg_nodes = handler.handle_element(simple_node_element_limburg(4, vec![]));
