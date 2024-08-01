@@ -6,7 +6,7 @@ use osm_io::osm::model::way::Way;
 use crate::handler::{HandlerResult, HIGHEST_NODE_ID, into_node_element, into_relation_element, into_way_element, Handler};
 
 pub(crate) struct ReferencedNodeIdCollector {
-    referenced_node_ids: BitVec
+    referenced_node_ids: BitVec //TODO @Julian check if ok
 }
 impl ReferencedNodeIdCollector {
     pub(crate) fn default() -> Self {
@@ -18,7 +18,6 @@ impl ReferencedNodeIdCollector {
         }
     }
     fn handle_way(&mut self, way: Way) -> Vec<Element> {
-        log::trace!("xxxxxxxxxxxxxxxxx way");
         for id in way.refs() {
             let idc = id.clone();
             self.referenced_node_ids.set(idc as usize, true);
@@ -26,7 +25,6 @@ impl ReferencedNodeIdCollector {
         vec![into_way_element(way)]
     }
     fn handle_relation(&mut self, relation: Relation) -> Vec<Element> {
-        log::trace!("xxxxxxxxxxxxxxxxx relation");
         for member in relation.members() {
             match member {
                 Member::Node { member } => {

@@ -217,6 +217,8 @@ mod tests {
             output_pbf:  Some(PathBuf::from("output.pbf")),
             country_csv: Some(PathBuf::from("test/mapping_test.csv")),
             elevation_tiffs: None,
+            elevation_batch_size: 500,
+            elevation_total_buffer_size: 5000,
             debug: 0,
             with_node_filtering: false,
             print_node_ids: HashSet::new(),

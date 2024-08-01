@@ -123,8 +123,9 @@ fn process(config: &Config, node_filter_result: Option<HandlerResult>) -> Handle
         Some(file_pattern) => {
             log::info!("Initializing elevation enricher");
             stopwatch.start();
-            let mut elevation_enricher = BufferingElevationEnricher::default();
-            elevation_enricher.init(&config.elevation_tiffs.clone().unwrap()).expect("Elevation enricher failed to initialize");
+            //TODO check old logic with elevation threshold and edge splitting
+            let mut elevation_enricher = BufferingElevationEnricher::new(config.elevation_batch_size, config.elevation_total_buffer_size);
+            elevation_enricher.init(file_pattern);
             log::info!("Finished initializing elevation enricher, time: {}", stopwatch);
             handler_chain = handler_chain.add(elevation_enricher);
             stopwatch.reset();
@@ -178,4 +179,6 @@ pub struct Config {
     pub print_way_ids: HashSet<i64>,
     pub print_relation_ids: HashSet<i64>,
     pub remove_metadata: bool,
+    pub elevation_batch_size: usize,
+    pub elevation_total_buffer_size: usize,
 }

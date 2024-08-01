@@ -35,6 +35,14 @@ pub struct Args {
     #[arg(short = 'e', long, value_name = "PATTERN")]
     pub(crate) elevation_tiffs: Option<String>,
 
+    /// Size of the elevation buffer for each elevation tiff file. This is the number of nodes that are buffered in memory before their elevation is read from the elevation tiff file in a batch.
+    #[arg(short = 'b', long, default_value = "1000000")]
+    pub elevation_batch_size: usize,
+
+    /// Total number of nodes that are buffered in all elevation file buffers. When the number is reached, the largest buffer is flushed.
+    #[arg(short = 'B', long, default_value = "50000000")]
+    pub elevation_total_buffer_size: usize,
+
     /// Turn debugging information on.
     #[arg(short = 'd', long, action = clap::ArgAction::Count)]
     pub debug: u8,
@@ -42,12 +50,12 @@ pub struct Args {
     /// Print node with id=<ID> at beginning and end of processing pipeline.
     #[arg(short = 'n', long, value_name = "ID")]
     pub print_node_ids: Vec<i64>,
-    /// Print way with id=<ID> at beginning and end of processing pipeline.
 
+    /// Print way with id=<ID> at beginning and end of processing pipeline.
     #[arg(short = 'w', long, value_name = "ID")]
     pub print_way_ids: Vec<i64>,
-    /// Print relation with id=<ID> at beginning and end of processing pipeline.
 
+    /// Print relation with id=<ID> at beginning and end of processing pipeline.
     #[arg(short = 'r', long, value_name = "ID")]
     pub print_relation_ids: Vec<i64>,
 
@@ -67,6 +75,8 @@ impl Args {
             country_csv: self.country_csv,
             output_pbf: self.output_pbf,
             elevation_tiffs: self.elevation_tiffs,
+            elevation_batch_size: self.elevation_batch_size,
+            elevation_total_buffer_size: self.elevation_total_buffer_size,
             debug: self.debug,
             with_node_filtering: ! self.suppress_node_filtering,
             print_node_ids: HashSet::from_iter(self.print_node_ids),
