@@ -87,6 +87,12 @@ impl HandlerResult {
     pub fn to_string(&self) -> String {
         format!("HandlerResult:\n  {:?}\n  {:?}", &self.counts, &self.other)
     }
+    pub fn to_string_with_node_ids(&self) -> String {
+        let node_ids_len = self.node_ids.len();
+        let node_ids_true = self.node_ids.iter().filter(|b| b == &true).count();
+        let node_ids_false = node_ids_len - node_ids_true;
+        format!("HandlerResult:\n  counts: {:?}\n  other: {:?}\n  node_ids: len={} true={} false={}", &self.counts, &self.other, node_ids_len, node_ids_true, node_ids_false)
+    }
 }
 
 

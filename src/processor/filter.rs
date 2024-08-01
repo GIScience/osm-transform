@@ -383,6 +383,7 @@ impl Handler for ComplexElementsFilter {
 
     fn handle_element(&mut self, element: Element) -> Vec<Element> {
         match element {
+            Element::Node { node } => { vec![into_node_element(node)] }
             Element::Way { way} => { self.handle_way(way) }
             Element::Relation { relation } => { self.handle_relation(relation) }
             _ => vec![]

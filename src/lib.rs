@@ -67,15 +67,22 @@ fn extract_referenced_nodes(config: &Config) -> HandlerResult {
     stopwatch.start();
     let _ = process_with_handler(config, &mut handler_chain).expect("Extraction of referenced node ids failed");
     let mut handler_result = handler_chain.collect_result();
+
     log::info!("Finished extraction of referenced node ids, time: {}", stopwatch);
-    log::info!("{}" , &handler_result.to_string());
+    if log::log_enabled!(log::Level::Trace)  {
+        log::trace!("Generating node-id statistics..." , &handler_result.to_string_with_node_ids());
+        log::trace!("{}" , &handler_result.to_string_with_node_ids());
+    }
+    else {
+        log::info!("{}" , &handler_result.to_string());
+    }
     stopwatch.reset();
     handler_result
 }
 
 fn process(config: &Config, node_filter_result: Option<HandlerResult>) -> HandlerResult {
     let mut handler_chain = HandlerChain::default()
-        .add(ElementPrinter::with_prefix("input:----------------\n".to_string())
+        .add(ElementPrinter::with_prefix("\ninput:----------------\n".to_string())
             .with_node_ids(config.print_node_ids.clone())
             .with_way_ids(config.print_way_ids.clone())
             .with_relation_ids(config.print_relation_ids.clone()))
@@ -121,7 +128,7 @@ fn process(config: &Config, node_filter_result: Option<HandlerResult>) -> Handle
 
     handler_chain = handler_chain.add(ElementCounter::new("final"));
 
-    handler_chain = handler_chain.add(ElementPrinter::with_prefix("output:----------------\n".to_string())
+    handler_chain = handler_chain.add(ElementPrinter::with_prefix("\noutput:----------------\n".to_string())
         .with_node_ids(config.print_node_ids.clone())
         .with_way_ids(config.print_way_ids.clone())
         .with_relation_ids(config.print_relation_ids.clone()));
