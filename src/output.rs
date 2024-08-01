@@ -8,7 +8,7 @@ use osm_io::osm::pbf;
 use osm_io::osm::pbf::compression_type::CompressionType;
 use osm_io::osm::pbf::file_info::FileInfo;
 
-use crate::processor::{Handler, HandlerResult, into_relation_element};
+use crate::handler::{Handler, HandlerResult, into_relation_element};
 
 pub struct OutputHandler {
     pub writer: pbf::writer::Writer,

@@ -113,12 +113,12 @@ impl HandlerChain {
         let mut indent = "".to_string();
         for processor in &mut self.processors {
             if (elements.len() == 0) {
-                log::trace!("{indent}Skipping processor chain, elements were filtered or buffered?");
+                log::trace!("{indent}Skipping handler chain, elements were filtered or buffered?");
                 break
             }
             let mut new_collected = vec![];
             for inner_element in elements {
-                log::trace!("{indent}Passing {} to processor {}", format_element_id(&inner_element), processor.name());
+                log::trace!("{indent}Passing {} to handler {}", format_element_id(&inner_element), processor.name());
                 let handled_elements = &mut processor.handle_element(inner_element);
                 log::trace!("{indent}{} returned {} elements", processor.name(), handled_elements.len());
                 new_collected.append(handled_elements);
@@ -172,9 +172,9 @@ pub(crate) mod tests {
     use osm_io::osm::model::way::Way;
     use regex::Regex;
     use simple_logger::SimpleLogger;
-    use crate::processor::*;
-    use crate::processor::filter::*;
-    use crate::processor::info::*;
+    use crate::handler::*;
+    use crate::handler::filter::*;
+    use crate::handler::info::*;
 
     fn existing_tag() -> String { "EXISTING_TAG".to_string() }
     fn missing_tag() -> String { "MISSING_TAG".to_string() }
@@ -303,7 +303,7 @@ pub(crate) mod tests {
             match element {
                 Element::Node { .. } => { vec![element] }
                 Element::Way { way } => {
-                    let mut elements: Vec<Element> = way.refs().iter().map(|id| simple_node_element(id.clone(), vec![("added", "by processor")])).collect();
+                    let mut elements: Vec<Element> = way.refs().iter().map(|id| simple_node_element(id.clone(), vec![("added", "by handler")])).collect();
                     elements.push(Element::Way { way });
                     elements
                 }
@@ -333,13 +333,13 @@ pub(crate) mod tests {
             flush_nodes
         }
         fn handle_and_flush_ways(&mut self) -> Vec<Element> {
-            //TODO add the tricky part to also change, duplicate, etc. the buffered elements (at this point, elevation processor would do its job
+            //TODO add the tricky part to also change, duplicate, etc. the buffered elements (at this point, elevation handler would do its job
             let result = self.ways.iter().map(|way| Element::Way { way: way.clone() }).collect();
             self.ways.clear();
             result
         }
         fn handle_and_flush_relations(&mut self) -> Vec<Element> {
-            //TODO add the tricky part to also change, duplicate, etc. the buffered elements (at this point, elevation processor would do its job
+            //TODO add the tricky part to also change, duplicate, etc. the buffered elements (at this point, elevation handler would do its job
             let result = self.relations.iter().map(|relation| Element::Relation { relation: relation.clone() }).collect();
             self.relations.clear();
             result

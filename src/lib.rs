@@ -3,7 +3,7 @@ pub mod area;
 pub mod output;
 pub mod osm_model;
 pub mod srs;
-pub mod processor;
+pub mod handler;
 
 #[macro_use]
 extern crate maplit;
@@ -17,12 +17,12 @@ use log::LevelFilter;
 use regex::Regex;
 use crate::io::process_with_handler;
 use area::AreaHandler;
-use crate::processor::{HandlerChain, HandlerResult, OsmElementTypeSelection};
-use crate::processor::collect::{ReferencedNodeIdCollector};
-use crate::processor::filter::{AllElementsFilter, ComplexElementsFilter, FilterType, NodeIdFilter, TagFilterByKey};
-use crate::processor::geotiff::{BufferingElevationEnricher};
-use crate::processor::info::{CountType, ElementCounter, ElementPrinter};
-use crate::processor::modify::MetadataRemover;
+use crate::handler::{HandlerChain, HandlerResult, OsmElementTypeSelection};
+use crate::handler::collect::{ReferencedNodeIdCollector};
+use crate::handler::filter::{AllElementsFilter, ComplexElementsFilter, FilterType, NodeIdFilter, TagFilterByKey};
+use crate::handler::geotiff::{BufferingElevationEnricher};
+use crate::handler::info::{CountType, ElementCounter, ElementPrinter};
+use crate::handler::modify::MetadataRemover;
 
 use crate::output::OutputHandler;
 

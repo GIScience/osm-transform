@@ -14,7 +14,7 @@ use osm_io::osm::model::tag::Tag;
 use proj4rs::Proj;
 use rstar::{AABB, Envelope, Point, PointDistance, RTree, RTreeObject};
 
-use crate::processor::{format_element_id, into_node_element, into_vec_node_element, into_vec_relation_element, into_vec_way_element, into_way_element, Handler};
+use crate::handler::{format_element_id, into_node_element, into_vec_node_element, into_vec_relation_element, into_vec_way_element, into_way_element, Handler};
 use crate::srs::DynamicSrsResolver;
 
 pub struct GeoTiff {
@@ -455,8 +455,8 @@ mod tests {
     use proj4rs::Proj;
     use simple_logger::SimpleLogger;
 
-    use crate::processor::geotiff::{BufferingElevationEnricher, format_as_elevation_string, GeoTiff, GeoTiffLoader, round_f32, round_f64, transform};
-    use crate::processor::Handler;
+    use crate::handler::geotiff::{BufferingElevationEnricher, format_as_elevation_string, GeoTiff, GeoTiffLoader, round_f32, round_f64, transform};
+    use crate::handler::Handler;
     use crate::srs::DynamicSrsResolver;
     struct TestPoint {
         lon: f64,
@@ -521,11 +521,11 @@ mod tests {
 
     pub fn simple_node_element_limburg(id: i64, tags: Vec<(&str, &str)>) -> Element {
         let tags_obj = tags.iter().map(|(k, v)| Tag::new(k.to_string(), v.to_string())).collect();
-        crate::processor::tests::node_element(id, 1, wgs84_coordinate_limburg_vienna_house().as_coordinate(), 1, 1, 1, "a".to_string(), true, tags_obj)
+        crate::handler::tests::node_element(id, 1, wgs84_coordinate_limburg_vienna_house().as_coordinate(), 1, 1, 1, "a".to_string(), true, tags_obj)
     }
     pub fn simple_node_element_hd_ma(id: i64, tags: Vec<(&str, &str)>) -> Element {
         let tags_obj = tags.iter().map(|(k, v)| Tag::new(k.to_string(), v.to_string())).collect();
-        crate::processor::tests::node_element(id, 1, wgs84_coordinate_hd_river().as_coordinate(), 1, 1, 1, "a".to_string(), true, tags_obj)
+        crate::handler::tests::node_element(id, 1, wgs84_coordinate_hd_river().as_coordinate(), 1, 1, 1, "a".to_string(), true, tags_obj)
     }
     fn validate_node_id(id: i64, element_option: &Option<&Element>) {
         if element_option.is_none() {

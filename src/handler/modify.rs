@@ -2,7 +2,7 @@ use osm_io::osm::model::element::Element;
 use osm_io::osm::model::node::Node;
 use osm_io::osm::model::relation::Relation;
 use osm_io::osm::model::way::Way;
-use crate::processor::{into_node_element, into_relation_element, into_way_element, Handler};
+use crate::handler::{into_node_element, into_relation_element, into_way_element, Handler};
 
 #[derive(Default)]
 pub(crate) struct MetadataRemover;
@@ -42,7 +42,7 @@ mod test {
     use osm_io::osm::model::relation::{Member, MemberData, Relation};
     use osm_io::osm::model::tag::Tag;
     use osm_io::osm::model::way::Way;
-    use crate::processor::modify::MetadataRemover;
+    use crate::handler::modify::MetadataRemover;
 
     #[test]
     fn metadata_remover_node() {

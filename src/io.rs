@@ -10,7 +10,7 @@ use osm_io::osm::pbf;
 use osm_io::osm::pbf::compression_type::CompressionType;
 use osm_io::osm::pbf::file_info::FileInfo;
 use crate::Config;
-use crate::processor::HandlerChain;
+use crate::handler::HandlerChain;
 
 pub fn process_with_handler(config: &Config, handler_chain: &mut HandlerChain) -> Result<(), anyhow::Error> {
     log::info!("Starting pbf io pipeline...");

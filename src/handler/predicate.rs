@@ -42,7 +42,7 @@ impl HasNoneOfTagKeysPredicate {
 mod test {
     use std::collections::HashMap;
     use osm_io::osm::model::tag::Tag;
-    use crate::processor::predicate::{HasNoneOfTagKeysPredicate, HasOneOfTagKeysPredicate, HasTagKeyValuePredicate};
+    use crate::handler::predicate::{HasNoneOfTagKeysPredicate, HasOneOfTagKeysPredicate, HasTagKeyValuePredicate};
 
     #[test]
     fn has_one_of_tag_keys_predicate_with_only_matching_tags() {

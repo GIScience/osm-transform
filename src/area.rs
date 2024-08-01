@@ -17,7 +17,7 @@ use wkt::{Geometry, ToWkt};
 use wkt::Wkt;
 
 use crate::Config;
-use crate::processor::{Handler, into_node_element};
+use crate::handler::{Handler, into_node_element};
 
 const GRID_SIZE: usize = 64800;
 const AREA_ID_MULTIPLE: u16 = u16::MAX;
@@ -203,8 +203,8 @@ impl Handler for AreaHandler {
 mod tests {
     use std::collections::HashSet;
     use crate::area::AreaHandler;
-    use crate::processor::{HandlerChain, OsmElementTypeSelection};
-    use crate::processor::info::{CountType, ElementCounter};
+    use crate::handler::{HandlerChain, OsmElementTypeSelection};
+    use crate::handler::info::{CountType, ElementCounter};
     use crate::io::process_with_handler;
 
     use super::*;

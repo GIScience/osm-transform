@@ -5,7 +5,7 @@ use osm_io::osm::model::node::Node;
 use osm_io::osm::model::relation::Relation;
 use osm_io::osm::model::way::Way;
 
-use crate::processor::{HandlerResult, OsmElementTypeSelection, Handler};
+use crate::handler::{HandlerResult, OsmElementTypeSelection, Handler};
 
 #[derive(Debug)]
 pub(crate) enum CountType {
@@ -185,9 +185,9 @@ impl Handler for ElementPrinter {
 
 #[cfg(test)]
 mod test {
-    use crate::processor::info::ElementPrinter;
-    use crate::processor::Handler;
-    use crate::processor::tests::simple_node_element;
+    use crate::handler::info::ElementPrinter;
+    use crate::handler::Handler;
+    use crate::handler::tests::simple_node_element;
 
     #[test]
     fn element_printer(){

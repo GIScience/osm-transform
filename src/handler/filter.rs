@@ -7,8 +7,8 @@ use osm_io::osm::model::relation::Relation;
 use osm_io::osm::model::tag::Tag;
 use osm_io::osm::model::way::Way;
 use regex::Regex;
-use crate::processor::{HIGHEST_NODE_ID, into_node_element, into_relation_element, into_way_element, OsmElementTypeSelection, Handler};
-use crate::processor::predicate::{HasOneOfTagKeysPredicate, HasTagKeyValuePredicate, HasNoneOfTagKeysPredicate};
+use crate::handler::{HIGHEST_NODE_ID, into_node_element, into_relation_element, into_way_element, OsmElementTypeSelection, Handler};
+use crate::handler::predicate::{HasOneOfTagKeysPredicate, HasTagKeyValuePredicate, HasNoneOfTagKeysPredicate};
 
 #[derive(Debug)]
 pub(crate) enum FilterType {
@@ -399,8 +399,8 @@ mod test {
     use osm_io::osm::model::tag::Tag;
     use osm_io::osm::model::way::Way;
     use regex::Regex;
-    use crate::processor::filter::{ComplexElementsFilter, FilterType, TagFilterByKey, TagKeyBasedOsmElementsFilter};
-    use crate::processor::OsmElementTypeSelection;
+    use crate::handler::filter::{ComplexElementsFilter, FilterType, TagFilterByKey, TagKeyBasedOsmElementsFilter};
+    use crate::handler::OsmElementTypeSelection;
 
     #[test]
     fn test_tag_filter_by_key_with_remove_matching() {
