@@ -98,7 +98,7 @@ fn process(config: &Config, node_filter_result: Option<HandlerResult>) -> Handle
         None => {}
         Some(result) => {
             log::debug!("Cloning result node_ids with len={}", result.node_ids.len());
-            let node_id_filter = NodeIdFilter { node_ids: result.node_ids.clone() };
+            let node_id_filter = NodeIdFilter { node_ids: result.node_ids.clone() };//todo check if clone is necessary
             log::debug!("node_id_filter has node_ids with len={}", node_id_filter.node_ids.len());
             handler_chain = handler_chain.add(node_id_filter);
         }

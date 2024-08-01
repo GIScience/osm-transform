@@ -55,7 +55,7 @@ impl Handler for ReferencedNodeIdCollector {
     }
     fn add_result(&mut self, mut result: HandlerResult) -> HandlerResult {
         log::debug!("cloning node_ids of ReferencedNodeIdCollector with len={} into HandlerResult ", self.referenced_node_ids.len());
-        result.node_ids = self.referenced_node_ids.clone();
+        result.node_ids = self.referenced_node_ids.clone();//todo check if clone is necessary
         result
     }
 }
