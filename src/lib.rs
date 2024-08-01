@@ -1,6 +1,5 @@
 pub mod io;
 pub mod area;
-pub mod handler;
 pub mod output;
 pub mod osm_model;
 pub mod srs;
@@ -70,7 +69,7 @@ fn extract_referenced_nodes(config: &Config) -> HandlerResult {
 
     log::info!("Finished extraction of referenced node ids, time: {}", stopwatch);
     if log::log_enabled!(log::Level::Trace)  {
-        log::trace!("Generating node-id statistics..." , &handler_result.to_string_with_node_ids());
+        log::trace!("Generating node-id statistics...");
         log::trace!("{}" , &handler_result.to_string_with_node_ids());
     }
     else {
