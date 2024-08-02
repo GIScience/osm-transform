@@ -209,35 +209,6 @@ mod tests {
 
     use super::*;
 
-    #[test]
-    #[ignore] // fixme
-    fn test_area_handler() {
-        let config = Config {
-            input_pbf: PathBuf::from("test/baarle_small.pbf"),
-            output_pbf:  Some(PathBuf::from("output.pbf")),
-            country_csv: Some(PathBuf::from("test/mapping_test.csv")),
-            elevation_tiffs: None,
-            elevation_batch_size: 500,
-            elevation_total_buffer_size: 5000,
-            debug: 0,
-            with_node_filtering: false,
-            print_node_ids: HashSet::new(),
-            print_way_ids: HashSet::new(),
-            print_relation_ids: HashSet::new(),
-            remove_metadata: true
-        };
-
-        let mut area_handler = AreaHandler::new();
-        area_handler.load(config.country_csv.clone().unwrap()).expect("Area handler failed to load CSV file");
-
-        let mut handler_chain = HandlerChain::default()
-            .add(ElementCounter::new("initial"))
-            .add(area_handler)
-            .add(ElementCounter::new("final"));
-
-        let _ = process_with_handler(&config, &mut handler_chain).expect("process_with_handler failed");
-        let result = handler_chain.collect_result();
-        println!("result: {:?}", result )
-    }
+    todo!("Add unit tests for AreaHandler");
 
 }
