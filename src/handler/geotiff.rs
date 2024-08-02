@@ -341,6 +341,9 @@ impl BufferingElevationEnricher {
     fn handle_and_flush_buffer(&mut self, buffer_name: String) -> Vec<Element> {
         let mut result_elements = vec![];
         let buffer_vec = self.nodes_for_geotiffs.remove(&buffer_name).expect("buffer not found");
+        if buffer_vec.is_empty() {
+            return vec![];
+        }
         log::debug!("Handling and flushing buffer with {} buffered nodes for geotiff '{}'", buffer_vec.len(), buffer_name);
         let mut geotiff = self.geotiff_loader.load_geotiff(buffer_name.as_str(), &self.srs_resolver).expect("could not load geotiff");
         for mut node in buffer_vec {
@@ -414,6 +417,7 @@ impl Handler for BufferingElevationEnricher {
                 // When the element is not a node, we need to flush all (node-) buffers first and _then_ handle the element
                 let mut elements = vec![];
                 if ! self.all_buffers_flushed {
+                    log::debug!("{}: Flushing all buffers before handling first non-node element", self.name());
                     self.flush_all_buffers(&mut elements);
                     self.all_buffers_flushed = true;
                 }
