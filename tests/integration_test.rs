@@ -1,6 +1,7 @@
 use std::collections::HashSet;
 use std::path::PathBuf;
-
+use osm_io::osm::model::element::Element;
+use osm_io::osm::pbf::reader::Reader;
 use rusty_routes_transformer::Config;
 
 fn base_config() -> Config {
@@ -70,6 +71,7 @@ fn run_all() {
     assert_eq!(result.counts.get("relations count final").unwrap(), &filtered_relation_count);
     assert_eq!(result.counts.get("ways count initial").unwrap(), &baarle_way_count);
     assert_eq!(result.counts.get("ways count final").unwrap(), &filtered_way_count);
+    check_pbf("target/tmp/output-integration-test-run_all.pbf", Some(42645645));
 }
 #[test]
 fn run_country() {
@@ -124,4 +126,25 @@ fn run_elevation() {
     assert_eq!(result.counts.get("relations count final").unwrap(), &filtered_relation_count);
     assert_eq!(result.counts.get("ways count initial").unwrap(), &baarle_way_count);
     assert_eq!(result.counts.get("ways count final").unwrap(), &filtered_way_count);
+}
+
+fn check_pbf(path: &str, expected_node: Option<i64>) {
+    let path_buf = PathBuf::from(path);
+    let reader = Reader::new(&path_buf).expect("pbf file not found");
+    let mut node_found = false;
+    for element in reader.elements().expect("corrupted file") {
+        match &element {
+            Element::Node { node } => {
+                if let Some(expected_node) = expected_node {
+                    if node.id() == expected_node {
+                        node_found = true;
+                    }
+                }
+            }
+            _ => (),
+        }
+    }
+    if let Some(expected_node) = expected_node {
+        assert!(node_found);
+    }
 }
