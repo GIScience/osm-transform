@@ -331,7 +331,7 @@ impl BufferingElevationEnricher {
         }
 
         let geotiff_name = geotiffs.first().unwrap().to_string();
-        self.nodes_for_geotiffs.entry(geotiff_name.clone()).or_insert_with(Vec::new).push(node); //todo remove clone
+        self.nodes_for_geotiffs.entry(geotiff_name.clone()).or_insert_with(Vec::new).push(node); //todo avoid clone String
 
         (Some(geotiff_name), None)
     }
@@ -355,10 +355,10 @@ impl BufferingElevationEnricher {
                     }
                 }
                 Some(value) => {
-                    node.tags_mut().push(Tag::new("ele".to_string(), value.clone())); //todo avoid clone
+                    node.tags_mut().push(Tag::new("ele".to_string(), value.clone())); //todo avoid clone String
                 }
             }
-            result_elements.push(into_node_element(node.clone())); //todo avoid clone
+            result_elements.push(into_node_element(node.clone())); //todo avoid clone Node
         }
         self.nodes_for_geotiffs.insert(buffer_name, vec![]);
         result_elements
@@ -443,8 +443,8 @@ impl Handler for BufferingElevationEnricher {
                                 }
                                 Some(node) => {
                                     log::warn!("node was not buffered for some reason, but will be sent to downstream processing");
-                                    let _ = handeled_nodes.push(into_node_element(node.clone()));
-                                } //todo avoid clone?
+                                    let _ = handeled_nodes.push(into_node_element(node.clone()));//todo avoid clone Node
+                                }
                             }
                         }
                         Some(_) => {
@@ -717,8 +717,8 @@ mod tests {
             &Proj::from_epsg_code(25832).expect("not found"),
             wgs84_coordinate_limburg_traffic_circle().lon(), wgs84_coordinate_limburg_traffic_circle().lat()).expect("transformation error");
         dbg!(&point_3d);
-        assert!(are_floats_close(point_3d.0, 433305.7043197789f64, 1e-2)); //todo is this still ok?
-        assert!(are_floats_close(point_3d.1, 5581899.216447188f64, 1e-2)); //todo is this still ok?
+        assert!(are_floats_close(point_3d.0, 433305.7043197789f64, 1e-2)); // Is this precision still ok?
+        assert!(are_floats_close(point_3d.1, 5581899.216447188f64, 1e-2)); // Is this precision still ok?
     }
 
     #[test]
@@ -728,8 +728,8 @@ mod tests {
             &Proj::from_epsg_code(25832).expect("not found"),
             8.06f64, 50.28f64).expect("transformation error");
         dbg!(&point_3d);
-        assert!(are_floats_close(point_3d.0, 433025.5633903637f64, 1e-4)); //todo is this still ok?
-        assert!(are_floats_close(point_3d.1, 5570185.7364423815f64, 1e-3)); //todo is this still ok?
+        assert!(are_floats_close(point_3d.0, 433025.5633903637f64, 1e-4)); // Is this precision still ok?
+        assert!(are_floats_close(point_3d.1, 5570185.7364423815f64, 1e-3)); // Is this precision still ok?
     }
 
     #[test]

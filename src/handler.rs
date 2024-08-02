@@ -16,7 +16,7 @@ use osm_io::osm::model::tag::Tag;
 use osm_io::osm::model::way::Way;
 
 
-const HIGHEST_NODE_ID: i64 = 50_000_000_000; //todo make configurable
+const HIGHEST_NODE_ID: i64 = 50_000_000_000;
 
 pub fn format_element_id(element: &Element) -> String {
     match &element {
@@ -134,8 +134,7 @@ impl HandlerChain {
             log::trace!("######");
             log::trace!("###### Flushing {} with {} elements flushed by upstream processors", processor.name(), elements.len());
             log::trace!("######");
-            //todo find solution without clone. but flushing is done only once, so it's not THAT important
-            let new_collected = processor.handle_and_flush_elements(elements.clone());
+            let new_collected = processor.handle_and_flush_elements(elements.clone()); //todo avoid clone elements. but flushing is done only once, so it's not THAT important
             if new_collected.len() > 0 {
                 log::trace!("  {} returned {} flushed elements", processor.name(), new_collected.len())
             }
@@ -333,22 +332,21 @@ pub(crate) mod tests {
             flush_nodes
         }
         fn handle_and_flush_ways(&mut self) -> Vec<Element> {
-            //TODO add the tricky part to also change, duplicate, etc. the buffered elements (at this point, elevation handler would do its job
+            // modifying the elements is tested in handle_and_flush_nodes -> should be the same here
             let result = self.ways.iter().map(|way| Element::Way { way: way.clone() }).collect();
             self.ways.clear();
             result
         }
         fn handle_and_flush_relations(&mut self) -> Vec<Element> {
-            //TODO add the tricky part to also change, duplicate, etc. the buffered elements (at this point, elevation handler would do its job
+            // modifying the elements is tested in handle_and_flush_nodes -> should be the same here
             let result = self.relations.iter().map(|relation| Element::Relation { relation: relation.clone() }).collect();
             self.relations.clear();
             result
         }
         fn handle_node(&self, node: Node) -> Vec<Node> {
-            //todo pass to configured fn/closure or something
             let mut node_clone = copy_node_with_new_id(&node, node.id().clone().add(100));
             node_clone.tags_mut().push(Tag::new("elevation".to_string(), "default-elevation".to_string()));
-            vec![node, node_clone] //todo remove the clone, thats just an experiment
+            vec![node, node_clone]
         }
     }
     impl Handler for TestOnlyElementBufferingDuplicatingEditingProcessor {
