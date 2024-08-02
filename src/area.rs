@@ -209,6 +209,6 @@ mod tests {
 
     use super::*;
 
-    todo!("Add unit tests for AreaHandler");
+    //todo Add unit tests for AreaHandler
 
 }
