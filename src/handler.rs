@@ -134,7 +134,7 @@ impl HandlerChain {
             log::trace!("######");
             log::trace!("###### Flushing {} with {} elements flushed by upstream processors", processor.name(), elements.len());
             log::trace!("######");
-            let new_collected = processor.handle_and_flush_elements(elements.clone()); //todo avoid clone elements. but flushing is done only once, so it's not THAT important
+            let new_collected = processor.handle_and_flush_elements(elements);
             if new_collected.len() > 0 {
                 log::trace!("  {} returned {} flushed elements", processor.name(), new_collected.len())
             }

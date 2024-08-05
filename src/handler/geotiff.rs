@@ -347,7 +347,7 @@ impl BufferingElevationEnricher {
         log::debug!("Handling and flushing buffer with {} buffered nodes for geotiff '{}'", buffer_vec.len(), buffer_name);
         let mut geotiff = self.geotiff_loader.load_geotiff(buffer_name.as_str(), &self.srs_resolver).expect("could not load geotiff");
         for mut node in buffer_vec {
-            let result = &geotiff.get_string_value_for_wgs_84(node.coordinate().lon(), node.coordinate().lat());
+            let result = geotiff.get_string_value_for_wgs_84(node.coordinate().lon(), node.coordinate().lat());
             match result {
                 None => {
                     if log::log_enabled!(log::Level::Trace) {
@@ -355,10 +355,10 @@ impl BufferingElevationEnricher {
                     }
                 }
                 Some(value) => {
-                    node.tags_mut().push(Tag::new("ele".to_string(), value.clone())); //todo avoid clone String
+                    node.tags_mut().push(Tag::new("ele".to_string(), value));
                 }
             }
-            result_elements.push(into_node_element(node.clone())); //todo avoid clone Node
+            result_elements.push(into_node_element(node));
         }
         self.nodes_for_geotiffs.insert(buffer_name, vec![]);
         result_elements
@@ -443,7 +443,7 @@ impl Handler for BufferingElevationEnricher {
                                 }
                                 Some(node) => {
                                     log::warn!("node was not buffered for some reason, but will be sent to downstream processing");
-                                    let _ = handeled_nodes.push(into_node_element(node.clone()));//todo avoid clone Node
+                                    let _ = handeled_nodes.push(into_node_element(node));
                                 }
                             }
                         }
