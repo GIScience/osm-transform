@@ -55,8 +55,8 @@ pub fn run(config: &Config) -> HandlerResult{
 fn extract_referenced_nodes(config: &Config) -> HandlerResult {
     let mut handler_chain = HandlerChain::default()
         .add(ElementCounter::new("initial"))
-        .add(AllElementsFilter{handle_types: OsmElementTypeSelection::node_only()})
-        .add(ComplexElementsFilter::ors_default())
+        //.add(AllElementsFilter{handle_types: OsmElementTypeSelection::node_only()})
+        .add(ComplexElementsFilter::ors_default(true))
         .add(ReferencedNodeIdCollector::default())
         .add(ElementCounter::new("final"))
         ;
@@ -91,7 +91,7 @@ fn process(config: &Config, node_filter_result: Option<HandlerResult>) -> Handle
         handler_chain = handler_chain.add(MetadataRemover::default())
     }
 
-    handler_chain = handler_chain.add(ComplexElementsFilter::ors_default());
+    handler_chain = handler_chain.add(ComplexElementsFilter::ors_default(false));
 
     match node_filter_result {
         None => {}

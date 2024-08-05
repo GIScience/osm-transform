@@ -308,20 +308,23 @@ pub(crate) struct ComplexElementsFilter {
     pub has_good_key_predicate: HasOneOfTagKeysPredicate,
     pub has_good_key_value_predicate: HasTagKeyValuePredicate,
     pub has_bad_key_predicate: HasNoneOfTagKeysPredicate,
+    pub discard_nodes: bool,
 }
 impl ComplexElementsFilter {
     pub(crate) fn new(
         has_good_key_predicate: HasOneOfTagKeysPredicate,
         has_good_key_value_predicate: HasTagKeyValuePredicate,
-        has_bad_key_predicate: HasNoneOfTagKeysPredicate) -> Self {
+        has_bad_key_predicate: HasNoneOfTagKeysPredicate,
+        discard_nodes: bool) -> Self {
         Self {
             has_good_key_predicate,
             has_good_key_value_predicate,
             has_bad_key_predicate,
+            discard_nodes
         }
     }
 
-    pub(crate) fn ors_default() -> Self{
+    pub(crate) fn ors_default(discard_nodes: bool) -> Self{
         let mut key_values = HashMap::new();
         key_values.insert("railway".to_string(), "platform".to_string());
         key_values.insert("public_transport".to_string(), "platform".to_string());
@@ -344,7 +347,8 @@ impl ComplexElementsFilter {
                     "power".to_string(),
                     "communication".to_string(),
                     "man_made".to_string()]
-            })
+            },
+            discard_nodes)
     }
     fn accept_by_tags(&mut self, tags: &Vec<Tag>) -> bool {
         self.has_good_key_predicate.test(tags) ||
@@ -591,7 +595,7 @@ mod test {
 
     #[test]
     fn complex_filter_with_ors_default() {
-        let mut filter = ComplexElementsFilter::ors_default();
+        let mut filter = ComplexElementsFilter::ors_default(false);
         // has key to keep and key-value to keep, bad key 'building' should not take effect => should be accepted
         assert_eq!(filter.handle_way(Way::new(1, 1, 1, 1, 1, "a".to_string(), true, vec![],
                                               vec![
