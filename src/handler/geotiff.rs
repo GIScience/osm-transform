@@ -3,7 +3,7 @@ use std::error::Error;
 use std::fs::File;
 use std::io::BufReader;
 use std::path::PathBuf;
-
+use itertools::Itertools;
 use bit_vec::BitVec;
 use georaster::geotiff::{GeoTiffReader, RasterValue};
 use glob::glob;
@@ -13,7 +13,7 @@ use osm_io::osm::model::node::Node;
 use osm_io::osm::model::tag::Tag;
 use proj4rs::Proj;
 use rstar::{AABB, Envelope, Point, PointDistance, RTree, RTreeObject};
-
+use serde::__private::de::Content::F64;
 use crate::handler::{format_element_id, into_node_element, into_vec_node_element, into_vec_relation_element, into_vec_way_element, into_way_element, Handler};
 use crate::srs::DynamicSrsResolver;
 
@@ -65,6 +65,13 @@ impl GeoTiff {
         let lon_tiff = self.top_left_x + (self.pixel_width * self.pixels_horizontal as f64);
         let lat_tiff = self.top_left_y + (self.pixel_height * self.pixels_vertical as f64);
         transform(&self.proj_tiff, &self.proj_wgs_84, lon_tiff, lat_tiff)
+    }
+    pub(crate) fn get_pixel_degrees_horizontal_vertical(&self) -> (f64, f64){
+        let top_left_wgs84 = self.get_top_left_as_wgs84().expect("Could not transform top left corner to WGS 84");
+        let bottom_right_wgs84 = self.get_bottom_right_as_wgs84().expect("Could not transform bottom right corner to WGS 84");
+        let pixel_size_horizontal = (bottom_right_wgs84.0 - top_left_wgs84.0) / self.pixels_horizontal as f64;
+        let pixel_size_vertical = (top_left_wgs84.1 - bottom_right_wgs84.1) / self.pixels_vertical as f64;
+        (pixel_size_horizontal, pixel_size_vertical)
     }
 }
 fn transform(src: &Proj, dst: &Proj, lon: f64, lat: f64) -> Result<(f64, f64), proj4rs::errors::Error> {
@@ -212,7 +219,7 @@ pub trait GeoTiffIndex {
 
 
 pub struct RSGeoTiffIndex {
-    rtree: RTree<RSBoundingBox>,
+    pub(crate) rtree: RTree<RSBoundingBox>,
 }
 impl RSGeoTiffIndex {
     pub fn new() -> Self {
@@ -225,9 +232,11 @@ impl GeoTiffIndex for RSGeoTiffIndex {
     fn add_geotiff(&mut self, geotiff: GeoTiff, geotiff_id: &str) {
         let top_left_wgs84 = geotiff.get_top_left_as_wgs84().expect("Could not transform top left corner to WGS 84");
         let bottom_right_wgs84 = geotiff.get_bottom_right_as_wgs84().expect("Could not transform bottom right corner to WGS 84");
+        let pixel_size = geotiff.get_pixel_degrees_horizontal_vertical();
         let bbox = RSBoundingBox::new(geotiff_id.to_string(),
                                       [top_left_wgs84.0, bottom_right_wgs84.1],
                                       [bottom_right_wgs84.0, top_left_wgs84.1],
+                                      f64::max(pixel_size.0, pixel_size.1) as f64
         );
         self.rtree.insert(bbox);
     }
@@ -238,8 +247,13 @@ impl GeoTiffIndex for RSGeoTiffIndex {
         //     dbg!(b);
         // }
         // dbg!(&point_to_find);
+        // self.rtree.iter().for_each(|b| {
+        //     println!("{:?}: {}", b.pixel_size, b.id);
+        // });
         self.rtree.locate_all_at_point(&point_to_find)
-            .map(|bbox| bbox.id.clone())
+            .map(|bbox| (bbox.pixel_size, bbox.id.clone()))
+            .sorted_by(|a, b| a.0.partial_cmp(&b.0).unwrap())
+            .map(|(_, id)| id)
             .collect()
     }
 
@@ -262,10 +276,11 @@ struct RSBoundingBox {
     id: String,
     min: [f64; 2],
     max: [f64; 2],
+    pixel_size: f64,
 }
 impl RSBoundingBox {
-    fn new(id: String, min: [f64; 2], max: [f64; 2]) -> Self {
-        Self { id, min, max }
+    fn new(id: String, min: [f64; 2], max: [f64; 2], pixel_size: f64) -> Self {
+        Self { id, min, max, pixel_size }
     }
 }
 impl RTreeObject for RSBoundingBox
@@ -290,7 +305,7 @@ impl PointDistance for RSBoundingBox {
 
 
 pub(crate) struct BufferingElevationEnricher {
-    geotiff_loader: GeoTiffManager,
+    geotiff_manager: GeoTiffManager,
     nodes_for_geotiffs: HashMap<String, Vec<Node>>,
     node_counts_for_geotiffs: HashMap<String, usize>,
     srs_resolver: DynamicSrsResolver,
@@ -304,7 +319,7 @@ impl BufferingElevationEnricher {
     }
     pub fn new(max_buffer_len: usize, max_buffered_nodes: usize) -> Self {
         Self {
-            geotiff_loader: GeoTiffManager::new(),
+            geotiff_manager: GeoTiffManager::new(),
             nodes_for_geotiffs: HashMap::new(),
             node_counts_for_geotiffs: HashMap::new(),
             srs_resolver: DynamicSrsResolver::new(),
@@ -314,18 +329,18 @@ impl BufferingElevationEnricher {
         }
     }
     pub fn init(&mut self, file_pattern: &str) -> Result<(), Box<dyn Error>> {
-        self.geotiff_loader.load_and_index_geotiffs(file_pattern, &self.srs_resolver);
+        self.geotiff_manager.load_and_index_geotiffs(file_pattern, &self.srs_resolver);
         Ok(())
     }
     fn use_loader(mut self, geo_tiff_loader: GeoTiffManager) -> Self {
-        self.geotiff_loader = geo_tiff_loader;
+        self.geotiff_manager = geo_tiff_loader;
         self
     }
 
     /// Only add node to (new) buffer, nothing else.
     /// Handling and flushing is triggered by the trait methods.
     fn buffer_node(&mut self, node: Node) -> (Option<String>, Option<Node>) {
-        let geotiffs = self.geotiff_loader.find_geotiff_id_for_wgs84_coord(node.coordinate().lon(), node.coordinate().lat());
+        let geotiffs = self.geotiff_manager.find_geotiff_id_for_wgs84_coord(node.coordinate().lon(), node.coordinate().lat());
         if geotiffs.is_empty() {
             return (None, Some(node));
         }
@@ -345,7 +360,7 @@ impl BufferingElevationEnricher {
             return vec![];
         }
         log::debug!("Handling and flushing buffer with {} buffered nodes for geotiff '{}'", buffer_vec.len(), buffer_name);
-        let mut geotiff = self.geotiff_loader.load_geotiff(buffer_name.as_str(), &self.srs_resolver).expect("could not load geotiff");
+        let mut geotiff = self.geotiff_manager.load_geotiff(buffer_name.as_str(), &self.srs_resolver).expect("could not load geotiff");
         for mut node in buffer_vec {
             let result = &geotiff.get_string_value_for_wgs_84(node.coordinate().lon(), node.coordinate().lat());
             match result {
@@ -503,21 +518,75 @@ mod tests {
     }
     fn as_coord(tup: (f64, f64)) -> Coordinate {Coordinate::new(tup.1, tup.0)}
     fn as_tuple_lon_lat(coordinate: Coordinate) -> (f64, f64) { (coordinate.lon(), coordinate.lat()) }
+    #[test]
+    #[ignore]
+    fn test_find_geotiff_id_for_wgs84_coord_srtm_ma_hd() {
+        SimpleLogger::new().init();
+        let srs_resolver = DynamicSrsResolver::new();
+        let mut geotiff_loader = GeoTiffManager::new();
+        geotiff_loader.load_and_index_geotiffs("test/srtm*.tif", &srs_resolver);
+        assert_eq!(2, geotiff_loader.index.get_geotiff_count());
+        geotiff_loader.load_and_index_geotiffs("test/region*.tif", &srs_resolver);
+        assert_eq!(4, geotiff_loader.index.get_geotiff_count());
+        geotiff_loader.load_and_index_geotiffs("test/*gmted*.tif", &srs_resolver);
+        assert_eq!(6, geotiff_loader.index.get_geotiff_count());
+
+        let test_point = wgs84_coordinate_hd_river();
+        let geotiffs = geotiff_loader.index.find_geotiff_id_for_wgs84_coord(test_point.lon(), test_point.lat());
+        dbg!(&geotiffs);
+        assert_eq!(3, geotiffs.len());
+        assert_eq!(geotiffs[0], "test/srtm_38_03.tif");
+        assert_eq!(geotiffs[1], "test/region_heidelberg_mannheim.tif");
+        assert_eq!(geotiffs[2], "test/30N000E_20101117_gmted_mea075.tif");
+
+        let test_point = wgs84_coordinate_limburg_traffic_circle();
+        let geotiffs = geotiff_loader.index.find_geotiff_id_for_wgs84_coord(test_point.lon(), test_point.lat());
+        dbg!(&geotiffs);
+        assert_eq!(3, geotiffs.len());
+        assert_eq!(geotiffs[0], "test/region_limburg_an_der_lahn.tif");
+        assert_eq!(geotiffs[1], "test/srtm_38_02.tif");
+        assert_eq!(geotiffs[2], "test/50N000E_20101117_gmted_mea075.tif");
+
+        let test_point = wgs84_coord_hd_mountain();
+        let geotiffs = geotiff_loader.index.find_geotiff_id_for_wgs84_coord(test_point.lon(), test_point.lat());
+        dbg!(&geotiffs);
+        assert_eq!(3, geotiffs.len());
+        assert_eq!(geotiffs[0], "test/srtm_38_03.tif");
+        assert_eq!(geotiffs[1], "test/region_heidelberg_mannheim.tif");
+        assert_eq!(geotiffs[2], "test/30N000E_20101117_gmted_mea075.tif");
+
+        let test_point = wgs84_coordinate_limburg_vienna_house();
+        let geotiffs = geotiff_loader.index.find_geotiff_id_for_wgs84_coord(test_point.lon(), test_point.lat());
+        dbg!(&geotiffs);
+        assert_eq!(3, geotiffs.len());
+        assert_eq!(geotiffs[0], "test/region_limburg_an_der_lahn.tif");
+        assert_eq!(geotiffs[1], "test/srtm_38_02.tif");
+        assert_eq!(geotiffs[2], "test/50N000E_20101117_gmted_mea075.tif");
+
+        let test_point = wgs84_coordinate_hamburg_elbphilharmonie();
+        let geotiffs = geotiff_loader.index.find_geotiff_id_for_wgs84_coord(test_point.lon(), test_point.lat());
+        dbg!(&geotiffs);
+        assert_eq!(2, geotiffs.len());
+        assert_eq!(geotiffs[0], "test/srtm_38_02.tif");
+        assert_eq!(geotiffs[1], "test/50N000E_20101117_gmted_mea075.tif");
+    }
     fn wgs84_coord_hd_mountain() -> TestPoint {TestPoint::new(8.726878, 49.397500)}
     fn wgs84_coordinate_hd_river() -> TestPoint {TestPoint::new(8.682461, 49.411029)}
     fn wgs84_coordinate_limburg_vienna_house() -> TestPoint {TestPoint::new(8.06, 50.39)}
     fn wgs84_coordinate_limburg_traffic_circle() -> TestPoint {TestPoint::new(8.06185930, 50.38536322)}
 
+    fn wgs84_coordinate_hamburg_elbphilharmonie() -> TestPoint {TestPoint::new(9.984270930290224, 53.54137211789218)}
     fn create_geotiff_limburg() -> GeoTiff {
         let mut tiff_loader = GeoTiffManager::new();
-        let mut geotiff = tiff_loader.load_geotiff("test/limburg_an_der_lahn.tif", &DynamicSrsResolver::new()).expect("got error");
+        let mut geotiff = tiff_loader.load_geotiff("test/region_limburg_an_der_lahn.tif", &DynamicSrsResolver::new()).expect("got error");
         geotiff
     }
     fn create_geotiff_ma_hd() -> GeoTiff {
         let mut tiff_loader = GeoTiffManager::new();
-        let mut geotiff = tiff_loader.load_geotiff("test/heidelberg_mannheim_dsm.tif", &DynamicSrsResolver::new()).expect("got error");
+        let mut geotiff = tiff_loader.load_geotiff("test/region_heidelberg_mannheim.tif", &DynamicSrsResolver::new()).expect("got error");
         geotiff
     }
+
     fn create_fake_geotiff(proj_tiff: Proj, file_path: &str) -> GeoTiff {
         let img_file = BufReader::new(File::open(file_path).expect("Could not open input file"));
         let mut geotiffreader = GeoTiffReader::open(img_file).expect("Could not read input file as tiff");
@@ -534,14 +603,13 @@ mod tests {
             geotiffreader: geotiffreader,
         }
     }
-
     fn are_floats_close_7(a: f64, b: f64) -> bool {
         are_floats_close(a, b, 1e-7)
     }
+
     fn are_floats_close(a: f64, b: f64, epsilon: f64) -> bool {
         (a - b).abs() < epsilon
     }
-
     pub fn simple_node_element_limburg(id: i64, tags: Vec<(&str, &str)>) -> Element {
         let tags_obj = tags.iter().map(|(k, v)| Tag::new(k.to_string(), v.to_string())).collect();
         crate::handler::tests::node_element(id, 1, wgs84_coordinate_limburg_vienna_house().as_coordinate(), 1, 1, 1, "a".to_string(), true, tags_obj)
@@ -574,6 +642,7 @@ mod tests {
     fn validate_all_have_elevation_tag(elements: &Vec<Element>) {
         elements.iter().for_each(|element| validate_has_elevation_tag(&element));
     }
+
     fn validate_has_elevation_tag(element_option: &Element) {
         match element_option {
             Element::Node { node } => {
@@ -582,7 +651,6 @@ mod tests {
             _ => panic!("expected a node element")
         }
     }
-
     #[test]
     fn geotiff_limburg_load() {
         let geotiff = create_geotiff_limburg();
@@ -594,33 +662,86 @@ mod tests {
         SimpleLogger::new().init();
         let srs_resolver = DynamicSrsResolver::new();
         let mut geotiff_loader = GeoTiffManager::new();
-        geotiff_loader.load_and_index_geotiffs("test/*.tif", &srs_resolver);
+        geotiff_loader.load_and_index_geotiffs("test/region*.tif", &srs_resolver);
         assert_eq!(2, geotiff_loader.index.get_geotiff_count());
-        assert!(geotiff_loader.index.get_geotiff_by_id("test/limburg_an_der_lahn.tif").is_some());
+        assert!(geotiff_loader.index.get_geotiff_by_id("test/region_limburg_an_der_lahn.tif").is_some());
     }
     #[test]
     fn test_find_geotiff_id_for_wgs84_coord() {
         SimpleLogger::new().init();
         let srs_resolver = DynamicSrsResolver::new();
         let mut geotiff_loader = GeoTiffManager::new();
-        geotiff_loader.load_and_index_geotiffs("test/*.tif", &srs_resolver);
+        geotiff_loader.load_and_index_geotiffs("test/region*.tif", &srs_resolver);
         assert_eq!(2, geotiff_loader.index.get_geotiff_count());
         let test_point = wgs84_coordinate_limburg_vienna_house();
         let geotiffs = geotiff_loader.index.find_geotiff_id_for_wgs84_coord(test_point.lon(), test_point.lat());
         assert_eq!(1, geotiffs.len());
-        assert_eq!("test/limburg_an_der_lahn.tif", geotiffs[0]);
+        assert_eq!("test/region_limburg_an_der_lahn.tif", geotiffs[0]);
     }
+
     #[test]
     fn test_find_geotiff_id_for_wgs84_coord_ma_hd() {
         SimpleLogger::new().init();
         let srs_resolver = DynamicSrsResolver::new();
         let mut geotiff_loader = GeoTiffManager::new();
-        geotiff_loader.load_and_index_geotiffs("test/*.tif", &srs_resolver);
+        geotiff_loader.load_and_index_geotiffs("test/region*.tif", &srs_resolver);
         assert_eq!(2, geotiff_loader.index.get_geotiff_count());
         let test_point = wgs84_coordinate_hd_river();
         let geotiffs = geotiff_loader.index.find_geotiff_id_for_wgs84_coord(test_point.lon(), test_point.lat());
         assert_eq!(1, geotiffs.len());
-        assert_eq!("test/heidelberg_mannheim_dsm.tif", geotiffs[0]);
+        assert_eq!("test/region_heidelberg_mannheim.tif", geotiffs[0]);
+    }
+    #[test]
+    #[ignore]
+    fn test_find_geotiff_id_for_wgs84_coord_ma_hd_srtm() {
+        SimpleLogger::new().init();
+        let srs_resolver = DynamicSrsResolver::new();
+        let mut geotiff_loader = GeoTiffManager::new();
+        geotiff_loader.load_and_index_geotiffs("test/region*.tif", &srs_resolver);
+        assert_eq!(2, geotiff_loader.index.get_geotiff_count());
+        geotiff_loader.load_and_index_geotiffs("test/*gmted*.tif", &srs_resolver);
+        assert_eq!(4, geotiff_loader.index.get_geotiff_count());
+        geotiff_loader.load_and_index_geotiffs("test/srtm*.tif", &srs_resolver);
+        assert_eq!(6, geotiff_loader.index.get_geotiff_count());
+
+        let test_point = wgs84_coordinate_hd_river();
+        let geotiffs = geotiff_loader.index.find_geotiff_id_for_wgs84_coord(test_point.lon(), test_point.lat());
+        dbg!(&geotiffs);
+        assert_eq!(3, geotiffs.len());
+        assert_eq!(geotiffs[0], "test/srtm_38_03.tif");
+        assert_eq!(geotiffs[1], "test/region_heidelberg_mannheim.tif");
+        assert_eq!(geotiffs[2], "test/30N000E_20101117_gmted_mea075.tif");
+
+        let test_point = wgs84_coordinate_limburg_traffic_circle();
+        let geotiffs = geotiff_loader.index.find_geotiff_id_for_wgs84_coord(test_point.lon(), test_point.lat());
+        dbg!(&geotiffs);
+        assert_eq!(3, geotiffs.len());
+        assert_eq!(geotiffs[0], "test/region_limburg_an_der_lahn.tif");
+        assert_eq!(geotiffs[1], "test/srtm_38_02.tif");
+        assert_eq!(geotiffs[2], "test/50N000E_20101117_gmted_mea075.tif");
+
+        let test_point = wgs84_coord_hd_mountain();
+        let geotiffs = geotiff_loader.index.find_geotiff_id_for_wgs84_coord(test_point.lon(), test_point.lat());
+        dbg!(&geotiffs);
+        assert_eq!(3, geotiffs.len());
+        assert_eq!(geotiffs[0], "test/srtm_38_03.tif");
+        assert_eq!(geotiffs[1], "test/region_heidelberg_mannheim.tif");
+        assert_eq!(geotiffs[2], "test/30N000E_20101117_gmted_mea075.tif");
+
+        let test_point = wgs84_coordinate_limburg_vienna_house();
+        let geotiffs = geotiff_loader.index.find_geotiff_id_for_wgs84_coord(test_point.lon(), test_point.lat());
+        dbg!(&geotiffs);
+        assert_eq!(3, geotiffs.len());
+        assert_eq!(geotiffs[0], "test/region_limburg_an_der_lahn.tif");
+        assert_eq!(geotiffs[1], "test/srtm_38_02.tif");
+        assert_eq!(geotiffs[2], "test/50N000E_20101117_gmted_mea075.tif");
+
+        let test_point = wgs84_coordinate_hamburg_elbphilharmonie();
+        let geotiffs = geotiff_loader.index.find_geotiff_id_for_wgs84_coord(test_point.lon(), test_point.lat());
+        dbg!(&geotiffs);
+        assert_eq!(2, geotiffs.len());
+        assert_eq!(geotiffs[0], "test/srtm_38_02.tif");
+        assert_eq!(geotiffs[1], "test/50N000E_20101117_gmted_mea075.tif");
     }
 
     #[test]
@@ -750,14 +871,14 @@ mod tests {
     }
     #[test]
     fn wgs_84_to_tiff_coord_4326() {
-        let mut geotiff = create_fake_geotiff(Proj::from_epsg_code(4326).unwrap(), "test/limburg_an_der_lahn.tif");
+        let mut geotiff = create_fake_geotiff(Proj::from_epsg_code(4326).unwrap(), "test/region_limburg_an_der_lahn.tif");
         let tiff_coord = geotiff.wgs_84_to_tiff_coord(wgs84_coordinate_limburg_traffic_circle().lon(), wgs84_coordinate_limburg_traffic_circle().lat());
         assert_eq!(tiff_coord.0, 8.06185930f64);
         assert_eq!(tiff_coord.1, 50.38536322f64);
     }
     #[test]
     fn wgs_84_to_tiff_coord_25832() {
-        let mut geotiff = create_fake_geotiff(Proj::from_epsg_code(25832).unwrap(), "test/limburg_an_der_lahn.tif");
+        let mut geotiff = create_fake_geotiff(Proj::from_epsg_code(25832).unwrap(), "test/region_limburg_an_der_lahn.tif");
         let tiff_coord = geotiff.wgs_84_to_tiff_coord(wgs84_coordinate_limburg_traffic_circle().lon(), wgs84_coordinate_limburg_traffic_circle().lat());
         assert!(are_floats_close(tiff_coord.0, 433305.7043197789f64, 1e-2));
         assert!(are_floats_close(tiff_coord.1, 5581899.216447188f64, 1e-2));
@@ -845,7 +966,7 @@ mod tests {
     fn buffering_elevation_enricher_test() {
         SimpleLogger::new().init();
         let mut handler = BufferingElevationEnricher::new(4, 5);
-        handler.init("test/*.tif");
+        handler.init("test/region*.tif");
 
         // The first elements should be buffered in the buffer for their tiff
         assert_eq!(0usize, handler.handle_element(simple_node_element_limburg(1, vec![])).len());
