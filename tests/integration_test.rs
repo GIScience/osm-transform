@@ -9,7 +9,7 @@ fn base_config() -> Config {
         input_pbf: PathBuf::from("test/baarle_small.pbf"),
         output_pbf:  None,
         country_csv: None,
-        elevation_tiffs: None,
+        elevation_tiffs: vec![],
         elevation_batch_size: 10000,
         elevation_total_buffer_size: 50000,
         remove_metadata: false,
@@ -58,7 +58,7 @@ fn run_all() {
     let mut config = base_config();
     config.output_pbf = Some(PathBuf::from("target/tmp/output-integration-test-run_all.pbf"));
     config.country_csv = Some(PathBuf::from("test/mapping_test.csv"));
-    config.elevation_tiffs = Some("test/*.tif".to_string());
+    config.elevation_tiffs = vec!["test/srtm*.tif".to_string(), "test/region*.tif".to_string()];
     config.elevation_batch_size = 100000;
     config.elevation_total_buffer_size = 500000;
     config.with_node_filtering = true;
@@ -117,7 +117,7 @@ fn run_remove_metadata() {
 #[test]
 fn run_elevation() {
     let mut config = base_config();
-    config.elevation_tiffs = Some("test/*.tif".to_string());
+    config.elevation_tiffs = vec!["test/*.tif".to_string()];
     rusty_routes_transformer::init(&config);
     let result = rusty_routes_transformer::run(&config);
     assert_eq!(result.counts.get("nodes count initial").unwrap(), &baarle_node_count);

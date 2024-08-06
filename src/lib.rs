@@ -118,18 +118,16 @@ fn process(config: &Config, node_filter_result: Option<HandlerResult>) -> Handle
         None => ()
     }
 
-    match &config.elevation_tiffs {
-        None => (),
-        Some(file_pattern) => {
-            log::info!("Initializing elevation enricher");
-            stopwatch.start();
-            //TODO check old logic with elevation threshold and edge splitting
-            let mut elevation_enricher = BufferingElevationEnricher::new(config.elevation_batch_size, config.elevation_total_buffer_size);
-            elevation_enricher.init(file_pattern);
-            log::info!("Finished initializing elevation enricher, time: {}", stopwatch);
-            handler_chain = handler_chain.add(elevation_enricher);
-            stopwatch.reset();
+    if &config.elevation_tiffs.len() > &0 {
+        log::info!("Initializing elevation enricher");
+        stopwatch.start();
+        let mut elevation_enricher = BufferingElevationEnricher::new(config.elevation_batch_size, config.elevation_total_buffer_size);
+        for elevation_glob_pattern in &config.elevation_tiffs {
+            elevation_enricher.init(elevation_glob_pattern);
         }
+        log::info!("Finished initializing elevation enricher, time: {}", stopwatch);
+        handler_chain = handler_chain.add(elevation_enricher);
+        stopwatch.reset();
     }
 
     handler_chain = handler_chain.add(TagFilterByKey::new(
@@ -172,7 +170,7 @@ pub struct Config {
     pub input_pbf: PathBuf,
     pub country_csv: Option<PathBuf>,
     pub output_pbf: Option<PathBuf>,
-    pub elevation_tiffs: Option<String>,
+    pub elevation_tiffs: Vec<String>,
     pub with_node_filtering: bool,
     pub debug: u8,
     pub print_node_ids: HashSet<i64>,
