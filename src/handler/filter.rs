@@ -261,25 +261,25 @@ impl Handler for AllElementsFilter {
         }
     }
 
-    fn handle_nodes<'a, 'b>(&'a mut self, elements: &'b mut Vec<Node>) -> &'b mut Vec<Node> {
-        if self.handle_types.node {
-            elements.clear();
+    fn handle_nodes(&mut self, mut elements:Vec<Node>) -> Vec<Node> {
+        match self.handle_types.node {
+            true => { Vec::new() }
+            false => { elements }
         }
-        elements
     }
 
-    fn handle_ways<'a, 'b>(&'a mut self, elements: &'b mut Vec<Way>) -> &'b mut Vec<Way> {
-        if self.handle_types.way {
-            elements.clear();
+    fn handle_ways(&mut self, mut elements: Vec<Way>) -> Vec<Way> {
+        match self.handle_types.way {
+            true => { Vec::new() }
+            false => { elements }
         }
-        elements
     }
 
-    fn handle_relations<'a, 'b>(&'a mut self, elements: &'b mut Vec<Relation>) -> &'b mut Vec<Relation> {
-        if self.handle_types.relation {
-            elements.clear();
+    fn handle_relations(&mut self, mut elements: Vec<Relation>) -> Vec<Relation> {
+        match self.handle_types.relation {
+            true => { Vec::new() }
+            false => { elements }
         }
-        elements
     }
 }
 
@@ -321,19 +321,8 @@ impl Handler for NodeIdFilter {
         }
     }
 
-    fn handle_nodes<'a, 'b>(&'a mut self, elements: &'b mut Vec<Node>) -> &'b mut Vec<Node> {
-        for i in 0..elements.len() {
-            let id = elements[i].id();
-            match self.node_ids.get(id as usize).unwrap_or(false) {
-                true => {
-                    log::trace!("node {} found in bitmap", id);
-                }
-                false => {
-                    log::trace!("node {} is not in bitmap - filtering", id);
-                    elements.remove(i);
-                }
-            }
-        }
+    fn handle_nodes(&mut self, mut elements: Vec<Node>) -> Vec<Node> {
+        elements.retain(|node| self.node_ids.get(node.id() as usize).unwrap_or(false));
         elements
     }
 }
@@ -427,35 +416,13 @@ impl Handler for ComplexElementsFilter {
         }
     }
 
-    fn handle_ways<'a, 'b>(&'a mut self, elements: &'b mut Vec<Way>) -> &'b mut Vec<Way> {
-        for i in 0..elements.len() {
-            let element = &elements[i];
-            match self.accept_by_tags(element.tags()) {
-                true => {
-                    log::trace!("accepting way {}", element.id());
-                }
-                false => {
-                    log::trace!("removing way {}", element.id());
-                    elements.remove(i);
-                }
-            }
-        }
+    fn handle_ways(&mut self, mut elements: Vec<Way>) -> Vec<Way> {
+        elements.retain(|element| self.accept_by_tags(element.tags()));
         elements
     }
 
-    fn handle_relations<'a, 'b>(&'a mut self, elements: &'b mut Vec<Relation>) -> &'b mut Vec<Relation> {
-        for i in 0..elements.len() {
-            let element = &elements[i];
-            match self.accept_by_tags(element.tags()) {
-                true => {
-                    log::trace!("accepting relation {}", element.id());
-                }
-                false => {
-                    log::trace!("removing relation {}", element.id());
-                    elements.remove(i);
-                }
-            }
-        }
+    fn handle_relations(&mut self, mut elements: Vec<Relation>) -> Vec<Relation> {
+        elements.retain(|element| self.accept_by_tags(element.tags()));
         elements
     }
 }

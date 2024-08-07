@@ -40,17 +40,18 @@ pub trait Handler {
         vec![element]
     }
 
-    fn handle_nodes<'a, 'b>(&'a mut self, elements: &'b mut Vec<Node>) -> &'b mut Vec<Node> {
+    fn handle_nodes(&mut self, mut elements: Vec<Node>) -> Vec<Node> {
         elements
     }
 
-    fn handle_ways<'a, 'b>(&'a mut self, elements: &'b mut Vec<Way>) -> &'b mut Vec<Way> {
+    fn handle_ways(&mut self, mut elements: Vec<Way>) -> Vec<Way> {
         elements
     }
 
-    fn handle_relations<'a, 'b>(&'a mut self, elements: &'b mut Vec<Relation>) -> &'b mut Vec<Relation> {
+    fn handle_relations(&mut self, mut elements: Vec<Relation>) -> Vec<Relation> {
         elements
     }
+
 
     fn handle_and_flush_elements(&mut self, elements: Vec<Element>) -> Vec<Element> {
         let mut handeled = vec![];
@@ -123,42 +124,42 @@ impl HandlerChain {
         log::trace!("######");
         match element {
             Element::Node { node } => {
-                self.process_nodes(&mut vec![node])
+                self.process_nodes(vec![node])
             },
             Element::Way { way } => {
-                self.process_ways(&mut vec![way])
+                self.process_ways(vec![way])
             },
             Element::Relation { relation } => {
-                self.process_relations(&mut vec![relation])
+                self.process_relations(vec![relation])
             },
             _ => (),
         }
     }
 
-    fn process_nodes<'a, 'b>(&'a mut self, elements: &'b mut Vec<Node>) {
+    fn process_nodes(&mut self, mut elements: Vec<Node>) {
         for processor in &mut self.processors {
             if (elements.len() == 0) {
                 break
             }
-            processor.handle_nodes(elements);
+            elements = processor.handle_nodes(elements);
         }
     }
 
-    fn process_ways<'a, 'b>(&'a mut self, elements: &'b mut Vec<Way>) {
+    fn process_ways(&mut self, mut elements: Vec<Way>) {
         for processor in &mut self.processors {
             if (elements.len() == 0) {
                 break
             }
-            processor.handle_ways(elements);
+            elements = processor.handle_ways(elements);
         }
     }
 
-    fn process_relations<'a, 'b>(&'a mut self, elements: &'b mut Vec<Relation>) {
+    fn process_relations(&mut self, mut elements: Vec<Relation>) {
         for processor in &mut self.processors {
             if (elements.len() == 0) {
                 break
             }
-            processor.handle_relations(elements);
+            elements = processor.handle_relations(elements);
         }
     }
 

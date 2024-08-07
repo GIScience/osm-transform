@@ -52,7 +52,7 @@ impl Handler for ReferencedNodeIdCollector {
         }
     }
 
-    fn handle_ways<'a, 'b>(&'a mut self, elements: &'b mut Vec<Way>) -> &'b mut Vec<Way> {
+    fn handle_ways(&mut self, mut elements: Vec<Way>) -> Vec<Way> {
         for element in &mut *elements {
             for &id in element.refs() {
                 self.referenced_node_ids.set(id as usize, true);
@@ -61,7 +61,7 @@ impl Handler for ReferencedNodeIdCollector {
         elements
     }
 
-    fn handle_relations<'a, 'b>(&'a mut self, elements: &'b mut Vec<Relation>) -> &'b mut Vec<Relation> {
+    fn handle_relations(&mut self, mut elements: Vec<Relation>) -> Vec<Relation> {
         for element in &mut *elements {
             for member in element.members() {
                 match member {

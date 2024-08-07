@@ -40,17 +40,17 @@ impl Handler for ElementCounter {
         vec![element]
     }
 
-    fn handle_nodes<'a, 'b>(&'a mut self, elements: &'b mut Vec<Node>) -> &'b mut Vec<Node> {
+    fn handle_nodes(&mut self, mut elements: Vec<Node>) -> Vec<Node> {
         self.nodes_count += elements.len();
         elements
     }
 
-    fn handle_ways<'a, 'b>(&'a mut self, elements: &'b mut Vec<Way>) -> &'b mut Vec<Way> {
+    fn handle_ways(&mut self, mut elements: Vec<Way>) -> Vec<Way> {
         self.ways_count += elements.len();
         elements
     }
 
-    fn handle_relations<'a, 'b>(&'a mut self, elements: &'b mut Vec<Relation>) -> &'b mut Vec<Relation> {
+    fn handle_relations(&mut self, mut elements: Vec<Relation>) -> Vec<Relation> {
         self.relations_count += elements.len();
         elements
     }

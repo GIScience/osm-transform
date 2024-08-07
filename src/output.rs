@@ -59,28 +59,25 @@ impl Handler for OutputHandler {
         }
     }
 
-    fn handle_nodes<'a, 'b>(&'a mut self, elements: &'b mut Vec<Node>) -> &'b mut Vec<Node> {
-        for element in elements.clone() {
+    fn handle_nodes(&mut self, elements: Vec<Node>) -> Vec<Node> {
+        for element in elements {
             self.writer.write_element(into_node_element(element)).expect("Failed to write node");
         }
-        elements.clear();
-        elements
+        Vec::new()
     }
 
-    fn handle_ways<'a, 'b>(&'a mut self, elements: &'b mut Vec<Way>) -> &'b mut Vec<Way> {
-        for element in elements.clone() {
+    fn handle_ways(&mut self, elements: Vec<Way>) -> Vec<Way> {
+        for element in elements {
             self.writer.write_element(into_way_element(element)).expect("Failed to write way");
         }
-        elements.clear();
-        elements
+        Vec::new()
     }
 
-    fn handle_relations<'a, 'b>(&'a mut self, elements: &'b mut Vec<Relation>) -> &'b mut Vec<Relation> {
-        for element in elements.clone() {
+    fn handle_relations(&mut self, elements: Vec<Relation>) -> Vec<Relation> {
+        for element in elements {
             self.writer.write_element(into_relation_element(element)).expect("Failed to write relation");
         }
-        elements.clear();
-        elements
+        Vec::new()
     }
 
     fn add_result(&mut self, result: HandlerResult) -> HandlerResult {

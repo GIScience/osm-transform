@@ -44,7 +44,7 @@ impl Handler for MetadataRemover {
         }
     }
 
-    fn handle_nodes<'a, 'b>(&'a mut self, elements: &'b mut Vec<Node>) -> &'b mut Vec<Node> {
+    fn handle_nodes(&mut self, mut elements: Vec<Node>) -> Vec<Node> {
         //for element in elements {
         //    *element = self.handle_node2(element);
         //}
@@ -52,12 +52,12 @@ impl Handler for MetadataRemover {
         elements
     }
 
-    fn handle_ways<'a, 'b>(&'a mut self, elements: &'b mut Vec<Way>) -> &'b mut Vec<Way> {
+    fn handle_ways(&mut self, mut elements: Vec<Way>) -> Vec<Way> {
         elements.iter_mut().for_each(|element| self.handle_way2(element));
         elements
     }
 
-    fn handle_relations<'a, 'b>(&'a mut self, elements: &'b mut Vec<Relation>) -> &'b mut Vec<Relation> {
+    fn handle_relations(&mut self, mut elements: Vec<Relation>) -> Vec<Relation> {
         elements.iter_mut().for_each(|element| self.handle_relation2(element));
         elements
     }
