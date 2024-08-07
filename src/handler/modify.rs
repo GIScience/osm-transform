@@ -18,6 +18,18 @@ impl MetadataRemover {
     fn handle_relation(&mut self, relation: Relation) -> Vec<Element> {
         vec![into_relation_element(Relation::new(relation.id(), 0, 0, 0, 0, String::default(), relation.visible(), relation.members().clone(), relation.tags().clone()))]
     }
+
+    fn handle_node2(&mut self, node: &mut Node) {
+        *node = Node::new(node.id(), 0, node.coordinate().clone(), 0, 0, 0, String::default(), node.visible(), node.tags().clone())
+    }
+
+    fn handle_way2(&mut self, way: &mut Way) {
+        *way = Way::new(way.id(), 0, 0, 0, 0, String::default(), way.visible(), way.refs().clone(), way.tags().clone())
+    }
+
+    fn handle_relation2(&mut self, relation: &mut Relation) {
+        *relation = Relation::new(relation.id(), 0, 0, 0, 0, String::default(), relation.visible(), relation.members().clone(), relation.tags().clone())
+    }
 }
 impl Handler for MetadataRemover {
     fn name(&self) -> String {
@@ -30,6 +42,24 @@ impl Handler for MetadataRemover {
             Element::Relation { relation } => { self.handle_relation(relation) }
             Element::Sentinel => vec![]
         }
+    }
+
+    fn handle_nodes<'a, 'b>(&'a mut self, elements: &'b mut Vec<Node>) -> &'b mut Vec<Node> {
+        //for element in elements {
+        //    *element = self.handle_node2(element);
+        //}
+        elements.iter_mut().for_each(|element| self.handle_node2(element));
+        elements
+    }
+
+    fn handle_ways<'a, 'b>(&'a mut self, elements: &'b mut Vec<Way>) -> &'b mut Vec<Way> {
+        elements.iter_mut().for_each(|element| self.handle_way2(element));
+        elements
+    }
+
+    fn handle_relations<'a, 'b>(&'a mut self, elements: &'b mut Vec<Relation>) -> &'b mut Vec<Relation> {
+        elements.iter_mut().for_each(|element| self.handle_relation2(element));
+        elements
     }
 }
 

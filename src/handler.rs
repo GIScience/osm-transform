@@ -40,6 +40,18 @@ pub trait Handler {
         vec![element]
     }
 
+    fn handle_nodes<'a, 'b>(&'a mut self, elements: &'b mut Vec<Node>) -> &'b mut Vec<Node> {
+        elements
+    }
+
+    fn handle_ways<'a, 'b>(&'a mut self, elements: &'b mut Vec<Way>) -> &'b mut Vec<Way> {
+        elements
+    }
+
+    fn handle_relations<'a, 'b>(&'a mut self, elements: &'b mut Vec<Relation>) -> &'b mut Vec<Relation> {
+        elements
+    }
+
     fn handle_and_flush_elements(&mut self, elements: Vec<Element>) -> Vec<Element> {
         let mut handeled = vec![];
         for element in elements {
@@ -69,7 +81,7 @@ impl OsmElementTypeSelection {
 
 #[derive(Debug)]
 pub struct HandlerResult {
-    pub counts: BTreeMap<String, i32>,
+    pub counts: BTreeMap<String, usize>,
     pub other: HashMap<String, String>,
     pub node_ids: BitVec,
 }
@@ -109,23 +121,44 @@ impl HandlerChain {
         log::trace!("######");
         log::trace!("###### Processing {}", format_element_id(&element));
         log::trace!("######");
-        let mut elements = vec![element];
-        let mut indent = "".to_string();
+        match element {
+            Element::Node { node } => {
+                self.process_nodes(&mut vec![node])
+            },
+            Element::Way { way } => {
+                self.process_ways(&mut vec![way])
+            },
+            Element::Relation { relation } => {
+                self.process_relations(&mut vec![relation])
+            },
+            _ => (),
+        }
+    }
+
+    fn process_nodes<'a, 'b>(&'a mut self, elements: &'b mut Vec<Node>) {
         for processor in &mut self.processors {
             if (elements.len() == 0) {
-                log::trace!("{indent}Skipping handler chain, elements were filtered or buffered?");
                 break
             }
-            let mut new_collected = vec![];
-            for inner_element in elements {
-                log::trace!("{indent}Passing {} to handler {}", format_element_id(&inner_element), processor.name());
-                let handled_elements = &mut processor.handle_element(inner_element);
-                log::trace!("{indent}{} returned {} elements", processor.name(), handled_elements.len());
-                new_collected.append(handled_elements);
+            processor.handle_nodes(elements);
+        }
+    }
+
+    fn process_ways<'a, 'b>(&'a mut self, elements: &'b mut Vec<Way>) {
+        for processor in &mut self.processors {
+            if (elements.len() == 0) {
+                break
             }
-            log::trace!("{indent}{} returned {} elements in total", processor.name(), new_collected.len());
-            elements = new_collected;
-            indent += "    ";
+            processor.handle_ways(elements);
+        }
+    }
+
+    fn process_relations<'a, 'b>(&'a mut self, elements: &'b mut Vec<Relation>) {
+        for processor in &mut self.processors {
+            if (elements.len() == 0) {
+                break
+            }
+            processor.handle_relations(elements);
         }
     }
 

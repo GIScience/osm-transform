@@ -3,7 +3,7 @@ use std::panic::resume_unwind;
 use bit_vec::BitVec;
 use osm_io::osm::model::element::Element;
 use osm_io::osm::model::node::Node;
-use osm_io::osm::model::relation::Relation;
+use osm_io::osm::model::relation::{Member, Relation};
 use osm_io::osm::model::tag::Tag;
 use osm_io::osm::model::way::Way;
 use regex::Regex;
@@ -260,6 +260,27 @@ impl Handler for AllElementsFilter {
             Element::Sentinel => vec![]
         }
     }
+
+    fn handle_nodes<'a, 'b>(&'a mut self, elements: &'b mut Vec<Node>) -> &'b mut Vec<Node> {
+        if self.handle_types.node {
+            elements.clear();
+        }
+        elements
+    }
+
+    fn handle_ways<'a, 'b>(&'a mut self, elements: &'b mut Vec<Way>) -> &'b mut Vec<Way> {
+        if self.handle_types.way {
+            elements.clear();
+        }
+        elements
+    }
+
+    fn handle_relations<'a, 'b>(&'a mut self, elements: &'b mut Vec<Relation>) -> &'b mut Vec<Relation> {
+        if self.handle_types.relation {
+            elements.clear();
+        }
+        elements
+    }
 }
 
 
@@ -298,6 +319,20 @@ impl Handler for NodeIdFilter {
             Element::Node { node } => { self.handle_node(node) }
             _ => vec![element]
         }
+    }
+
+    fn handle_nodes<'a, 'b>(&'a mut self, elements: &'b mut Vec<Node>) -> &'b mut Vec<Node> {
+        if elements.len() > 1 { panic!("assumed single-element processing here"); }
+        match self.node_ids.get(elements[0].id() as usize).unwrap_or(false) {
+            true => {
+                log::trace!("node {} found in bitmap", &elements[0].id().clone());
+            }
+            false => {
+                log::trace!("node {} is not in bitmap - filtering", &elements[0].id().clone());
+                elements.clear()
+            }
+        }
+        elements
     }
 }
 
@@ -387,6 +422,38 @@ impl Handler for ComplexElementsFilter {
             Element::Way { way} => { self.handle_way(way) }
             Element::Relation { relation } => { self.handle_relation(relation) }
             _ => vec![]
+        }
+    }
+
+    fn handle_ways<'a, 'b>(&'a mut self, elements: &'b mut Vec<Way>) -> &'b mut Vec<Way> {
+        if elements.len() > 1 { panic!("assumed single-element processing here"); }
+        else {
+            match self.accept_by_tags(&elements[0].tags()) {
+                true => {
+                    log::trace!("accepting way {}", &elements[0].id());
+                }
+                false => {
+                    log::trace!("removing way {}",&elements[0].id());
+                    elements.clear();
+                }
+            }
+            elements
+        }
+    }
+
+    fn handle_relations<'a, 'b>(&'a mut self, elements: &'b mut Vec<Relation>) -> &'b mut Vec<Relation> {
+        if elements.len() > 1 { panic!("assumed single-element processing here"); }
+        else {
+            match self.accept_by_tags(&elements[0].tags()) {
+                true => {
+                    log::trace!("accepting relation {}", &elements[0].id());
+                }
+                false => {
+                    log::trace!("removing relation {}",&elements[0].id());
+                    elements.clear();
+                }
+            }
+            elements
         }
     }
 }

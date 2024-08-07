@@ -8,7 +8,7 @@ use osm_io::osm::pbf;
 use osm_io::osm::pbf::compression_type::CompressionType;
 use osm_io::osm::pbf::file_info::FileInfo;
 
-use crate::handler::{Handler, HandlerResult, into_relation_element};
+use crate::handler::{Handler, HandlerResult, into_node_element, into_relation_element, into_way_element};
 
 pub struct OutputHandler {
     pub writer: pbf::writer::Writer,
@@ -57,6 +57,30 @@ impl Handler for OutputHandler {
             Element::Relation { relation } => self.handle_relation(relation),
             Element::Sentinel => vec![]
         }
+    }
+
+    fn handle_nodes<'a, 'b>(&'a mut self, elements: &'b mut Vec<Node>) -> &'b mut Vec<Node> {
+        for element in elements.clone() {
+            self.writer.write_element(into_node_element(element)).expect("Failed to write node");
+        }
+        elements.clear();
+        elements
+    }
+
+    fn handle_ways<'a, 'b>(&'a mut self, elements: &'b mut Vec<Way>) -> &'b mut Vec<Way> {
+        for element in elements.clone() {
+            self.writer.write_element(into_way_element(element)).expect("Failed to write way");
+        }
+        elements.clear();
+        elements
+    }
+
+    fn handle_relations<'a, 'b>(&'a mut self, elements: &'b mut Vec<Relation>) -> &'b mut Vec<Relation> {
+        for element in elements.clone() {
+            self.writer.write_element(into_relation_element(element)).expect("Failed to write relation");
+        }
+        elements.clear();
+        elements
     }
 
     fn add_result(&mut self, result: HandlerResult) -> HandlerResult {

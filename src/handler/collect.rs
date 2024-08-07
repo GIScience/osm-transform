@@ -51,6 +51,31 @@ impl Handler for ReferencedNodeIdCollector {
             _ => vec![]
         }
     }
+
+    fn handle_ways<'a, 'b>(&'a mut self, elements: &'b mut Vec<Way>) -> &'b mut Vec<Way> {
+        if elements.len() > 1 { panic!("assumed single-element processing here"); }
+        for &id in elements[0].refs() {
+            self.referenced_node_ids.set(id as usize, true);
+        }
+        elements
+    }
+
+    fn handle_relations<'a, 'b>(&'a mut self, elements: &'b mut Vec<Relation>) -> &'b mut Vec<Relation> {
+        if elements.len() > 1 { panic!("assumed single-element processing here"); }
+        for member in elements[0].members() {
+            match member {
+                Member::Node { member } => {
+                    log::trace!("relation {} references node {} - set true in bitmap", elements[0].id(), member.id());
+                    self.referenced_node_ids.set(member.id() as usize, true);
+                }
+                Member::Way { .. } => {}
+                Member::Relation { .. } => {}
+            }
+
+        }
+        elements
+    }
+
     fn add_result(&mut self, mut result: HandlerResult) -> HandlerResult {
         log::debug!("cloning node_ids of ReferencedNodeIdCollector with len={} into HandlerResult ", self.referenced_node_ids.len());
         result.node_ids = self.referenced_node_ids.clone();//todo check if clone is necessary
