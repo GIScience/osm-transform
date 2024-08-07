@@ -322,14 +322,16 @@ impl Handler for NodeIdFilter {
     }
 
     fn handle_nodes<'a, 'b>(&'a mut self, elements: &'b mut Vec<Node>) -> &'b mut Vec<Node> {
-        if elements.len() > 1 { panic!("assumed single-element processing here"); }
-        match self.node_ids.get(elements[0].id() as usize).unwrap_or(false) {
-            true => {
-                log::trace!("node {} found in bitmap", &elements[0].id().clone());
-            }
-            false => {
-                log::trace!("node {} is not in bitmap - filtering", &elements[0].id().clone());
-                elements.clear()
+        for i in 0..elements.len() {
+            let id = elements[i].id();
+            match self.node_ids.get(id as usize).unwrap_or(false) {
+                true => {
+                    log::trace!("node {} found in bitmap", id);
+                }
+                false => {
+                    log::trace!("node {} is not in bitmap - filtering", id);
+                    elements.remove(i);
+                }
             }
         }
         elements
@@ -426,35 +428,35 @@ impl Handler for ComplexElementsFilter {
     }
 
     fn handle_ways<'a, 'b>(&'a mut self, elements: &'b mut Vec<Way>) -> &'b mut Vec<Way> {
-        if elements.len() > 1 { panic!("assumed single-element processing here"); }
-        else {
-            match self.accept_by_tags(&elements[0].tags()) {
+        for i in 0..elements.len() {
+            let element = &elements[i];
+            match self.accept_by_tags(element.tags()) {
                 true => {
-                    log::trace!("accepting way {}", &elements[0].id());
+                    log::trace!("accepting way {}", element.id());
                 }
                 false => {
-                    log::trace!("removing way {}",&elements[0].id());
-                    elements.clear();
+                    log::trace!("removing way {}", element.id());
+                    elements.remove(i);
                 }
             }
-            elements
         }
+        elements
     }
 
     fn handle_relations<'a, 'b>(&'a mut self, elements: &'b mut Vec<Relation>) -> &'b mut Vec<Relation> {
-        if elements.len() > 1 { panic!("assumed single-element processing here"); }
-        else {
-            match self.accept_by_tags(&elements[0].tags()) {
+        for i in 0..elements.len() {
+            let element = &elements[i];
+            match self.accept_by_tags(element.tags()) {
                 true => {
-                    log::trace!("accepting relation {}", &elements[0].id());
+                    log::trace!("accepting relation {}", element.id());
                 }
                 false => {
-                    log::trace!("removing relation {}",&elements[0].id());
-                    elements.clear();
+                    log::trace!("removing relation {}", element.id());
+                    elements.remove(i);
                 }
             }
-            elements
         }
+        elements
     }
 }
 

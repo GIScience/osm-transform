@@ -53,25 +53,26 @@ impl Handler for ReferencedNodeIdCollector {
     }
 
     fn handle_ways<'a, 'b>(&'a mut self, elements: &'b mut Vec<Way>) -> &'b mut Vec<Way> {
-        if elements.len() > 1 { panic!("assumed single-element processing here"); }
-        for &id in elements[0].refs() {
-            self.referenced_node_ids.set(id as usize, true);
+        for element in &mut *elements {
+            for &id in element.refs() {
+                self.referenced_node_ids.set(id as usize, true);
+            }
         }
         elements
     }
 
     fn handle_relations<'a, 'b>(&'a mut self, elements: &'b mut Vec<Relation>) -> &'b mut Vec<Relation> {
-        if elements.len() > 1 { panic!("assumed single-element processing here"); }
-        for member in elements[0].members() {
-            match member {
-                Member::Node { member } => {
-                    log::trace!("relation {} references node {} - set true in bitmap", elements[0].id(), member.id());
-                    self.referenced_node_ids.set(member.id() as usize, true);
+        for element in &mut *elements {
+            for member in element.members() {
+                match member {
+                    Member::Node { member } => {
+                        log::trace!("relation {} references node {} - set true in bitmap", element.id(), member.id());
+                        self.referenced_node_ids.set(member.id() as usize, true);
+                    }
+                    Member::Way { .. } => {}
+                    Member::Relation { .. } => {}
                 }
-                Member::Way { .. } => {}
-                Member::Relation { .. } => {}
             }
-
         }
         elements
     }
