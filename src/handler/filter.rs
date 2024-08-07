@@ -309,6 +309,19 @@ impl NodeIdFilter {
         }
     }
 
+    fn is_node_referenced(& self, id: i64) -> bool {
+        match self.node_ids.get(id as usize).unwrap_or(false) {
+            true => {
+                log::trace!("node {} found in bitmap", id);
+                true
+            }
+            false => {
+                log::trace!("node {} is not in bitmap - filtering", id);
+                false
+            }
+        }
+    }
+
 }
 impl Handler for NodeIdFilter {
     fn name(&self) -> String {
@@ -322,7 +335,7 @@ impl Handler for NodeIdFilter {
     }
 
     fn handle_nodes(&mut self, mut elements: Vec<Node>) -> Vec<Node> {
-        elements.retain(|node| self.node_ids.get(node.id() as usize).unwrap_or(false));
+        elements.retain(|node| self.is_node_referenced(node.id()));
         elements
     }
 }
@@ -377,6 +390,33 @@ impl ComplexElementsFilter {
             self.has_good_key_value_predicate.test(tags) ||
             self.has_bad_key_predicate.test(tags)
     }
+
+    fn is_way_accepted(&mut self, way: &Way) -> bool {
+        match self.accept_by_tags(way.tags()) {
+            true => {
+                log::trace!("accepting way {}", way.id());
+                true
+            }
+            false => {
+                log::trace!("removing way {}", way.id());
+                false
+            }
+        }
+    }
+
+    fn is_relation_accepted(&mut self, relation: &Relation) -> bool {
+        match self.accept_by_tags(relation.tags()) {
+            true => {
+                log::trace!("accepting relation {}", relation.id());
+                true
+            }
+            false => {
+                log::trace!("removing relation {}", relation.id());
+                false
+            }
+        }
+    }
+
     fn handle_way(&mut self, way: Way) -> Vec<Element> {
         match self.accept_by_tags(&way.tags()) {
             true => {
@@ -417,12 +457,12 @@ impl Handler for ComplexElementsFilter {
     }
 
     fn handle_ways(&mut self, mut elements: Vec<Way>) -> Vec<Way> {
-        elements.retain(|element| self.accept_by_tags(element.tags()));
+        elements.retain(|way| self.is_way_accepted(way));
         elements
     }
 
     fn handle_relations(&mut self, mut elements: Vec<Relation>) -> Vec<Relation> {
-        elements.retain(|element| self.accept_by_tags(element.tags()));
+        elements.retain(|relation| self.is_relation_accepted(relation));
         elements
     }
 }
