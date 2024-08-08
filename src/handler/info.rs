@@ -13,9 +13,9 @@ pub(crate) enum CountType {
     ACCEPTED,
 }
 pub(crate) struct ElementCounter {
-    pub nodes_count: usize,
-    pub ways_count: usize,
-    pub relations_count: usize,
+    pub nodes_count: u64,
+    pub ways_count: u64,
+    pub relations_count: u64,
     pub result_key: String,
 }
 impl ElementCounter {
@@ -41,17 +41,17 @@ impl Handler for ElementCounter {
     }
 
     fn handle_nodes(&mut self, mut elements: Vec<Node>) -> Vec<Node> {
-        self.nodes_count += elements.len();
+        self.nodes_count += elements.len() as u64;
         elements
     }
 
     fn handle_ways(&mut self, mut elements: Vec<Way>) -> Vec<Way> {
-        self.ways_count += elements.len();
+        self.ways_count += elements.len() as u64;
         elements
     }
 
     fn handle_relations(&mut self, mut elements: Vec<Relation>) -> Vec<Relation> {
-        self.relations_count += elements.len();
+        self.relations_count += elements.len() as u64;
         elements
     }
 

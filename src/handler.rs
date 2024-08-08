@@ -82,7 +82,7 @@ impl OsmElementTypeSelection {
 
 #[derive(Debug)]
 pub struct HandlerResult {
-    pub counts: BTreeMap<String, usize>,
+    pub counts: BTreeMap<String, u64>,
     pub other: HashMap<String, String>,
     pub node_ids: BitVec,
 }
