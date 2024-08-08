@@ -21,12 +21,12 @@ fn base_config() -> Config {
     }
 }
 
-const baarle_node_count: i32 = 3964i32;
-const baarle_relation_count: i32 = 59i32;
-const baarle_way_count: i32 = 463i32;
-const filtered_node_count: i32 = 299i32;
-const filtered_relation_count: i32 = 29i32;
-const filtered_way_count: i32 = 51i32;
+const baarle_node_count: u64 = 3964u64;
+const baarle_relation_count: u64 = 59u64;
+const baarle_way_count: u64 = 463u64;
+const filtered_node_count: u64 = 299u64;
+const filtered_relation_count: u64 = 29u64;
+const filtered_way_count: u64 = 51u64;
 
 #[test]
 fn run_minimal() {
