@@ -161,10 +161,10 @@ impl AreaHandler {
         }
         wtr.flush().expect("failed to flush");
     }
-    fn handle_node(&mut self, node: Node) -> Vec<Element> {
+    fn handle_node(&mut self, node: &mut Node) {
         let mut result: Vec<String> = Vec::new();
         if node.coordinate().lat() >= 90.0 || node.coordinate().lat() <= -90.0 {
-            return vec![];
+            return;
         }
         let grid_index = (node.coordinate().lat() as i32 + 90) * 360 + (node.coordinate().lon() as i32 + 180);
         let coord = Coord {x: node.coordinate().lon(), y: node.coordinate().lat()};
@@ -185,30 +185,18 @@ impl AreaHandler {
         }
         let mut node = node;
         node.tags_mut().push(Tag::new("country".to_string(), result.join(",")));
-        vec![into_node_element(node)]
     }
 }
 
 impl Handler for AreaHandler {
     fn name(&self) -> String { "AreaHandler".to_string() }
-    fn handle_element(&mut self, element: Element) -> Vec<Element> {
-        match element {
-            Element::Node { node } => self.handle_node(node),
-            _ => vec![element]
-        }
+    fn handle_nodes(&mut self, mut elements: Vec<Node>) -> Vec<Node> {
+        elements.iter_mut().for_each(|node| self.handle_node(node));
+        elements
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use std::collections::HashSet;
-    use crate::area::AreaHandler;
-    use crate::handler::{HandlerChain, OsmElementTypeSelection};
-    use crate::handler::info::{CountType, ElementCounter};
-    use crate::io::process_with_handler;
-
-    use super::*;
-
-    //todo Add unit tests for AreaHandler
-
+    //TODO: Add unit tests for AreaHandler
 }
