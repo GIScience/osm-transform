@@ -273,24 +273,21 @@ pub(crate) mod tests {
     ///Modify element and return same instance.
     #[derive(Debug, Default)]
     pub(crate) struct TestOnlyElementModifier;
+    impl TestOnlyElementModifier {
+        fn handle_node(&mut self, mut node: &mut Node)  {
+            let id = node.id();
+            let tags = node.tags_mut();
+            if id % 2 == 0 {
+                tags.push(Tag::new("added".to_string(), "yes".to_string()));
+            }
+        }
+    }
     impl Handler for TestOnlyElementModifier {
         fn name(&self) -> String { "TestOnlyElementModifier".to_string() }
-        fn handle_element(&mut self, element: Element) -> Vec<Element> {
-            match element {
-                Element::Node { mut node} => {
-                    let id = node.id().clone();
-                    let tags = node.tags_mut();
-                    if id % 2 == 0 {
-                        tags.push(Tag::new("added".to_string(), "yes".to_string()));
-                    }
-                    if let Some(tag_to_modify_pos) = tags.iter().position(|tag| tag.k() == "who"){
-                        let tag_to_modify = tags.remove(tag_to_modify_pos);
-                        tags.push(Tag::new(tag_to_modify.k().clone(), tag_to_modify.v().to_string().to_uppercase()));
-                    }
-                    vec![into_node_element(node)]
-                }
-                _ => vec![element]
-            }
+
+        fn handle_nodes(&mut self, mut elements: Vec<Node>) -> Vec<Node> {
+            elements.iter_mut().for_each(|node| self.handle_node(node));
+            elements
         }
     }
 
@@ -583,7 +580,7 @@ pub(crate) mod tests {
     }
 
     #[test]
-    #[ignore]//functionality is unsupported in current handler implementation
+    #[ignore]//this functionality is unsupported in current handler implementation
     /// Assert that it is possible to run the chain and let processors receive one element
     /// and add additional elements of a different type to the processing chain
     /// that are processed by downstream processors.
@@ -720,7 +717,6 @@ pub(crate) mod tests {
     }
 
     #[test]
-    #[ignore]//FIXME
     /// Assert that it is possible to run the chain and let processors modify received instances,
     /// e.g. without cloning.
     /// The test uses
@@ -767,7 +763,6 @@ pub(crate) mod tests {
 
 
     #[test]
-    #[ignore]//FIXME
     fn handler_chain() {
         SimpleLogger::new().init();
         let chain = HandlerChain::default()
