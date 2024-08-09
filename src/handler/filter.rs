@@ -32,28 +32,17 @@ impl TagValueBasedOsmElementsFilter {
         }
     }
     fn accept_by_tags(&mut self, tags: &Vec<Tag>) -> bool {
-        let mut accept = false;
-        match self.filter_type {
-            FilterType::AcceptMatching => {
-                accept = false;
-                for tag in tags {
-                    if self.tag_key.eq(tag.k()) && self.tag_value_regex.is_match(tag.v()) {
-                        accept = true;
-                        break
-                    }
-                }
-            }
-            FilterType::RemoveMatching => {
-                for tag in tags {
-                    accept = true;
-                    if self.tag_key.eq(tag.k()) && self.tag_value_regex.is_match(tag.v()) {
-                        accept = false;
-                        break;
-                    }
-                }
+        let mut matched = false;
+        for tag in tags {
+            if self.tag_key.eq(tag.k()) && self.tag_value_regex.is_match(tag.v()) {
+                matched = true;
+                break
             }
         }
-        accept
+        match self.filter_type {
+            FilterType::AcceptMatching =>  { matched }
+            FilterType::RemoveMatching =>  {!matched }
+        }
     }
 }
 impl Handler for TagValueBasedOsmElementsFilter {
