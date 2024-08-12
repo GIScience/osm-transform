@@ -353,129 +353,92 @@ impl BufferingElevationEnricher {
 
     /// Load geotiff for this buffer and add elevation to all nodes in buffer,
     /// return nodes for downstream processing and empty the buffer.
-    fn handle_and_flush_buffer(&mut self, buffer_name: String) -> Vec<Element> {
-        let mut result_elements = vec![];
-        let buffer_vec = self.nodes_for_geotiffs.remove(&buffer_name).expect("buffer not found");
-        if buffer_vec.is_empty() {
-            return vec![];
-        }
+    fn handle_and_flush_buffer(&mut self, buffer_name: String) -> Vec<Node> {
+        let mut result = vec![];
+        let buffer_vec = &mut self.nodes_for_geotiffs.remove(&buffer_name).expect("buffer not found");
+
         log::debug!("Handling and flushing buffer with {} buffered nodes for geotiff '{}'", buffer_vec.len(), buffer_name);
-        let mut geotiff = self.geotiff_manager.load_geotiff(buffer_name.as_str(), &self.srs_resolver).expect("could not load geotiff");
-        for mut node in buffer_vec {
-            let result = geotiff.get_string_value_for_wgs_84(node.coordinate().lon(), node.coordinate().lat());
-            match result {
-                None => {
-                    if log::log_enabled!(log::Level::Trace) {
-                        log::warn!("no elevation value for node#{}", node.id());
-                    }
-                }
-                Some(value) => {
-                    node.tags_mut().push(Tag::new("ele".to_string(), value));
-                }
-            }
-            result_elements.push(into_node_element(node));
-        }
-        self.nodes_for_geotiffs.insert(buffer_name, vec![]);
-        result_elements
+        let geotiff = &mut self.geotiff_manager.load_geotiff(buffer_name.as_str(), &self.srs_resolver).expect("could not load geotiff");
+        buffer_vec.iter_mut().for_each(|node| self.add_elevation_tag(geotiff, node));
+
+        result.append(buffer_vec);
+        result
     }
 
-    fn flush_all_buffers(&mut self, handeled_nodes: &mut Vec<Element>) {
+    fn add_elevation_tag(&mut self, mut geotiff: &mut GeoTiff, mut node: &mut Node) {
+        let result = geotiff.get_string_value_for_wgs_84(node.coordinate().lon(), node.coordinate().lat());
+        match result {
+            None => {
+                if log::log_enabled!(log::Level::Trace) {
+                    log::warn!("no elevation value for node#{}", node.id());
+                }
+            }
+            Some(value) => {
+                node.tags_mut().push(Tag::new("ele".to_string(), value));
+            }
+        }
+    }
+
+    fn handle_node(&mut self, node: Node) -> Vec<Node> {
+        let node_id = node.id();
+        let (buffer_option, node_option) = self.buffer_node(node); //nur puffern, nichts tun
+        match buffer_option {
+            None => {
+                if log::log_enabled!(log::Level::Trace) {
+                    log::warn!("node#{} was not buffered - no geotiff found for it?", &node_id);
+                }
+                match node_option {
+                    None => {
+                        log::error!("buffer_node returned no buffer name and also no node");
+                        vec![]
+                    }
+                    Some(node) => { vec![node] }
+                }
+            }
+            Some(buffer_name) => {
+                match self.nodes_for_geotiffs.get(&buffer_name) {
+                    None => {
+                        log::error!("the map nodes_for_geotiffs contained key {} but no value!", &node_id);
+                        match node_option {
+                            None => vec![],
+                            Some(node) => { vec![node] }
+                        }
+                    }
+                    Some(buffer_vec) => {
+                        if buffer_vec.len() >= self.max_buffer_len {
+                            self.handle_and_flush_buffer(buffer_name) //elevation setzen, zrückgeben
+                        } else {
+                            vec![]
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+impl Handler for BufferingElevationEnricher {
+    fn name(&self) -> String { "BufferingElevationEnricher".to_string() }
+
+    fn handle_nodes(&mut self, nodes: Vec<Node>) -> Vec<Node> {
+        let mut result = Vec::new();
+        for node in nodes {
+            result.extend(self.handle_node(node));
+        }
+        result
+    }
+
+    fn handle_and_flush_nodes(&mut self, mut elements: Vec<Node> ) -> Vec<Node> {
+        log::debug!("{}: handle_and_flush_nodes called", self.name());
+        let mut result = self.handle_nodes(elements);
+
         let mut buffers: Vec<String> = self.nodes_for_geotiffs.iter()
             .map(|(k, v)| k.to_string())
             .collect();
         for buffer_name in buffers {
-            handeled_nodes.append(&mut self.handle_and_flush_buffer(buffer_name));
+            result.extend(self.handle_and_flush_buffer(buffer_name));
         }
-    }
-}
-impl Handler for BufferingElevationEnricher {
-    fn name(&self) -> String { "BufferingElevationEnricher".to_string() }
-    fn handle_element(&mut self, element: Element) -> Vec<Element> {
-        match element {
-            Element::Node { node } => {
-                let node_id = node.id();
-                let (buffer_option, node_option) = self.buffer_node(node); //nur puffern, nichts tun
-                match buffer_option {
-                    None => {
-                        if log::log_enabled!(log::Level::Trace) {
-                            log::warn!("node#{} was not buffered - no geotiff found for it?", &node_id);
-                        }
-                        match node_option {
-                            None => {
-                                log::error!("buffer_node returned no buffer name and also no node");
-                                vec![]
-                            }
-                            Some(node) => { vec![into_node_element(node)] }
-                        }
-                    }
-                    Some(buffer_name) => {
-                        match self.nodes_for_geotiffs.get(&buffer_name) {
-                            None => {
-                                log::error!("the map nodes_for_geotiffs contained key {} but no value!", &node_id);
-                                match node_option {
-                                    None => vec![],
-                                    Some(node) => { vec![into_node_element(node)] }
-                                }
-                            }
-                            Some(buffer_vec) => {
-                                if buffer_vec.len() >= self.max_buffer_len {
-                                    self.handle_and_flush_buffer(buffer_name) //elevation setzen, zrückgeben
-                                } else {
-                                    vec![]
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-            _ => {
-                // When the element is not a node, we need to flush all (node-) buffers first and _then_ handle the element
-                let mut elements = vec![];
-                if ! self.all_buffers_flushed {
-                    log::debug!("{}: Flushing all buffers before handling first non-node element", self.name());
-                    self.flush_all_buffers(&mut elements);
-                    self.all_buffers_flushed = true;
-                }
-                elements.push(element);
-                elements
-            }
-        }
-    }
-    fn handle_and_flush_elements(&mut self, elements: Vec<Element>) -> Vec<Element> {
-        log::debug!("{}: handle_and_flush_elements called", self.name());
-        let mut handeled_nodes = vec![];
-        let mut handeled_ways = vec![];
-        let mut handeled_relations = vec![];
-        for element in elements {
-            match element {
-                Element::Node { node } => {
-                    let (buffer_option, node_option) = self.buffer_node(node);
-                    match buffer_option {
-                        None => {
-                            match node_option {
-                                None => {
-                                    log::error!("buffer_node returned no buffer name and also no node");
-                                }
-                                Some(node) => {
-                                    log::warn!("node was not buffered for some reason, but will be sent to downstream processing");
-                                    let _ = handeled_nodes.push(into_node_element(node));
-                                }
-                            }
-                        }
-                        Some(_) => {
-                            //buffering is ok for now, no action needed her, node will be flushed a few lines below
-                        }
-                    }
-                }
-                Element::Way { .. } => { handeled_ways.push(element) },
-                Element::Relation { .. } => { handeled_relations.push(element) }
-                Element::Sentinel => {}
-            }
-        }
-        self.flush_all_buffers(&mut handeled_nodes);
-        handeled_nodes.extend(handeled_ways);
-        handeled_nodes.extend(handeled_relations);
-        handeled_nodes
+        result
     }
 }
 
@@ -489,6 +452,7 @@ mod tests {
     use georaster::geotiff::{GeoTiffReader, RasterValue};
     use osm_io::osm::model::coordinate::Coordinate;
     use osm_io::osm::model::element::Element;
+    use osm_io::osm::model::node::Node;
     use osm_io::osm::model::tag::Tag;
     use proj4rs::Proj;
     use simple_logger::SimpleLogger;
@@ -610,13 +574,13 @@ mod tests {
     fn are_floats_close(a: f64, b: f64, epsilon: f64) -> bool {
         (a - b).abs() < epsilon
     }
-    pub fn simple_node_element_limburg(id: i64, tags: Vec<(&str, &str)>) -> Element {
+    pub fn simple_node_element_limburg(id: i64, tags: Vec<(&str, &str)>) -> Node {
         let tags_obj = tags.iter().map(|(k, v)| Tag::new(k.to_string(), v.to_string())).collect();
-        crate::handler::tests::node_element(id, 1, wgs84_coordinate_limburg_vienna_house().as_coordinate(), 1, 1, 1, "a".to_string(), true, tags_obj)
+        Node::new(id, 1, wgs84_coordinate_limburg_vienna_house().as_coordinate(), 1, 1, 1, "a".to_string(), true, tags_obj)
     }
-    pub fn simple_node_element_hd_ma(id: i64, tags: Vec<(&str, &str)>) -> Element {
+    pub fn simple_node_element_hd_ma(id: i64, tags: Vec<(&str, &str)>) -> Node {
         let tags_obj = tags.iter().map(|(k, v)| Tag::new(k.to_string(), v.to_string())).collect();
-        crate::handler::tests::node_element(id, 1, wgs84_coordinate_hd_river().as_coordinate(), 1, 1, 1, "a".to_string(), true, tags_obj)
+        Node::new(id, 1, wgs84_coordinate_hd_river().as_coordinate(), 1, 1, 1, "a".to_string(), true, tags_obj)
     }
     fn validate_node_id(id: i64, element_option: &Option<&Element>) {
         if element_option.is_none() {
@@ -629,27 +593,15 @@ mod tests {
             _ => panic!("expected a node element")
         }
     }
-    fn validate_has_ids(elements: &Vec<Element>, ids: Vec<i64>) {
-        for id in ids {
-            assert!(elements.iter().any(|element| match element {
-                Element::Node { node } => { node.id() == id }
-                Element::Way { way } => { way.id() == id }
-                Element::Relation { relation } => { relation.id() == id }
-                Element::Sentinel => { panic!("sentinel?") }
-            }))
-        }
+    fn validate_has_ids(elements: &Vec<Node>, ids: Vec<i64>) {
+        let element_ids = elements.into_iter().map(|node| node.id()).collect::<Vec<_>>();
+        assert!(element_ids.iter().all(|id| ids.contains(id)));
     }
-    fn validate_all_have_elevation_tag(elements: &Vec<Element>) {
+    fn validate_all_have_elevation_tag(elements: &Vec<Node>) {
         elements.iter().for_each(|element| validate_has_elevation_tag(&element));
     }
-
-    fn validate_has_elevation_tag(element_option: &Element) {
-        match element_option {
-            Element::Node { node } => {
-                assert!(node.tags().iter().any(|tag| tag.k().eq("ele") && !tag.v().is_empty()));
-            }
-            _ => panic!("expected a node element")
-        }
+    fn validate_has_elevation_tag(node: &Node) {
+        assert!(node.tags().iter().any(|tag| tag.k().eq("ele") && !tag.v().is_empty()));
     }
     #[test]
     fn geotiff_limburg_load() {
@@ -969,31 +921,31 @@ mod tests {
         handler.init("test/region*.tif");
 
         // The first elements should be buffered in the buffer for their tiff
-        assert_eq!(0usize, handler.handle_element(simple_node_element_limburg(1, vec![])).len());
-        assert_eq!(0usize, handler.handle_element(simple_node_element_hd_ma(20, vec![])).len());
-        assert_eq!(0usize, handler.handle_element(simple_node_element_hd_ma(21, vec![])).len());
-        assert_eq!(0usize, handler.handle_element(simple_node_element_limburg(2, vec![])).len());
-        assert_eq!(0usize, handler.handle_element(simple_node_element_limburg(3, vec![])).len());
+        assert_eq!(0usize, handler.handle_node(simple_node_element_limburg(1, vec![])).len());
+        assert_eq!(0usize, handler.handle_node(simple_node_element_hd_ma(20, vec![])).len());
+        assert_eq!(0usize, handler.handle_node(simple_node_element_hd_ma(21, vec![])).len());
+        assert_eq!(0usize, handler.handle_node(simple_node_element_limburg(2, vec![])).len());
+        assert_eq!(0usize, handler.handle_node(simple_node_element_limburg(3, vec![])).len());
 
         // When receiving the max_buffer_len st element for tiff limburg, this buffer should be flushed
         // and all 4 elements should be returned.
         // But the 2 elements for tiff hd_ma should remain in their buffer.
-        let probably_4_limburg_nodes = handler.handle_element(simple_node_element_limburg(4, vec![]));
+        let probably_4_limburg_nodes = handler.handle_node(simple_node_element_limburg(4, vec![]));
         assert_eq!(4usize, probably_4_limburg_nodes.len());
         validate_has_ids(&probably_4_limburg_nodes, vec![1, 2, 3, 4]);
         validate_all_have_elevation_tag(&probably_4_limburg_nodes);
 
         // After the flush call all 2 elements from the hd buffer should be released
-        let probably_2_ma_hd_nodes = handler.handle_and_flush_elements(vec![]);
+        let probably_2_ma_hd_nodes = handler.handle_and_flush_nodes(vec![]);
         assert_eq!(2usize, probably_2_ma_hd_nodes.len());
         validate_has_ids(&probably_2_ma_hd_nodes, vec![20, 21]);
         validate_all_have_elevation_tag(&probably_2_ma_hd_nodes);
 
         // Now one more element is add, it should be buffered
-        assert_eq!(0usize, handler.handle_element(simple_node_element_limburg(10, vec![])).len());
+        assert_eq!(0usize, handler.handle_node(simple_node_element_limburg(10, vec![])).len());
         // and now the flush fn is called with two additional node elements.
         // The two buffered and the two transferred arguments are expected in the return vec:
-        let probably_3_elements = handler.handle_and_flush_elements(vec![
+        let probably_3_elements = handler.handle_and_flush_nodes(vec![
             simple_node_element_hd_ma(22, vec![]),
             simple_node_element_limburg(5, vec![]),
         ]);
