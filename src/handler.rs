@@ -5,6 +5,7 @@ pub(crate) mod info;
 pub(crate) mod modify;
 pub mod geotiff;
 pub(crate) mod interpolate;
+pub(crate) mod skip_ele;
 
 use std::collections::{BTreeMap, HashMap, HashSet};
 
@@ -96,6 +97,7 @@ pub struct HandlerResult {
     pub counts: BTreeMap<String, u64>,
     pub other: HashMap<String, String>,
     pub node_ids: BitVec,
+    pub skip_ele: BitVec
 }
 impl HandlerResult {
     pub(crate) fn default() -> Self {
@@ -106,6 +108,7 @@ impl HandlerResult {
             counts: btreemap! {},
             other: hashmap! {},
             node_ids: BitVec::from_elem(nbits, false),
+            skip_ele: BitVec::from_elem(nbits, false),
         }
     }
     pub fn to_string(&self) -> String {
@@ -265,6 +268,10 @@ pub(crate) mod tests {
     pub fn simple_way_element(id: i64, refs: Vec<i64>, tags: Vec<(&str, &str)>) -> Element {
         let tags_obj = tags.iter().map(|(k, v)| Tag::new(k.to_string(), v.to_string())).collect();
         way_element(id, 1, 1, 1, 1, "a_user".to_string(), true, refs, tags_obj)
+    }
+    pub fn simple_way(id: i64, refs: Vec<i64>, tags: Vec<(&str, &str)>) -> Way {
+        let tags_obj = tags.iter().map(|&(k, v)| Tag::new(String::from(k), String::from(v))).collect();
+        Way::new(id, 1, 1, 1, 1, String::from("a_user"), true, refs, tags_obj)
     }
     pub fn simple_relation_element(id: i64, members: Vec<(MemberType, i64, &str)>, tags: Vec<(&str, &str)>) -> Element {
         let members_obj = members.iter().map(|(t, id, role)| {
