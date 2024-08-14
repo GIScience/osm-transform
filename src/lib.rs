@@ -80,6 +80,17 @@ fn extract_referenced_nodes(config: &Config) -> HandlerResult {
 }
 
 fn process(config: &Config, node_filter_result: Option<HandlerResult>) -> HandlerResult {
+    let mut node_ids = None;
+    let mut skip_ele = None;
+
+    match node_filter_result {
+        None => {}
+        Some(result) => {
+            node_ids = Some(result.node_ids);
+            skip_ele = Some(result.skip_ele);
+        }
+    }
+
     let mut handler_chain = HandlerChain::default()
         .add(ElementPrinter::with_prefix("\ninput:----------------\n".to_string())
             .with_node_ids(config.print_node_ids.clone())
@@ -93,14 +104,10 @@ fn process(config: &Config, node_filter_result: Option<HandlerResult>) -> Handle
 
     handler_chain = handler_chain.add(ComplexElementsFilter::ors_default());
 
-    match node_filter_result {
-        None => {}
-        Some(result) => {
-            log::debug!("Cloning result node_ids with len={}", result.node_ids.len());
-            let node_id_filter = NodeIdFilter { node_ids: result.node_ids };//todo check if clone is necessary
-            log::debug!("node_id_filter has node_ids with len={}", node_id_filter.node_ids.len());
-            handler_chain = handler_chain.add(node_id_filter);
-        }
+    if node_ids.is_some() {
+        let node_id_filter = NodeIdFilter { node_ids: node_ids.unwrap() };
+        log::debug!("node_id_filter has node_ids with len={}", node_id_filter.node_ids.len());
+        handler_chain = handler_chain.add(node_id_filter);
     }
 
     let mut stopwatch = StopWatch::new();
@@ -121,7 +128,7 @@ fn process(config: &Config, node_filter_result: Option<HandlerResult>) -> Handle
     if &config.elevation_tiffs.len() > &0 {
         log::info!("Initializing elevation enricher");
         stopwatch.start();
-        let mut elevation_enricher = BufferingElevationEnricher::new(config.elevation_batch_size, config.elevation_total_buffer_size);
+        let mut elevation_enricher = BufferingElevationEnricher::new(config.elevation_batch_size, config.elevation_total_buffer_size, skip_ele);
         for elevation_glob_pattern in &config.elevation_tiffs {
             elevation_enricher.init(elevation_glob_pattern);
         }

@@ -312,12 +312,10 @@ pub(crate) struct BufferingElevationEnricher {
     max_buffer_len: usize,
     max_buffered_nodes: usize,
     all_buffers_flushed: bool,
+    skip_ele: Option<BitVec>,
 }
 impl BufferingElevationEnricher {
-    pub fn default() -> Self {
-        Self::new(1_000_000, 5_000_000)
-    }
-    pub fn new(max_buffer_len: usize, max_buffered_nodes: usize) -> Self {
+    pub fn new(max_buffer_len: usize, max_buffered_nodes: usize, skip_ele: Option<BitVec>) -> Self {
         Self {
             geotiff_manager: GeoTiffManager::new(),
             nodes_for_geotiffs: HashMap::new(),
@@ -326,6 +324,7 @@ impl BufferingElevationEnricher {
             max_buffer_len,
             max_buffered_nodes,
             all_buffers_flushed: false,
+            skip_ele: skip_ele,
         }
     }
     pub fn init(&mut self, file_pattern: &str) -> Result<(), Box<dyn Error>> {
@@ -354,15 +353,11 @@ impl BufferingElevationEnricher {
     /// Load geotiff for this buffer and add elevation to all nodes in buffer,
     /// return nodes for downstream processing and empty the buffer.
     fn handle_and_flush_buffer(&mut self, buffer_name: String) -> Vec<Node> {
-        let mut result = vec![];
-        let buffer_vec = &mut self.nodes_for_geotiffs.remove(&buffer_name).expect("buffer not found");
-
+        let mut buffer_vec = self.nodes_for_geotiffs.remove(&buffer_name).expect("buffer not found");
         log::debug!("Handling and flushing buffer with {} buffered nodes for geotiff '{}'", buffer_vec.len(), buffer_name);
         let geotiff = &mut self.geotiff_manager.load_geotiff(buffer_name.as_str(), &self.srs_resolver).expect("could not load geotiff");
-        buffer_vec.iter_mut().for_each(|node| self.add_elevation_tag(geotiff, node));
-
-        result.append(buffer_vec);
-        result
+        buffer_vec.iter_mut().for_each(|node| if !self.skip_elevation(node) { self.add_elevation_tag(geotiff, node) });
+        buffer_vec
     }
 
     fn add_elevation_tag(&mut self, mut geotiff: &mut GeoTiff, mut node: &mut Node) {
@@ -414,6 +409,13 @@ impl BufferingElevationEnricher {
                 }
             }
         }
+    }
+
+    fn skip_elevation(&mut self, node: &Node) -> bool {
+        if self.skip_ele.is_some() {
+            return self.skip_ele.as_ref().unwrap().get(node.id() as usize).unwrap_or(false);
+        }
+        false
     }
 }
 
@@ -917,7 +919,7 @@ mod tests {
     #[test]
     fn buffering_elevation_enricher_test() {
         SimpleLogger::new().init();
-        let mut handler = BufferingElevationEnricher::new(4, 5);
+        let mut handler = BufferingElevationEnricher::new(4, 5, None);
         handler.init("test/region*.tif");
 
         // The first elements should be buffered in the buffer for their tiff
