@@ -10,6 +10,7 @@ extern crate maplit;
 
 use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;
+use std::sync::Once;
 use benchmark_rs::stopwatch::StopWatch;
 use log4rs::append::console::ConsoleAppender;
 use log4rs::config::{Appender, Logger, Root};
@@ -23,11 +24,12 @@ use crate::handler::filter::{AllElementsFilter, ComplexElementsFilter, FilterTyp
 use crate::handler::geotiff::{BufferingElevationEnricher};
 use crate::handler::info::{CountType, ElementCounter, ElementPrinter};
 use crate::handler::modify::MetadataRemover;
-
+use log::SetLoggerError;
 use crate::output::OutputHandler;
 
+static INIT: Once = Once::new();
 
-pub fn init(config: &Config) {
+pub fn init(config: &Config) -> Result<(), SetLoggerError> {
     let log_level: LevelFilter;
     match config.debug {
         0 => log_level = LevelFilter::Info,
@@ -41,10 +43,15 @@ pub fn init(config: &Config) {
         .logger(Logger::builder().build("rusty_routes_transformer", log_level))
         .build(Root::builder().appender("stdout").build(LevelFilter::Off))
         .unwrap();
-    let _handle = log4rs::init_config(config).unwrap();
+
+    let mut result = Ok(());
+    INIT.call_once(|| {
+        result = log4rs::init_config(config).map(|_| ());
+    });
+    result
 }
 
-pub fn run(config: &Config) -> HandlerResult{
+pub fn run(config: &Config) -> HandlerResult {
     let mut result: Option<HandlerResult> = None;
     if config.with_node_filtering {
         result = Some(extract_referenced_nodes(config));
@@ -55,7 +62,7 @@ pub fn run(config: &Config) -> HandlerResult{
 fn extract_referenced_nodes(config: &Config) -> HandlerResult {
     let mut handler_chain = HandlerChain::default()
         .add(ElementCounter::new("initial"))
-        .add(AllElementsFilter{handle_types: OsmElementTypeSelection::node_only()})
+        .add(AllElementsFilter { handle_types: OsmElementTypeSelection::node_only() })
         .add(ComplexElementsFilter::ors_default())
         .add(ReferencedNodeIdCollector::default())
         .add(ElementCounter::new("final"))
@@ -68,11 +75,10 @@ fn extract_referenced_nodes(config: &Config) -> HandlerResult {
     let mut handler_result = handler_chain.collect_result();
 
     log::info!("Finished extraction of referenced node ids, time: {}", stopwatch);
-    if log::log_enabled!(log::Level::Trace)  {
+    if log::log_enabled!(log::Level::Trace) {
         log::trace!("Generating node-id statistics...");
         log::trace!("{}" , &handler_result.to_string_with_node_ids());
-    }
-    else {
+    } else {
         log::info!("{}" , &handler_result.to_string());
     }
     stopwatch.reset();
