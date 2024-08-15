@@ -1,0 +1,7 @@
+# Ignore everything
+*
+
+# Allow
+!Cargo.toml
+!Cargo.lock
+!src
