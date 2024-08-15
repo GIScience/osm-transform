@@ -2,6 +2,7 @@
 extern crate maplit;
 use std::collections::HashSet;
 use std::path::PathBuf;
+use std::env;
 
 use clap::Parser;
 
@@ -9,6 +10,19 @@ use rusty_routes_transformer::{Config, init, run};
 
 
 fn main() {
+    // Print RUSTFLAGS and MALLOC_CONF
+    if let Ok(rustflags) = env::var("RUSTFLAGS") {
+        println!("RUSTFLAGS: {}", rustflags);
+    } else {
+        println!("RUSTFLAGS not set");
+    }
+
+    if let Ok(malloc_conf) = env::var("MALLOC_CONF") {
+        println!("MALLOC_CONF: {}", malloc_conf);
+    } else {
+        println!("MALLOC_CONF not set");
+    }
+
     let args = Args::parse();
     let config = args.to_config();
     init(&config);
@@ -65,8 +79,7 @@ pub struct Args {
 
     /// Do NOT remove metadata 'version', 'timestamp', 'changeset', 'uid', 'user'
     #[arg(long)]
-    pub keep_metadata: bool
-
+    pub keep_metadata: bool,
 }
 impl Args {
     pub fn to_config(mut self) -> Config {
@@ -78,11 +91,11 @@ impl Args {
             elevation_batch_size: self.elevation_batch_size,
             elevation_total_buffer_size: self.elevation_total_buffer_size,
             debug: self.debug,
-            with_node_filtering: ! self.suppress_node_filtering,
+            with_node_filtering: !self.suppress_node_filtering,
             print_node_ids: HashSet::from_iter(self.print_node_ids),
             print_way_ids: HashSet::from_iter(self.print_way_ids),
             print_relation_ids: HashSet::from_iter(self.print_relation_ids),
-            remove_metadata: ! self.keep_metadata
+            remove_metadata: !self.keep_metadata,
         }
     }
 }
