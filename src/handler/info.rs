@@ -6,6 +6,7 @@ use rustc_hash::FxHashSet;
 use crate::handler::{HandlerResult, OsmElementTypeSelection, Handler};
 
 #[derive(Debug)]
+#[allow(dead_code)]
 pub(crate) enum CountType {
     ALL,
     ACCEPTED,
@@ -80,6 +81,7 @@ impl Default for ElementPrinter {
         }
     }
 }
+#[allow(dead_code)]
 impl ElementPrinter {
     pub fn with_prefix(prefix: String) -> Self {
         Self {

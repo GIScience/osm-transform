@@ -76,6 +76,7 @@ impl Default for AreaHandler {
 }
 
 impl AreaHandler {
+    #[allow(dead_code)]
     pub fn new() -> Self {
         Self::default()
     }

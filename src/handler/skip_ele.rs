@@ -3,10 +3,12 @@ use osm_io::osm::model::way::Way;
 
 use crate::handler::{HandlerResult, HIGHEST_NODE_ID, Handler};
 
+#[allow(dead_code)]
 pub(crate) struct SkipElevationNodeCollector {
     referenced_node_ids: BitVec,
     no_elevation_keys: Vec<String>,
 }
+#[allow(dead_code)]
 impl SkipElevationNodeCollector {
     const DEFAULT_KEYS: [&'static str; 4] = ["bridge", "tunnel", "cutting", "indoor"];
 

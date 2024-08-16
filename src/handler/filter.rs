@@ -10,17 +10,19 @@ use crate::handler::{HIGHEST_NODE_ID, into_node_element, into_relation_element, 
 use crate::handler::predicate::{HasOneOfTagKeysPredicate, HasTagKeyValuePredicate, HasNoneOfTagKeysPredicate};
 
 #[derive(Debug)]
+#[allow(dead_code)]
 pub(crate) enum FilterType {
     AcceptMatching,
     RemoveMatching,
 }
-
+#[allow(dead_code)]
 pub(crate) struct TagValueBasedOsmElementsFilter {
     pub handle_types: OsmElementTypeSelection,
     pub tag_key: String,
     pub tag_value_regex: Regex,
     pub filter_type: FilterType,
 }
+#[allow(dead_code)]
 impl TagValueBasedOsmElementsFilter {
     pub(crate) fn new(handle_types: OsmElementTypeSelection, tag_key: String, tag_value_regex: Regex, filter_type: FilterType) -> Self {
         Self {
@@ -70,12 +72,14 @@ impl Handler for TagValueBasedOsmElementsFilter {
 }
 
 
-
+#[allow(dead_code)]
 pub(crate) struct TagKeyBasedOsmElementsFilter {
     pub handle_types: OsmElementTypeSelection,
     pub tag_keys: Vec<String>,
     pub filter_type: FilterType,
 }
+
+#[allow(dead_code)]
 impl TagKeyBasedOsmElementsFilter {
     pub(crate) fn new(handle_types: OsmElementTypeSelection, tag_keys: Vec<String>, filter_type: FilterType) -> Self {
         Self {
@@ -239,10 +243,11 @@ impl Handler for AllElementsFilter {
     }
 }
 
-
+#[allow(dead_code)]
 pub(crate) struct NodeIdFilter {
     pub(crate) node_ids: BitVec
 }
+#[allow(dead_code)]
 impl NodeIdFilter {
     fn default() -> Self {
         Self::with_capacity(HIGHEST_NODE_ID as usize)

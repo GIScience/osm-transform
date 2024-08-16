@@ -99,6 +99,7 @@ pub struct MutableWay<'a> {
     tags: Option<Vec<Tag>>,
 }
 
+#[allow(dead_code)]
 impl<'a> MutableWay<'a> {
     pub fn new(way: &'a Way) -> MutableWay {
         MutableWay {

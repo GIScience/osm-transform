@@ -14,6 +14,7 @@ use rstar::{AABB, Envelope, Point, PointDistance, RTree, RTreeObject};
 use rustc_hash::FxHashMap;
 use crate::handler::{Handler};
 
+#[allow(dead_code)]
 pub struct GeoTiff {
     file_path: String,
     proj_wgs_84: Proj,
@@ -129,7 +130,7 @@ impl Default for GeoTiffManager {
         Self::new()
     }
 }
-
+#[allow(dead_code)]
 impl GeoTiffManager {
     pub fn new() -> Self {
         Self {
@@ -341,7 +342,7 @@ impl PointDistance for RSBoundingBox {
     }
 }
 
-
+#[allow(dead_code)]
 pub(crate) struct BufferingElevationEnricher {
     geotiff_manager: GeoTiffManager,
     nodes_for_geotiffs: FxHashMap<String, Vec<Node>>,
@@ -367,6 +368,7 @@ impl BufferingElevationEnricher {
         self.geotiff_manager.load_and_index_geotiffs(file_pattern);
         Ok(())
     }
+    #[allow(dead_code)]
     fn use_loader(mut self, geo_tiff_loader: GeoTiffManager) -> Self {
         self.geotiff_manager = geo_tiff_loader;
         self
@@ -471,7 +473,7 @@ impl Handler for BufferingElevationEnricher {
         let mut result = self.handle_nodes(elements);
 
         let buffers: Vec<String> = self.nodes_for_geotiffs.iter()
-            .map(|(k, v)| k.to_string())
+            .map(|(k, _v)| k.to_string())
             .collect();
         for buffer_name in buffers {
             result.extend(self.handle_and_flush_buffer(buffer_name));
@@ -486,7 +488,7 @@ mod tests {
     use std::fs::File;
     use std::io::BufReader;
 
-    
+
     use georaster::geotiff::{GeoTiffReader, RasterValue};
     use osm_io::osm::model::coordinate::Coordinate;
     use osm_io::osm::model::element::Element;
@@ -505,6 +507,7 @@ mod tests {
         fn new(lon: f64, lat: f64) -> Self {
             Self { lon, lat }
         }
+        #[allow(dead_code)]
         fn from_coordinate(coordinate: Coordinate) -> Self {
             Self { lon: coordinate.lon(), lat: coordinate.lat() }
         }
@@ -517,12 +520,14 @@ mod tests {
         fn lon(&self) -> f64 { self.lon }
         fn lat(&self) -> f64 { self.lat }
     }
+    #[allow(dead_code)]
     fn as_coord(tup: (f64, f64)) -> Coordinate { Coordinate::new(tup.1, tup.0) }
+    #[allow(dead_code)]
     fn as_tuple_lon_lat(coordinate: Coordinate) -> (f64, f64) { (coordinate.lon(), coordinate.lat()) }
     #[test]
     #[ignore]
     fn test_find_geotiff_id_for_wgs84_coord_srtm_ma_hd() {
-        SimpleLogger::new().init();
+        SimpleLogger::new().init().expect("could not init logger");
         let mut geotiff_loader = GeoTiffManager::new();
         geotiff_loader.load_and_index_geotiffs("test/srtm*.tif");
         assert_eq!(2, geotiff_loader.index.get_geotiff_count());
@@ -578,12 +583,12 @@ mod tests {
     fn wgs84_coordinate_hamburg_elbphilharmonie() -> TestPoint { TestPoint::new(9.984270930290224, 53.54137211789218) }
     fn create_geotiff_limburg() -> GeoTiff {
         let mut tiff_loader = GeoTiffManager::new();
-        
+
         tiff_loader.load_geotiff("test/region_limburg_an_der_lahn.tif").expect("got error")
     }
     fn create_geotiff_ma_hd() -> GeoTiff {
         let mut tiff_loader = GeoTiffManager::new();
-        
+
         tiff_loader.load_geotiff("test/region_heidelberg_mannheim.tif").expect("got error")
     }
 
@@ -618,6 +623,7 @@ mod tests {
         let tags_obj = tags.iter().map(|(k, v)| Tag::new(k.to_string(), v.to_string())).collect();
         Node::new(id, 1, wgs84_coordinate_hd_river().as_coordinate(), 1, 1, 1, "a".to_string(), true, tags_obj)
     }
+    #[allow(dead_code)]
     fn validate_node_id(id: i64, element_option: &Option<&Element>) {
         if element_option.is_none() {
             panic!("expected some element")
@@ -647,7 +653,7 @@ mod tests {
     }
     #[test]
     fn test_load_geotiffs() {
-        SimpleLogger::new().init();
+        SimpleLogger::new().init().expect("could not init logger");
         let mut geotiff_loader = GeoTiffManager::new();
         geotiff_loader.load_and_index_geotiffs("test/region*.tif");
         assert_eq!(2, geotiff_loader.index.get_geotiff_count());
@@ -655,7 +661,7 @@ mod tests {
     }
     #[test]
     fn test_find_geotiff_id_for_wgs84_coord() {
-        SimpleLogger::new().init();
+        SimpleLogger::new().init().expect("could not init logger");
         let mut geotiff_loader = GeoTiffManager::new();
         geotiff_loader.load_and_index_geotiffs("test/region*.tif");
         assert_eq!(2, geotiff_loader.index.get_geotiff_count());
@@ -667,8 +673,8 @@ mod tests {
 
     #[test]
     fn test_find_geotiff_id_for_wgs84_coord_ma_hd() {
-        SimpleLogger::new().init();
-            let mut geotiff_loader = GeoTiffManager::new();
+        SimpleLogger::new().init().expect("could not init logger");
+        let mut geotiff_loader = GeoTiffManager::new();
         geotiff_loader.load_and_index_geotiffs("test/region*.tif");
         assert_eq!(2, geotiff_loader.index.get_geotiff_count());
         let test_point = wgs84_coordinate_hd_river();
@@ -679,7 +685,7 @@ mod tests {
     #[test]
     #[ignore]
     fn test_find_geotiff_id_for_wgs84_coord_ma_hd_srtm() {
-        SimpleLogger::new().init();
+        SimpleLogger::new().init().expect("could not init logger");
         let mut geotiff_loader = GeoTiffManager::new();
         geotiff_loader.load_and_index_geotiffs("test/region*.tif");
         assert_eq!(2, geotiff_loader.index.get_geotiff_count());
@@ -816,7 +822,7 @@ mod tests {
         proj4rs::transform::transform(
             &Proj::from_epsg_code(5174).expect("not found"),
             &Proj::from_epsg_code(4326).expect("not found"),
-            &mut point_3d);
+            &mut point_3d).expect("transformation error");
         dbg!(&point_3d);
         point_3d.0 = point_3d.0.to_degrees();
         point_3d.1 = point_3d.1.to_degrees();
@@ -919,9 +925,9 @@ mod tests {
 
     #[test]
     fn buffering_elevation_enricher_test() {
-        SimpleLogger::new().init();
+        SimpleLogger::new().init().expect("could not init logger");
         let mut handler = BufferingElevationEnricher::new(4, 5, None);
-        handler.init("test/region*.tif");
+        handler.init("test/region*.tif").expect("could not init handler");
 
         // The first elements should be buffered in the buffer for their tiff
         assert_eq!(0usize, handler.handle_node(simple_node_element_limburg(1, vec![])).len());
