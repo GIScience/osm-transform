@@ -1,4 +1,4 @@
-use std::collections::{BTreeMap, HashMap};
+use std::collections::BTreeMap;
 use std::error::Error;
 use std::fs::File;
 use std::io::BufReader;
@@ -7,6 +7,7 @@ use itertools::Itertools;
 use bit_vec::BitVec;
 use georaster::geotiff::{GeoTiffReader, RasterValue};
 use glob::glob;
+use log4rs::Logger;
 use log::error;
 use osm_io::osm::model::element::Element;
 use osm_io::osm::model::node::Node;
@@ -16,7 +17,6 @@ use rstar::{AABB, Envelope, Point, PointDistance, RTree, RTreeObject};
 use rustc_hash::FxHashMap;
 use serde::__private::de::Content::F64;
 use crate::handler::{format_element_id, into_node_element, into_vec_node_element, into_vec_relation_element, into_vec_way_element, into_way_element, Handler};
-use crate::srs::DynamicSrsResolver;
 
 pub struct GeoTiff {
     file_path: String,
@@ -67,7 +67,7 @@ impl GeoTiff {
         let lat_tiff = self.top_left_y + (self.pixel_height * self.pixels_vertical as f64);
         transform(&self.proj_tiff, &self.proj_wgs_84, lon_tiff, lat_tiff)
     }
-    pub(crate) fn get_pixel_degrees_horizontal_vertical(&self) -> (f64, f64){
+    pub(crate) fn get_pixel_degrees_horizontal_vertical(&self) -> (f64, f64) {
         let top_left_wgs84 = self.get_top_left_as_wgs84().expect("Could not transform top left corner to WGS 84");
         let bottom_right_wgs84 = self.get_bottom_right_as_wgs84().expect("Could not transform bottom right corner to WGS 84");
         let pixel_size_horizontal = (bottom_right_wgs84.0 - top_left_wgs84.0) / self.pixels_horizontal as f64;
@@ -134,14 +134,14 @@ impl GeoTiffManager {
             index: Box::new(RSGeoTiffIndex::new())
         }
     }
-    pub fn load_and_index_geotiffs(&mut self, files_pattern: &str, srs_resolver: &DynamicSrsResolver) {
+    pub fn load_and_index_geotiffs(&mut self, files_pattern: &str) {
         match glob(files_pattern) {
             Ok(paths) => {
                 for entry in paths {
                     match entry {
                         Ok(path) => {
                             if path.is_file() {
-                                let geotiff = self.load_geotiff(path.to_str().unwrap(), srs_resolver);
+                                let geotiff = self.load_geotiff(path.to_str().unwrap());
                                 match geotiff {
                                     Ok(geotiff) => {
                                         self.index_geotiff(path, geotiff);
@@ -165,33 +165,44 @@ impl GeoTiffManager {
         log::debug!("Successfully indexed geotiff file {:?}", path);
     }
 
-    pub fn load_geotiff(&mut self, file_path: &str, srs_resolver: &DynamicSrsResolver) -> Result<GeoTiff, Box<dyn Error>> {
+
+    pub fn load_geotiff(&mut self, file_path: &str) -> Result<GeoTiff, Box<dyn Error>> {
         log::debug!("Loading geotiff {}", file_path);
         let img_file = BufReader::new(File::open(file_path).expect("Could not open input file"));
         let mut geotiffreader = GeoTiffReader::open(img_file).expect("Could not read input file as tiff");
 
         let origin = geotiffreader.origin().unwrap();
         let pixel_size = geotiffreader.pixel_size().unwrap();
-        let geo_params = geotiffreader.geo_params.clone().unwrap();
         let dimensions = geotiffreader.images().get(0).expect("no image in tiff").dimensions.unwrap();
 
-        let geo_params: Vec<&str> = geo_params.split("|").collect();
-        let proj_tiff = srs_resolver.get_epsg(geo_params[0].to_string()).expect("not found");
+        let (raw_projected_epsg_code, raw_geographic_epsg_code) = if let Some(keys) = geotiffreader.geo_keys.as_ref() {
+            extract_epsg_codes(keys)
+        } else {
+            (0, 0)
+        };
 
         let proj_wgs84 = Proj::from_epsg_code(4326).unwrap();
-        let proj_tiff = Proj::from_epsg_code(proj_tiff as u16).unwrap(); //as u16 should not be necessary, SrsResolver should return u16
+
+        let mut proj_tiff = Proj::from_epsg_code(4326).unwrap();
+        if raw_projected_epsg_code > 0 {
+            proj_tiff = Proj::from_epsg_code(raw_projected_epsg_code).unwrap();
+        } else if raw_geographic_epsg_code > 0 {
+            proj_tiff = Proj::from_epsg_code(raw_geographic_epsg_code).unwrap();
+        } else {
+            log::warn!("No EPSG code found in GeoKeys. Using WGS 84 as default projection.");
+        }
 
         let geo_tiff = GeoTiff {
             file_path: file_path.to_string(),
             proj_wgs_84: proj_wgs84,
-            proj_tiff: proj_tiff,
+            proj_tiff,
             top_left_x: origin[0],
             top_left_y: origin[1],
             pixel_width: pixel_size[0],
             pixel_height: pixel_size[1],
             pixels_horizontal: dimensions.0,
             pixels_vertical: dimensions.1,
-            geotiffreader: geotiffreader,
+            geotiffreader,
         };
         Ok(geo_tiff)
     }
@@ -206,7 +217,27 @@ impl GeoTiffManager {
     }
 }
 
+fn extract_epsg_codes(geo_keys: &Vec<u32>) -> (u16, u16) {
+    const PROJECTED_CS_TYPE_GEO_KEY: u32 = 3072;
+    const GEOGRAPHIC_TYPE_GEO_KEY: u32 = 2048;
+    let mut raw_projected_epsg_code: u16 = 0;
+    let mut raw_geographic_epsg_code: u16 = 0;
 
+    let header_length = 4;
+    let key_length = 4;
+
+    for i in (header_length..geo_keys.len()).step_by(key_length) {
+        let key_id = geo_keys[i];
+        if key_id == PROJECTED_CS_TYPE_GEO_KEY {
+            raw_projected_epsg_code = geo_keys[i + 3] as u16;
+        }
+        if key_id == GEOGRAPHIC_TYPE_GEO_KEY {
+            raw_geographic_epsg_code = geo_keys[i + 3] as u16;
+        }
+    }
+
+    (raw_projected_epsg_code, raw_geographic_epsg_code)
+}
 // Save wgs84 Bounding Boxes with geotiff_id that can be found efficiently by wgs84 coords.
 // Clients of the index can identify which geotiff contains the coordinate of interest.
 // It's their own responsibility to get the GeoTiffLoader by the id and get the geotiff value for the coordinate.
@@ -237,7 +268,7 @@ impl GeoTiffIndex for RSGeoTiffIndex {
         let bbox = RSBoundingBox::new(geotiff_id.to_string(),
                                       [top_left_wgs84.0, bottom_right_wgs84.1],
                                       [bottom_right_wgs84.0, top_left_wgs84.1],
-                                      f64::max(pixel_size.0, pixel_size.1) as f64
+                                      f64::max(pixel_size.0, pixel_size.1),
         );
         self.rtree.insert(bbox);
     }
@@ -309,7 +340,6 @@ pub(crate) struct BufferingElevationEnricher {
     geotiff_manager: GeoTiffManager,
     nodes_for_geotiffs: FxHashMap<String, Vec<Node>>,
     node_counts_for_geotiffs: FxHashMap<String, usize>,
-    srs_resolver: DynamicSrsResolver,
     max_buffer_len: usize,
     max_buffered_nodes: usize,
     all_buffers_flushed: bool,
@@ -321,7 +351,6 @@ impl BufferingElevationEnricher {
             geotiff_manager: GeoTiffManager::new(),
             nodes_for_geotiffs: FxHashMap::default(),
             node_counts_for_geotiffs: FxHashMap::default(),
-            srs_resolver: DynamicSrsResolver::new(),
             max_buffer_len,
             max_buffered_nodes,
             all_buffers_flushed: false,
@@ -356,7 +385,7 @@ impl BufferingElevationEnricher {
     fn handle_and_flush_buffer(&mut self, buffer_name: String) -> Vec<Node> {
         let mut buffer_vec = self.nodes_for_geotiffs.remove(&buffer_name).expect("buffer not found");
         log::debug!("Handling and flushing buffer with {} buffered nodes for geotiff '{}'", buffer_vec.len(), buffer_name);
-        let geotiff = &mut self.geotiff_manager.load_geotiff(buffer_name.as_str(), &self.srs_resolver).expect("could not load geotiff");
+        let geotiff = &mut self.geotiff_manager.load_geotiff(buffer_name.as_str()).expect("could not load geotiff");
         buffer_vec.iter_mut().for_each(|node| if !self.skip_elevation(node) { self.add_elevation_tag(geotiff, node) });
         buffer_vec
     }
@@ -431,7 +460,7 @@ impl Handler for BufferingElevationEnricher {
         result
     }
 
-    fn handle_and_flush_nodes(&mut self, mut elements: Vec<Node> ) -> Vec<Node> {
+    fn handle_and_flush_nodes(&mut self, mut elements: Vec<Node>) -> Vec<Node> {
         log::debug!("{}: handle_and_flush_nodes called", self.name());
         let mut result = self.handle_nodes(elements);
 
@@ -462,7 +491,6 @@ mod tests {
 
     use crate::handler::geotiff::{BufferingElevationEnricher, format_as_elevation_string, GeoTiff, GeoTiffManager, round_f32, round_f64, transform};
     use crate::handler::Handler;
-    use crate::srs::DynamicSrsResolver;
     struct TestPoint {
         lon: f64,
         lat: f64,
@@ -483,19 +511,18 @@ mod tests {
         fn lon(&self) -> f64 { self.lon }
         fn lat(&self) -> f64 { self.lat }
     }
-    fn as_coord(tup: (f64, f64)) -> Coordinate {Coordinate::new(tup.1, tup.0)}
+    fn as_coord(tup: (f64, f64)) -> Coordinate { Coordinate::new(tup.1, tup.0) }
     fn as_tuple_lon_lat(coordinate: Coordinate) -> (f64, f64) { (coordinate.lon(), coordinate.lat()) }
     #[test]
     #[ignore]
     fn test_find_geotiff_id_for_wgs84_coord_srtm_ma_hd() {
         SimpleLogger::new().init();
-        let srs_resolver = DynamicSrsResolver::new();
         let mut geotiff_loader = GeoTiffManager::new();
-        geotiff_loader.load_and_index_geotiffs("test/srtm*.tif", &srs_resolver);
+        geotiff_loader.load_and_index_geotiffs("test/srtm*.tif");
         assert_eq!(2, geotiff_loader.index.get_geotiff_count());
-        geotiff_loader.load_and_index_geotiffs("test/region*.tif", &srs_resolver);
+        geotiff_loader.load_and_index_geotiffs("test/region*.tif");
         assert_eq!(4, geotiff_loader.index.get_geotiff_count());
-        geotiff_loader.load_and_index_geotiffs("test/*gmted*.tif", &srs_resolver);
+        geotiff_loader.load_and_index_geotiffs("test/*gmted*.tif");
         assert_eq!(6, geotiff_loader.index.get_geotiff_count());
 
         let test_point = wgs84_coordinate_hd_river();
@@ -537,20 +564,20 @@ mod tests {
         assert_eq!(geotiffs[0], "test/srtm_38_02.tif");
         assert_eq!(geotiffs[1], "test/50N000E_20101117_gmted_mea075.tif");
     }
-    fn wgs84_coord_hd_mountain() -> TestPoint {TestPoint::new(8.726878, 49.397500)}
-    fn wgs84_coordinate_hd_river() -> TestPoint {TestPoint::new(8.682461, 49.411029)}
-    fn wgs84_coordinate_limburg_vienna_house() -> TestPoint {TestPoint::new(8.06, 50.39)}
-    fn wgs84_coordinate_limburg_traffic_circle() -> TestPoint {TestPoint::new(8.06185930, 50.38536322)}
+    fn wgs84_coord_hd_mountain() -> TestPoint { TestPoint::new(8.726878, 49.397500) }
+    fn wgs84_coordinate_hd_river() -> TestPoint { TestPoint::new(8.682461, 49.411029) }
+    fn wgs84_coordinate_limburg_vienna_house() -> TestPoint { TestPoint::new(8.06, 50.39) }
+    fn wgs84_coordinate_limburg_traffic_circle() -> TestPoint { TestPoint::new(8.06185930, 50.38536322) }
 
-    fn wgs84_coordinate_hamburg_elbphilharmonie() -> TestPoint {TestPoint::new(9.984270930290224, 53.54137211789218)}
+    fn wgs84_coordinate_hamburg_elbphilharmonie() -> TestPoint { TestPoint::new(9.984270930290224, 53.54137211789218) }
     fn create_geotiff_limburg() -> GeoTiff {
         let mut tiff_loader = GeoTiffManager::new();
-        let mut geotiff = tiff_loader.load_geotiff("test/region_limburg_an_der_lahn.tif", &DynamicSrsResolver::new()).expect("got error");
+        let mut geotiff = tiff_loader.load_geotiff("test/region_limburg_an_der_lahn.tif").expect("got error");
         geotiff
     }
     fn create_geotiff_ma_hd() -> GeoTiff {
         let mut tiff_loader = GeoTiffManager::new();
-        let mut geotiff = tiff_loader.load_geotiff("test/region_heidelberg_mannheim.tif", &DynamicSrsResolver::new()).expect("got error");
+        let mut geotiff = tiff_loader.load_geotiff("test/region_heidelberg_mannheim.tif").expect("got error");
         geotiff
     }
 
@@ -615,18 +642,16 @@ mod tests {
     #[test]
     fn test_load_geotiffs() {
         SimpleLogger::new().init();
-        let srs_resolver = DynamicSrsResolver::new();
         let mut geotiff_loader = GeoTiffManager::new();
-        geotiff_loader.load_and_index_geotiffs("test/region*.tif", &srs_resolver);
+        geotiff_loader.load_and_index_geotiffs("test/region*.tif");
         assert_eq!(2, geotiff_loader.index.get_geotiff_count());
         assert!(geotiff_loader.index.get_geotiff_by_id("test/region_limburg_an_der_lahn.tif").is_some());
     }
     #[test]
     fn test_find_geotiff_id_for_wgs84_coord() {
         SimpleLogger::new().init();
-        let srs_resolver = DynamicSrsResolver::new();
         let mut geotiff_loader = GeoTiffManager::new();
-        geotiff_loader.load_and_index_geotiffs("test/region*.tif", &srs_resolver);
+        geotiff_loader.load_and_index_geotiffs("test/region*.tif");
         assert_eq!(2, geotiff_loader.index.get_geotiff_count());
         let test_point = wgs84_coordinate_limburg_vienna_house();
         let geotiffs = geotiff_loader.index.find_geotiff_id_for_wgs84_coord(test_point.lon(), test_point.lat());
@@ -637,9 +662,8 @@ mod tests {
     #[test]
     fn test_find_geotiff_id_for_wgs84_coord_ma_hd() {
         SimpleLogger::new().init();
-        let srs_resolver = DynamicSrsResolver::new();
-        let mut geotiff_loader = GeoTiffManager::new();
-        geotiff_loader.load_and_index_geotiffs("test/region*.tif", &srs_resolver);
+            let mut geotiff_loader = GeoTiffManager::new();
+        geotiff_loader.load_and_index_geotiffs("test/region*.tif");
         assert_eq!(2, geotiff_loader.index.get_geotiff_count());
         let test_point = wgs84_coordinate_hd_river();
         let geotiffs = geotiff_loader.index.find_geotiff_id_for_wgs84_coord(test_point.lon(), test_point.lat());
@@ -650,13 +674,12 @@ mod tests {
     #[ignore]
     fn test_find_geotiff_id_for_wgs84_coord_ma_hd_srtm() {
         SimpleLogger::new().init();
-        let srs_resolver = DynamicSrsResolver::new();
         let mut geotiff_loader = GeoTiffManager::new();
-        geotiff_loader.load_and_index_geotiffs("test/region*.tif", &srs_resolver);
+        geotiff_loader.load_and_index_geotiffs("test/region*.tif");
         assert_eq!(2, geotiff_loader.index.get_geotiff_count());
-        geotiff_loader.load_and_index_geotiffs("test/*gmted*.tif", &srs_resolver);
+        geotiff_loader.load_and_index_geotiffs("test/*gmted*.tif");
         assert_eq!(4, geotiff_loader.index.get_geotiff_count());
-        geotiff_loader.load_and_index_geotiffs("test/srtm*.tif", &srs_resolver);
+        geotiff_loader.load_and_index_geotiffs("test/srtm*.tif");
         assert_eq!(6, geotiff_loader.index.get_geotiff_count());
 
         let test_point = wgs84_coordinate_hd_river();
@@ -728,35 +751,6 @@ mod tests {
         let value = geotiff.get_value_for_wgs_84(test_point.lon(), test_point.lat());
         dbg!(&value);
         assert_eq!(&value, &RasterValue::I16(107));
-    }
-
-    #[test]
-    fn experiment_from_user_string() {
-        let mut srs_resolver = DynamicSrsResolver::new();
-        proj_methods("ETRS89 / UTM zone 32N|ETRS89|",
-                     "geotiffreader.geo_params", &srs_resolver);
-        proj_methods("ETRS89 / UTM zone 32N",
-                     "geotiffreader.geo_params vereinfacht", &srs_resolver);
-        proj_methods("ETRS89/UTM zone 32N",
-                     "geotiffreader.geo_params vereinfacht", &srs_resolver);
-        proj_methods("ETRS89 UTM zone 32N",
-                     "geotiffreader.geo_params vereinfacht", &srs_resolver);
-        proj_methods("ETRS89UTMzone32N",
-                     "geotiffreader.geo_params vereinfacht", &srs_resolver);
-        proj_methods("ETRS89",
-                     "geotiffreader.geo_params vereinfacht", &srs_resolver);
-        proj_methods("+proj=utm +zone=32 +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs +type=crs",
-                     "proj4 von https://epsg.io/25832", &srs_resolver);
-        proj_methods("proj4.defs(\"EPSG:25832\",\"+proj=utm +zone=32 +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs +type=crs\");",
-                     "proj4js von https://epsg.io/25832", &srs_resolver);
-    }
-    fn proj_methods(value: &str, source: &str, srs_resolver: &DynamicSrsResolver) {
-        println!("\n{value} ({source}):");
-        dbg!(Proj::from_proj_string(value));
-        dbg!(Proj::from_user_string(value));
-        dbg!(CRS::try_from(value.to_string()));
-        dbg!(epsg::references::get_name(value));
-        dbg!(srs_resolver.get_epsg(value.to_string()));
     }
 
     #[test]

@@ -2,7 +2,6 @@ pub mod io;
 pub mod area;
 pub mod output;
 pub mod osm_model;
-pub mod srs;
 pub mod handler;
 
 #[macro_use]
