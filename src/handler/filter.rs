@@ -347,7 +347,7 @@ impl ComplexElementsFilter {
             self.has_bad_key_predicate.test(tags)
     }
 
-    fn is_way_accepted(&mut self, way: &Way) -> bool {
+    fn check_way_acceptance(&mut self, way: &Way) -> bool {
         match self.accept_by_tags(way.tags()) {
             true => {
                 log::trace!("accepting way {}", way.id());
@@ -360,7 +360,7 @@ impl ComplexElementsFilter {
         }
     }
 
-    fn is_relation_accepted(&mut self, relation: &Relation) -> bool {
+    fn check_relation_acceptance(&mut self, relation: &Relation) -> bool {
         match self.accept_by_tags(relation.tags()) {
             true => {
                 log::trace!("accepting relation {}", relation.id());
@@ -413,12 +413,12 @@ impl Handler for ComplexElementsFilter {
     }
 
     fn handle_ways(&mut self, mut elements: Vec<Way>) -> Vec<Way> {
-        elements.retain(|way| self.is_way_accepted(way));
+        elements.retain(|way| self.check_way_acceptance(way));
         elements
     }
 
     fn handle_relations(&mut self, mut elements: Vec<Relation>) -> Vec<Relation> {
-        elements.retain(|relation| self.is_relation_accepted(relation));
+        elements.retain(|relation| self.check_relation_acceptance(relation));
         elements
     }
 }

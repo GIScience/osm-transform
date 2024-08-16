@@ -329,6 +329,7 @@ impl RTreeObject for RSBoundingBox
     }
 }
 impl PointDistance for RSBoundingBox {
+    #[allow(unused_variables)]
     fn distance_2(&self, point: &<Self::Envelope as Envelope>::Point) -> <<Self::Envelope as Envelope>::Point as Point>::Scalar {
         log::warn!("distance_2 was called - but is not implemented");
         todo!()
