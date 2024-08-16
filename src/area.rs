@@ -182,7 +182,6 @@ impl AreaHandler {
                 result.push(self.mapping.id[&x].to_string())
             }
         }
-        let node = node;
         node.tags_mut().push(Tag::new("country".to_string(), result.join(",")));
     }
 }

@@ -472,8 +472,8 @@ impl Handler for BufferingElevationEnricher {
         log::debug!("{}: handle_and_flush_nodes called", self.name());
         let mut result = self.handle_nodes(elements);
 
-        let buffers: Vec<String> = self.nodes_for_geotiffs.iter()
-            .map(|(k, _v)| k.to_string())
+        let buffers: Vec<String> = self.nodes_for_geotiffs.keys()
+            .map(|k| k.to_string())
             .collect();
         for buffer_name in buffers {
             result.extend(self.handle_and_flush_buffer(buffer_name));

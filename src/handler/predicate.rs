@@ -5,7 +5,7 @@ pub(crate) struct HasOneOfTagKeysPredicate {
     pub keys: Vec<String>
 }
 impl HasOneOfTagKeysPredicate {
-    pub(crate) fn test(&mut self, tags: &Vec<Tag>) -> bool {
+    pub(crate) fn test(&mut self, tags: &[Tag]) -> bool {
         tags.iter().any(|tag| self.keys.contains(tag.k()))
     }
 }
@@ -32,7 +32,7 @@ pub(crate) struct HasNoneOfTagKeysPredicate {
     pub keys: Vec<String>
 }
 impl HasNoneOfTagKeysPredicate {
-    pub(crate) fn test(&mut self, tags: &Vec<Tag>) -> bool {
+    pub(crate) fn test(&mut self, tags: &[Tag]) -> bool {
         tags.iter().all(|tag| !self.keys.contains(tag.k()))
     }
 }

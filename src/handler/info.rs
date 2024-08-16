@@ -8,8 +8,8 @@ use crate::handler::{HandlerResult, OsmElementTypeSelection, Handler};
 #[derive(Debug)]
 #[allow(dead_code)]
 pub(crate) enum CountType {
-    ALL,
-    ACCEPTED,
+    All,
+    Accepted,
 }
 pub(crate) struct ElementCounter {
     pub nodes_count: u64,

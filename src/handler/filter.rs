@@ -88,7 +88,7 @@ impl TagKeyBasedOsmElementsFilter {
             filter_type,
         }
     }
-    fn accept_by_tags(&mut self, tags: &Vec<Tag>) -> bool {
+    fn accept_by_tags(&mut self, tags: &[Tag]) -> bool {
         let contains_any_key = tags.iter().any(|tag| self.tag_keys.contains(tag.k()));
         match self.filter_type {
             FilterType::AcceptMatching => {

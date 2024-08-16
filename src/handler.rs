@@ -8,7 +8,7 @@ pub(crate) mod interpolate;
 pub(crate) mod skip_ele;
 
 use std::collections::BTreeMap;
-
+use std::fmt;
 use bit_vec::BitVec;
 use osm_io::osm::model::element::Element;
 use osm_io::osm::model::node::Node;
@@ -23,17 +23,16 @@ pub fn format_element_id(element: &Element) -> String {
         Element::Node { node } => { format!("node#{}", node.id()) }
         Element::Way { way } => { format!("way#{}", way.id()) }
         Element::Relation { relation } => { format!("relation#{}", relation.id()) }
-        Element::Sentinel => {"sentinel#!".to_string()}
+        Element::Sentinel => { "sentinel#!".to_string() }
     }
 }
-pub fn into_node_element(node: Node) -> Element { Element::Node {node} }
+pub fn into_node_element(node: Node) -> Element { Element::Node { node } }
 pub fn into_way_element(way: Way) -> Element { Element::Way { way } }
 pub fn into_relation_element(relation: Relation) -> Element { Element::Relation { relation } }
-pub fn into_vec_node_element(node: Node) -> Vec<Element> { vec![into_node_element(node)]}
-pub fn into_vec_way_element(way: Way) -> Vec<Element> { vec![into_way_element(way)]}
-pub fn into_vec_relation_element(relation: Relation) -> Vec<Element> { vec![into_relation_element(relation)]}
+pub fn into_vec_node_element(node: Node) -> Vec<Element> { vec![into_node_element(node)] }
+pub fn into_vec_way_element(way: Way) -> Vec<Element> { vec![into_way_element(way)] }
+pub fn into_vec_relation_element(relation: Relation) -> Vec<Element> { vec![into_relation_element(relation)] }
 pub trait Handler {
-
     fn name(&self) -> String;
 
     fn handle_element(&mut self, element: Element) -> Vec<Element> {
@@ -91,18 +90,18 @@ impl OsmElementTypeSelection {
     pub(crate) fn none() -> Self { Self { node: false, way: false, relation: false } }
 }
 
-
 #[derive(Debug)]
 pub struct HandlerResult {
     pub counts: BTreeMap<String, u64>,
     pub other: FxHashMap<String, String>,
     pub node_ids: BitVec,
-    pub skip_ele: BitVec
+    pub skip_ele: BitVec,
 }
 impl HandlerResult {
     pub(crate) fn default() -> Self {
         Self::with_capacity(HIGHEST_NODE_ID as usize)
     }
+
     fn with_capacity(nbits: usize) -> Self {
         HandlerResult {
             counts: btreemap! {},
@@ -111,9 +110,7 @@ impl HandlerResult {
             skip_ele: BitVec::from_elem(nbits, false),
         }
     }
-    pub fn to_string(&self) -> String {
-        format!("HandlerResult:\n  counts:{:?}\n  other:{:?}", &self.counts, &self.other)
-    }
+
     pub fn to_string_with_node_ids(&self) -> String {
         let node_ids_len = self.node_ids.len();
         let node_ids_true = self.node_ids.iter().filter(|b| b == &true).count();
@@ -123,11 +120,17 @@ impl HandlerResult {
 }
 
 
+impl fmt::Display for HandlerResult {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "HandlerResult:\n  counts:{:?}\n  other:{:?}", &self.counts, &self.other)
+    }
+}
+
 #[derive(Default)]
 pub(crate) struct HandlerChain {
     pub processors: Vec<Box<dyn Handler>>,
     flushed_nodes: bool,
-    flushed_ways:  bool,
+    flushed_ways: bool,
 }
 impl HandlerChain {
     pub(crate) fn add(mut self, processor: impl Handler + Sized + 'static) -> HandlerChain {
@@ -141,19 +144,19 @@ impl HandlerChain {
         match element {
             Element::Node { node } => {
                 self.process_nodes(vec![node])
-            },
+            }
             Element::Way { way } => {
                 if !self.flushed_nodes {
                     self.flush_nodes();
                 }
                 self.process_ways(vec![way])
-            },
+            }
             Element::Relation { relation } => {
                 if !self.flushed_ways {
                     self.flush_ways();
                 }
                 self.process_relations(vec![relation])
-            },
+            }
             _ => (),
         }
     }
@@ -161,7 +164,7 @@ impl HandlerChain {
     fn process_nodes(&mut self, mut elements: Vec<Node>) {
         for processor in &mut self.processors {
             if elements.is_empty() {
-                break
+                break;
             }
             elements = processor.handle_nodes(elements);
         }
@@ -181,7 +184,7 @@ impl HandlerChain {
     fn process_ways(&mut self, mut elements: Vec<Way>) {
         for processor in &mut self.processors {
             if elements.is_empty() {
-                break
+                break;
             }
             elements = processor.handle_ways(elements);
         }
@@ -201,7 +204,7 @@ impl HandlerChain {
     fn process_relations(&mut self, mut elements: Vec<Relation>) {
         for processor in &mut self.processors {
             if elements.is_empty() {
-                break
+                break;
             }
             elements = processor.handle_relations(elements);
         }
@@ -228,13 +231,6 @@ impl HandlerChain {
         result
     }
 }
-
-
-
-
-
-
-
 
 
 #[cfg(test)]
@@ -302,7 +298,7 @@ pub(crate) mod tests {
     #[derive(Debug, Default)]
     pub(crate) struct TestOnlyElementModifier;
     impl TestOnlyElementModifier {
-        fn handle_node(&mut self, node: &mut Node)  {
+        fn handle_node(&mut self, node: &mut Node) {
             let id = node.id();
             let tags = node.tags_mut();
             if id % 2 == 0 {
@@ -326,7 +322,7 @@ pub(crate) mod tests {
         fn name(&self) -> String { "TestOnlyElementReplacer".to_string() }
 
         fn handle_nodes(&mut self, elements: Vec<Node>) -> Vec<Node> {
-            elements.iter().map(|node| if node.id() == 6 {simple_node(66, vec![("who", "dimpfelmoser")])} else {node.clone()}).collect()
+            elements.iter().map(|node| if node.id() == 6 { simple_node(66, vec![("who", "dimpfelmoser")]) } else { node.clone() }).collect()
         }
     }
 
@@ -337,7 +333,7 @@ pub(crate) mod tests {
         fn name(&self) -> String { "TestOnlyElementFilter".to_string() }
 
         fn handle_nodes(&mut self, mut elements: Vec<Node>) -> Vec<Node> {
-            elements.retain(|node| node.id() % 2 != 0 );
+            elements.retain(|node| node.id() % 2 != 0);
             elements
         }
     }
@@ -420,7 +416,7 @@ pub(crate) mod tests {
             elements
         }
 
-        fn handle_and_flush_nodes(&mut self, mut elements: Vec<Node> ) -> Vec<Node> {
+        fn handle_and_flush_nodes(&mut self, mut elements: Vec<Node>) -> Vec<Node> {
             let mut result = Vec::new();
             self.nodes.append(&mut elements);
             self.nodes.iter().for_each(|node| result.extend(self.handle_node(node.clone())));
