@@ -9,15 +9,13 @@ use btreemultimap::BTreeMultiMap;
 use csv::{ReaderBuilder, WriterBuilder};
 use geo::{BoundingRect, Contains, Coord, coord, Intersects, MultiPolygon, Rect};
 use geo::BooleanOps;
-use osm_io::osm::model::element::Element;
 use osm_io::osm::model::node::Node;
 use osm_io::osm::model::tag::Tag;
 use serde::Deserialize;
 use wkt::ToWkt;
 use wkt::Wkt;
 
-use crate::Config;
-use crate::handler::{Handler, into_node_element};
+use crate::handler::{Handler};
 
 const GRID_SIZE: usize = 64800;
 const AREA_ID_MULTIPLE: u16 = u16::MAX;
@@ -97,7 +95,7 @@ impl AreaHandler {
         for result in rdr.deserialize() {
             let record: Record = result?;
             let geo: Wkt<f64> = Wkt::from_str(record.geo.as_str())?;
-            let _ls = match geo {
+            match geo {
                 Wkt::MultiPolygon(mp) => {
                     let converted: MultiPolygon = mp.into();
                     self.add_area(index, &record.id, &record.name, &converted);
@@ -110,7 +108,7 @@ impl AreaHandler {
                     log::warn!("Area CSV file contains row with unsupported geometry! ID: {}, Name: {}", record.id, record.name);
                 }
             };
-            index = index + 1;
+            index += 1;
         }
         AreaHandler::save_area_records(file_basename, &self.mapping);
 
@@ -131,7 +129,7 @@ impl AreaHandler {
                 } else {
                     let tile_poly = &self.grid[i].poly;
                     self.mapping.index[i] = AREA_ID_MULTIPLE;
-                    self.mapping.area.insert(i as u16, AreaIntersect { id: index, geo: tile_poly.intersection(&area_geometry) });
+                    self.mapping.area.insert(i as u16, AreaIntersect { id: index, geo: tile_poly.intersection(area_geometry) });
                 }
             }
         }
@@ -183,7 +181,7 @@ impl AreaHandler {
                 result.push(self.mapping.id[&x].to_string())
             }
         }
-        let mut node = node;
+        let node = node;
         node.tags_mut().push(Tag::new("country".to_string(), result.join(",")));
     }
 }

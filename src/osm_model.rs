@@ -102,7 +102,7 @@ pub struct MutableWay<'a> {
 impl<'a> MutableWay<'a> {
     pub fn new(way: &'a Way) -> MutableWay {
         MutableWay {
-            way: way,
+            way,
             id: None,
             version: None,
             timestamp: None,
@@ -187,7 +187,7 @@ mod tests {
         assert_eq!(changed.changeset(), 1);
         assert_eq!(changed.uid(), 1);
         assert_eq!(changed.user(), "user");
-        assert_eq!(changed.visible(), true);
+        assert!(changed.visible());
         assert_eq!(*changed.refs(), vec![1, 2]);
         assert_eq!(*changed.tags(), vec![Tag::new("a_key".to_string(), "a_value".to_string())]);
     }
@@ -205,7 +205,7 @@ mod tests {
         assert_eq!(changed.changeset(), 1);
         assert_eq!(changed.uid(), 1);
         assert_eq!(changed.user(), "user");
-        assert_eq!(changed.visible(), true);
+        assert!(changed.visible());
         assert_eq!(*changed.refs(), vec![1, 2]);
         assert_eq!(*changed.tags(), vec![Tag::new("a_key".to_string(), "a_value".to_string())]);
     }
@@ -231,7 +231,7 @@ mod tests {
         assert_eq!(changed.changeset(), 2);
         assert_eq!(changed.uid(), 2);
         assert_eq!(changed.user(), "changed");
-        assert_eq!(changed.visible(), false);
+        assert!(!changed.visible());
         assert_eq!(*changed.refs(), vec![3, 4]);
         assert_eq!(*changed.tags(), vec![Tag::new("new_key".to_string(), "new_value".to_string())]);    }
 

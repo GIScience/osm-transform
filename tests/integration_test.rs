@@ -7,7 +7,7 @@ use rusty_routes_transformer::Config;
 fn base_config() -> Config {
     Config {
         input_pbf: PathBuf::from("test/baarle_small.pbf"),
-        output_pbf:  None,
+        output_pbf: None,
         country_csv: None,
         elevation_tiffs: vec![],
         elevation_batch_size: 10000,
@@ -30,8 +30,8 @@ const filtered_way_count: u64 = 51u64;
 
 #[test]
 fn run_minimal() {
-    let mut config = base_config();
-    rusty_routes_transformer::init(&config);
+    let config = base_config();
+    rusty_routes_transformer::init(&config).expect("init in run_minimal failed");
     let result = rusty_routes_transformer::run(&config);
     assert_eq!(result.counts.get("nodes count initial").unwrap(), &baarle_node_count);
     assert_eq!(result.counts.get("nodes count final").unwrap(), &baarle_node_count);

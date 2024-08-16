@@ -19,7 +19,7 @@ impl ReferencedNodeIdCollector {
     }
     fn handle_way(&mut self, way: Way) -> Vec<Element> {
         for id in way.refs() {
-            let idc = id.clone();
+            let idc = *id;
             self.referenced_node_ids.set(idc as usize, true);
         }
         vec![into_way_element(way)]
@@ -29,7 +29,7 @@ impl ReferencedNodeIdCollector {
             match member {
                 Member::Node { member } => {
                     log::trace!("relation {} references node {} - set true in bitmap", &relation.id(), &member.id());
-                    self.referenced_node_ids.set(member.id().clone() as usize, true);
+                    self.referenced_node_ids.set(member.id() as usize, true);
                 }
                 Member::Way { .. } => {}
                 Member::Relation { .. } => {}
@@ -79,7 +79,7 @@ impl Handler for ReferencedNodeIdCollector {
 
     fn add_result(&mut self, mut result: HandlerResult) -> HandlerResult {
         log::debug!("cloning node_ids of ReferencedNodeIdCollector with len={} into HandlerResult ", self.referenced_node_ids.len());
-        result.node_ids = self.referenced_node_ids.clone();//todo check if clone is necessary
+        result.node_ids.clone_from(&self.referenced_node_ids);//todo check if clone is necessary
         result
     }
 }
@@ -94,9 +94,9 @@ mod test {
         let mut collector = TestOnlyIdCollector::new(10);
         assert_eq!(10, collector.node_ids.len());
         collector.handle_element(simple_node_element(2, vec![]));
-        assert_eq!(false, collector.node_ids.get(0).unwrap_or(false));
-        assert_eq!(false, collector.node_ids.get(1).unwrap_or(false));
-        assert_eq!(true, collector.node_ids.get(2).unwrap_or(false));
+        assert!(!collector.node_ids.get(0).unwrap_or(false));
+        assert!(!collector.node_ids.get(1).unwrap_or(false));
+        assert!(collector.node_ids.get(2).unwrap_or(false));
     }
     #[test]
     #[should_panic(expected = "index out of bounds: 12 >= 10")]
@@ -109,13 +109,13 @@ mod test {
         let mut collector = TestOnlyIdCollector::new(HIGHEST_NODE_ID as usize);
 
         collector.handle_element(simple_node_element(1, vec![]));
-        assert_eq!(false, collector.node_ids.get(0).unwrap_or(false));
-        assert_eq!(true, collector.node_ids.get(1).unwrap_or(false));
-        assert_eq!(false, collector.node_ids.get(2).unwrap_or(false));
-        assert_eq!(false, collector.node_ids.get(11414456780).unwrap_or(false));
+        assert!(!collector.node_ids.get(0).unwrap_or(false));
+        assert!(collector.node_ids.get(1).unwrap_or(false));
+        assert!(!collector.node_ids.get(2).unwrap_or(false));
+        assert!(!collector.node_ids.get(11414456780).unwrap_or(false));
 
         collector.handle_element(simple_node_element(11414456780, vec![]));
-        assert_eq!(true, collector.node_ids.get(11414456780).unwrap_or(false));
+        assert!(collector.node_ids.get(11414456780).unwrap_or(false));
     }
 
 }

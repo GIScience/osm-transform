@@ -47,14 +47,14 @@ mod test {
     #[test]
     fn has_one_of_tag_keys_predicate_with_only_matching_tags() {
         let mut predicate = HasOneOfTagKeysPredicate { keys: vec!["good".to_string(), "nice".to_string()] };
-        assert_eq!(true, predicate.test(&vec![
+        assert!(predicate.test(&vec![
             Tag::new("good".to_string(), "1".to_string()),
         ]));
     }
     #[test]
     fn has_one_of_tag_keys_predicate_with_only_all_matching_tags() {
         let mut predicate = HasOneOfTagKeysPredicate { keys: vec!["good".to_string(), "nice".to_string()] };
-        assert_eq!(true, predicate.test(&vec![
+        assert!(predicate.test(&vec![
             Tag::new("good".to_string(), "1".to_string()),
             Tag::new("nice".to_string(), "2".to_string()),
         ]));
@@ -62,7 +62,7 @@ mod test {
     #[test]
     fn has_one_of_tag_keys_predicate_with_also_matching_tags() {
         let mut predicate = HasOneOfTagKeysPredicate { keys: vec!["good".to_string(), "nice".to_string()] };
-        assert_eq!(true, predicate.test(&vec![
+        assert!(predicate.test(&vec![
             Tag::new("good".to_string(), "1".to_string()),
             Tag::new("bad".to_string(), "2".to_string()),
         ]));
@@ -70,7 +70,7 @@ mod test {
     #[test]
     fn has_one_of_tag_keys_predicate_with_no_matching_tags() {
         let mut predicate = HasOneOfTagKeysPredicate { keys: vec!["good".to_string(), "nice".to_string()] };
-        assert_eq!(false, predicate.test(&vec![
+        assert!(!predicate.test(&vec![
             Tag::new("ugly".to_string(), "1".to_string()),
             Tag::new("bad".to_string(), "2".to_string()),
         ]));
@@ -82,7 +82,7 @@ mod test {
         key_values.insert("good".to_string(), "good".to_string());
         key_values.insert("nice".to_string(), "nice".to_string());
         let mut predicate = HasTagKeyValuePredicate { key_values };
-        assert_eq!(false, predicate.test(&vec![
+        assert!(!predicate.test(&vec![
             Tag::new("bad".to_string(), "1".to_string()),
             Tag::new("ugly".to_string(), "1".to_string()),
         ]));
@@ -93,7 +93,7 @@ mod test {
         key_values.insert("good".to_string(), "good".to_string());
         key_values.insert("nice".to_string(), "nice".to_string());
         let mut predicate = HasTagKeyValuePredicate { key_values };
-        assert_eq!(false, predicate.test(&vec![
+        assert!(!predicate.test(&vec![
             Tag::new("good".to_string(), "1".to_string()),
         ]));
     }
@@ -103,7 +103,7 @@ mod test {
         key_values.insert("good".to_string(), "good".to_string());
         key_values.insert("nice".to_string(), "nice".to_string());
         let mut predicate = HasTagKeyValuePredicate { key_values };
-        assert_eq!(true, predicate.test(&vec![
+        assert!(predicate.test(&vec![
             Tag::new("bad".to_string(), "1".to_string()),
             Tag::new("good".to_string(), "1".to_string()),
             Tag::new("nice".to_string(), "nice".to_string()),
@@ -115,7 +115,7 @@ mod test {
         key_values.insert("good".to_string(), "good".to_string());
         key_values.insert("nice".to_string(), "nice".to_string());
         let mut predicate = HasTagKeyValuePredicate { key_values };
-        assert_eq!(true, predicate.test(&vec![
+        assert!(predicate.test(&vec![
             Tag::new("good".to_string(), "good".to_string()),
         ]));
     }
@@ -125,7 +125,7 @@ mod test {
         key_values.insert("good".to_string(), "good".to_string());
         key_values.insert("nice".to_string(), "nice".to_string());
         let mut predicate = HasTagKeyValuePredicate { key_values };
-        assert_eq!(true, predicate.test(&vec![
+        assert!(predicate.test(&vec![
             Tag::new("bad".to_string(), "1".to_string()),
             Tag::new("good".to_string(), "good".to_string()),
         ]));
@@ -134,14 +134,14 @@ mod test {
     #[test]
     fn has_none_of_tag_keys_predicate_with_only_non_matching_tag() {
         let mut predicate = HasNoneOfTagKeysPredicate { keys: vec!["bad".to_string(), "ugly".to_string()] };
-        assert_eq!(true, predicate.test(&vec![
+        assert!(predicate.test(&vec![
             Tag::new("good".to_string(), "1".to_string()),
         ]));
     }
     #[test]
     fn has_none_of_tag_keys_predicate_also_matching_tag() {
         let mut predicate = HasNoneOfTagKeysPredicate { keys: vec!["bad".to_string(), "ugly".to_string()] };
-        assert_eq!(false, predicate.test(&vec![
+        assert!(!predicate.test(&vec![
             Tag::new("good".to_string(), "1".to_string()),
             Tag::new("bad".to_string(), "1".to_string()),
         ]));
@@ -149,7 +149,7 @@ mod test {
     #[test]
     fn has_none_of_tag_keys_predicate_only_matching_tags() {
         let mut predicate = HasNoneOfTagKeysPredicate { keys: vec!["bad".to_string(), "ugly".to_string()] };
-        assert_eq!(false, predicate.test(&vec![
+        assert!(!predicate.test(&vec![
             Tag::new("ugly".to_string(), "1".to_string()),
             Tag::new("bad".to_string(), "1".to_string()),
         ]));

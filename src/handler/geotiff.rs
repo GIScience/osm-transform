@@ -1,4 +1,3 @@
-use std::collections::BTreeMap;
 use std::error::Error;
 use std::fs::File;
 use std::io::BufReader;
@@ -7,16 +6,13 @@ use itertools::Itertools;
 use bit_vec::BitVec;
 use georaster::geotiff::{GeoTiffReader, RasterValue};
 use glob::glob;
-use log4rs::Logger;
 use log::error;
-use osm_io::osm::model::element::Element;
 use osm_io::osm::model::node::Node;
 use osm_io::osm::model::tag::Tag;
 use proj4rs::Proj;
 use rstar::{AABB, Envelope, Point, PointDistance, RTree, RTreeObject};
 use rustc_hash::FxHashMap;
-use serde::__private::de::Content::F64;
-use crate::handler::{format_element_id, into_node_element, into_vec_node_element, into_vec_relation_element, into_vec_way_element, into_way_element, Handler};
+use crate::handler::{Handler};
 
 pub struct GeoTiff {
     file_path: String,
@@ -83,7 +79,7 @@ fn transform(src: &Proj, dst: &Proj, lon: f64, lat: f64) -> Result<(f64, f64), p
         point.1 = point.1.to_radians();
     }
 
-    proj4rs::transform::transform(&src, &dst, &mut point)?;
+    proj4rs::transform::transform(src, dst, &mut point)?;
 
     if dst.is_latlong() {
         point.0 = point.0.to_degrees();
@@ -106,28 +102,34 @@ fn round_f64(num: f64, dec_places: f64) -> String {
 }
 fn format_as_elevation_string(raster_value: RasterValue) -> Option<String> {
     match raster_value {
-        RasterValue::NoData => { return None }
-        RasterValue::U8(val) => { return Some(val.to_string()) }
-        RasterValue::U16(val) => { return Some(val.to_string()) }
-        RasterValue::U32(val) => { return Some(val.to_string()) }
-        RasterValue::U64(val) => { return Some(val.to_string()) }
-        RasterValue::F32(val) => { return Some(round_f32(val, 2.0)) }
-        RasterValue::F64(val) => { return Some(round_f64(val, 2.0)) }
-        RasterValue::I8(val) => { return Some(val.to_string()) }
-        RasterValue::I16(val) => { return Some(val.to_string()) }
-        RasterValue::I32(val) => { return Some(val.to_string()) }
-        RasterValue::I64(val) => { return Some(val.to_string()) }
-        RasterValue::Rgb8(_, _, _) => { return None }
-        RasterValue::Rgba8(_, _, _, _) => { return None }
-        RasterValue::Rgb16(_, _, _) => { return None }
-        RasterValue::Rgba16(_, _, _, _) => { return None }
-        _ => { return None }
+        RasterValue::NoData => { None }
+        RasterValue::U8(val) => { Some(val.to_string()) }
+        RasterValue::U16(val) => { Some(val.to_string()) }
+        RasterValue::U32(val) => { Some(val.to_string()) }
+        RasterValue::U64(val) => { Some(val.to_string()) }
+        RasterValue::F32(val) => { Some(round_f32(val, 2.0)) }
+        RasterValue::F64(val) => { Some(round_f64(val, 2.0)) }
+        RasterValue::I8(val) => { Some(val.to_string()) }
+        RasterValue::I16(val) => { Some(val.to_string()) }
+        RasterValue::I32(val) => { Some(val.to_string()) }
+        RasterValue::I64(val) => { Some(val.to_string()) }
+        RasterValue::Rgb8(_, _, _) => { None }
+        RasterValue::Rgba8(_, _, _, _) => { None }
+        RasterValue::Rgb16(_, _, _) => { None }
+        RasterValue::Rgba16(_, _, _, _) => { None }
+        _ => { None }
     }
 }
 
 pub struct GeoTiffManager {
     index: Box<dyn GeoTiffIndex>,
 }
+impl Default for GeoTiffManager {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl GeoTiffManager {
     pub fn new() -> Self {
         Self {
@@ -169,11 +171,11 @@ impl GeoTiffManager {
     pub fn load_geotiff(&mut self, file_path: &str) -> Result<GeoTiff, Box<dyn Error>> {
         log::debug!("Loading geotiff {}", file_path);
         let img_file = BufReader::new(File::open(file_path).expect("Could not open input file"));
-        let mut geotiffreader = GeoTiffReader::open(img_file).expect("Could not read input file as tiff");
+        let geotiffreader = GeoTiffReader::open(img_file).expect("Could not read input file as tiff");
 
         let origin = geotiffreader.origin().unwrap();
         let pixel_size = geotiffreader.pixel_size().unwrap();
-        let dimensions = geotiffreader.images().get(0).expect("no image in tiff").dimensions.unwrap();
+        let dimensions = geotiffreader.images().first().expect("no image in tiff").dimensions.unwrap();
 
         let (raw_projected_epsg_code, raw_geographic_epsg_code) = if let Some(keys) = geotiffreader.geo_keys.as_ref() {
             extract_epsg_codes(keys)
@@ -253,6 +255,12 @@ pub trait GeoTiffIndex {
 pub struct RSGeoTiffIndex {
     pub(crate) rtree: RTree<RSBoundingBox>,
 }
+impl Default for RSGeoTiffIndex {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl RSGeoTiffIndex {
     pub fn new() -> Self {
         Self {
@@ -291,10 +299,7 @@ impl GeoTiffIndex for RSGeoTiffIndex {
 
     fn get_geotiff_by_id(&mut self, geotiff_id: &str) -> Option<String> {
         let option = self.rtree.iter().find(|bbox| bbox.id.as_str() == geotiff_id);
-        match option {
-            None => None,
-            Some(rsboundingbox) => Some(rsboundingbox.id.clone()),
-        }
+        option.map(|rsboundingbox| rsboundingbox.id.clone())
     }
 
     fn get_geotiff_count(&mut self) -> usize {
@@ -354,7 +359,7 @@ impl BufferingElevationEnricher {
             max_buffer_len,
             max_buffered_nodes,
             all_buffers_flushed: false,
-            skip_ele: skip_ele,
+            skip_ele,
         }
     }
     pub fn init(&mut self, file_pattern: &str) -> Result<(), Box<dyn Error>> {
@@ -375,7 +380,7 @@ impl BufferingElevationEnricher {
         }
 
         let geotiff_name = geotiffs.first().unwrap().to_string();
-        self.nodes_for_geotiffs.entry(geotiff_name.clone()).or_insert_with(Vec::new).push(node); //todo avoid clone String
+        self.nodes_for_geotiffs.entry(geotiff_name.clone()).or_default().push(node); //todo avoid clone String
 
         (Some(geotiff_name), None)
     }
@@ -390,7 +395,7 @@ impl BufferingElevationEnricher {
         buffer_vec
     }
 
-    fn add_elevation_tag(&mut self, mut geotiff: &mut GeoTiff, mut node: &mut Node) {
+    fn add_elevation_tag(&mut self, geotiff: &mut GeoTiff, node: &mut Node) {
         let result = geotiff.get_string_value_for_wgs_84(node.coordinate().lon(), node.coordinate().lat());
         match result {
             None => {
@@ -460,11 +465,11 @@ impl Handler for BufferingElevationEnricher {
         result
     }
 
-    fn handle_and_flush_nodes(&mut self, mut elements: Vec<Node>) -> Vec<Node> {
+    fn handle_and_flush_nodes(&mut self, elements: Vec<Node>) -> Vec<Node> {
         log::debug!("{}: handle_and_flush_nodes called", self.name());
         let mut result = self.handle_nodes(elements);
 
-        let mut buffers: Vec<String> = self.nodes_for_geotiffs.iter()
+        let buffers: Vec<String> = self.nodes_for_geotiffs.iter()
             .map(|(k, v)| k.to_string())
             .collect();
         for buffer_name in buffers {
@@ -480,7 +485,7 @@ mod tests {
     use std::fs::File;
     use std::io::BufReader;
 
-    use epsg::CRS;
+    
     use georaster::geotiff::{GeoTiffReader, RasterValue};
     use osm_io::osm::model::coordinate::Coordinate;
     use osm_io::osm::model::element::Element;
@@ -572,29 +577,29 @@ mod tests {
     fn wgs84_coordinate_hamburg_elbphilharmonie() -> TestPoint { TestPoint::new(9.984270930290224, 53.54137211789218) }
     fn create_geotiff_limburg() -> GeoTiff {
         let mut tiff_loader = GeoTiffManager::new();
-        let mut geotiff = tiff_loader.load_geotiff("test/region_limburg_an_der_lahn.tif").expect("got error");
-        geotiff
+        
+        tiff_loader.load_geotiff("test/region_limburg_an_der_lahn.tif").expect("got error")
     }
     fn create_geotiff_ma_hd() -> GeoTiff {
         let mut tiff_loader = GeoTiffManager::new();
-        let mut geotiff = tiff_loader.load_geotiff("test/region_heidelberg_mannheim.tif").expect("got error");
-        geotiff
+        
+        tiff_loader.load_geotiff("test/region_heidelberg_mannheim.tif").expect("got error")
     }
 
     fn create_fake_geotiff(proj_tiff: Proj, file_path: &str) -> GeoTiff {
         let img_file = BufReader::new(File::open(file_path).expect("Could not open input file"));
-        let mut geotiffreader = GeoTiffReader::open(img_file).expect("Could not read input file as tiff");
+        let geotiffreader = GeoTiffReader::open(img_file).expect("Could not read input file as tiff");
         GeoTiff {
             file_path: file_path.to_string(),
             proj_wgs_84: Proj::from_epsg_code(4326).unwrap(),
-            proj_tiff: proj_tiff,
+            proj_tiff,
             top_left_x: 0.0,
             top_left_y: 0.0,
             pixel_width: 1.0,
             pixel_height: 1.0,
             pixels_horizontal: 10,
             pixels_vertical: 10,
-            geotiffreader: geotiffreader,
+            geotiffreader,
         }
     }
     fn are_floats_close_7(a: f64, b: f64) -> bool {
@@ -624,11 +629,11 @@ mod tests {
         }
     }
     fn validate_has_ids(elements: &Vec<Node>, ids: Vec<i64>) {
-        let element_ids = elements.into_iter().map(|node| node.id()).collect::<Vec<_>>();
+        let element_ids = elements.iter().map(|node| node.id()).collect::<Vec<_>>();
         assert!(element_ids.iter().all(|id| ids.contains(id)));
     }
     fn validate_all_have_elevation_tag(elements: &Vec<Node>) {
-        elements.iter().for_each(|element| validate_has_elevation_tag(&element));
+        elements.iter().for_each(validate_has_elevation_tag);
     }
     fn validate_has_elevation_tag(node: &Node) {
         assert!(node.tags().iter().any(|tag| tag.k().eq("ele") && !tag.v().is_empty()));
@@ -764,7 +769,7 @@ mod tests {
 
     #[test]
     fn transform_4326_to_4326() {
-        let mut point_3d = transform(
+        let point_3d = transform(
             &Proj::from_epsg_code(4326).expect("not found"),
             &Proj::from_epsg_code(4326).expect("not found"),
             wgs84_coordinate_limburg_traffic_circle().lon(), wgs84_coordinate_limburg_traffic_circle().lat()).expect("transformation error");
@@ -773,7 +778,7 @@ mod tests {
     }
     #[test]
     fn transform_25832_to_4326() {
-        let mut point_3d = transform(
+        let point_3d = transform(
             &Proj::from_epsg_code(25832).expect("not found"),
             &Proj::from_epsg_code(4326).expect("not found"),
             433305.7043197789f64, 5581899.216447188f64).expect("transformation error");
@@ -782,7 +787,7 @@ mod tests {
     }
     #[test]
     fn transform_4326_to_25832() {
-        let mut point_3d = transform(
+        let point_3d = transform(
             &Proj::from_epsg_code(4326).expect("not found"),
             &Proj::from_epsg_code(25832).expect("not found"),
             wgs84_coordinate_limburg_traffic_circle().lon(), wgs84_coordinate_limburg_traffic_circle().lat()).expect("transformation error");
@@ -793,7 +798,7 @@ mod tests {
 
     #[test]
     fn transform_4326_to_25832_2() {
-        let mut point_3d = transform(
+        let point_3d = transform(
             &Proj::from_epsg_code(4326).expect("not found"),
             &Proj::from_epsg_code(25832).expect("not found"),
             8.06f64, 50.28f64).expect("transformation error");
@@ -820,14 +825,14 @@ mod tests {
     }
     #[test]
     fn wgs_84_to_tiff_coord_4326() {
-        let mut geotiff = create_fake_geotiff(Proj::from_epsg_code(4326).unwrap(), "test/region_limburg_an_der_lahn.tif");
+        let geotiff = create_fake_geotiff(Proj::from_epsg_code(4326).unwrap(), "test/region_limburg_an_der_lahn.tif");
         let tiff_coord = geotiff.wgs_84_to_tiff_coord(wgs84_coordinate_limburg_traffic_circle().lon(), wgs84_coordinate_limburg_traffic_circle().lat());
         assert_eq!(tiff_coord.0, 8.06185930f64);
         assert_eq!(tiff_coord.1, 50.38536322f64);
     }
     #[test]
     fn wgs_84_to_tiff_coord_25832() {
-        let mut geotiff = create_fake_geotiff(Proj::from_epsg_code(25832).unwrap(), "test/region_limburg_an_der_lahn.tif");
+        let geotiff = create_fake_geotiff(Proj::from_epsg_code(25832).unwrap(), "test/region_limburg_an_der_lahn.tif");
         let tiff_coord = geotiff.wgs_84_to_tiff_coord(wgs84_coordinate_limburg_traffic_circle().lon(), wgs84_coordinate_limburg_traffic_circle().lat());
         assert!(are_floats_close(tiff_coord.0, 433305.7043197789f64, 1e-2));
         assert!(are_floats_close(tiff_coord.1, 5581899.216447188f64, 1e-2));
@@ -874,10 +879,10 @@ mod tests {
 
     #[test]
     fn test_round_f32() {
-        assert_eq!(round_f32(123.555555f32, 0.0), "124");
-        assert_eq!(round_f32(123.555555f32, 1.0), "123.6");
-        assert_eq!(round_f32(123.555555f32, 2.0), "123.56");
-        assert_eq!(round_f32(123.555555f32, 3.0), "123.556");
+        assert_eq!(round_f32(123.555_56_f32, 0.0), "124");
+        assert_eq!(round_f32(123.555_56_f32, 1.0), "123.6");
+        assert_eq!(round_f32(123.555_56_f32, 2.0), "123.56");
+        assert_eq!(round_f32(123.555_56_f32, 3.0), "123.556");
     }
     #[test]
     fn test_round_f64() {
@@ -893,8 +898,8 @@ mod tests {
         assert_eq!(format_as_elevation_string(RasterValue::U16(123)), Some("123".to_string()));
         assert_eq!(format_as_elevation_string(RasterValue::U32(123)), Some("123".to_string()));
         assert_eq!(format_as_elevation_string(RasterValue::U64(123)), Some("123".to_string()));
-        assert_eq!(format_as_elevation_string(RasterValue::F32(1234.56789)), Some("1234.57".to_string()));
-        assert_eq!(format_as_elevation_string(RasterValue::F32(-1234.56789)), Some("-1234.57".to_string()));
+        assert_eq!(format_as_elevation_string(RasterValue::F32(1_234.567_9)), Some("1234.57".to_string()));
+        assert_eq!(format_as_elevation_string(RasterValue::F32(-1_234.567_9)), Some("-1234.57".to_string()));
         assert_eq!(format_as_elevation_string(RasterValue::F64(1234.56789)), Some("1234.57".to_string()));
         assert_eq!(format_as_elevation_string(RasterValue::F64(-1234.56789)), Some("-1234.57".to_string()));
         assert_eq!(format_as_elevation_string(RasterValue::I8(123)), Some("123".to_string()));

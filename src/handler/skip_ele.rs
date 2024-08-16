@@ -1,10 +1,7 @@
 use bit_vec::BitVec;
-use osm_io::osm::model::element::Element;
-use osm_io::osm::model::relation::{Member, Relation};
 use osm_io::osm::model::way::Way;
 
-use crate::handler::{HandlerResult, HIGHEST_NODE_ID, into_node_element, into_relation_element, into_way_element, Handler};
-use crate::handler::predicate::{HasNoneOfTagKeysPredicate, HasOneOfTagKeysPredicate, HasTagKeyValuePredicate};
+use crate::handler::{HandlerResult, HIGHEST_NODE_ID, Handler};
 
 pub(crate) struct SkipElevationNodeCollector {
     referenced_node_ids: BitVec,
@@ -24,7 +21,7 @@ impl SkipElevationNodeCollector {
     }
 
     fn skip_elevation(&mut self, way: &Way) -> bool {
-        way.tags().iter().any(|tag| self.no_elevation_keys.contains(&tag.k()) && tag.v() != "no")
+        way.tags().iter().any(|tag| self.no_elevation_keys.contains(tag.k()) && tag.v() != "no")
     }
 
     fn handle_way(&mut self, way: &Way) {
@@ -49,7 +46,7 @@ impl Handler for SkipElevationNodeCollector {
 
     fn add_result(&mut self, mut result: HandlerResult) -> HandlerResult {
         log::debug!("cloning node_ids of NoElevationNodeIdCollector with len={} into HandlerResult ", self.referenced_node_ids.len());
-        result.skip_ele = self.referenced_node_ids.clone();
+        result.skip_ele.clone_from(&self.referenced_node_ids);
         result
     }
 }
@@ -57,7 +54,7 @@ impl Handler for SkipElevationNodeCollector {
 
 #[cfg(test)]
 mod test {
-    use log4rs::append::Append;
+    
     use crate::handler::skip_ele::SkipElevationNodeCollector;
     use crate::handler::tests::{simple_way};
     const TUNNEL: (&str, &str) = ("tunnel", "avalanche_protector");

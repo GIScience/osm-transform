@@ -13,7 +13,6 @@ use bit_vec::BitVec;
 use osm_io::osm::model::element::Element;
 use osm_io::osm::model::node::Node;
 use osm_io::osm::model::relation::Relation;
-use osm_io::osm::model::tag::Tag;
 use osm_io::osm::model::way::Way;
 use rustc_hash::FxHashMap;
 
@@ -21,9 +20,9 @@ const HIGHEST_NODE_ID: i64 = 50_000_000_000;
 
 pub fn format_element_id(element: &Element) -> String {
     match &element {
-        Element::Node { node } => { format!("node#{}", node.id().to_string()) }
-        Element::Way { way } => { format!("way#{}", way.id().to_string()) }
-        Element::Relation { relation } => { format!("relation#{}", relation.id().to_string()) }
+        Element::Node { node } => { format!("node#{}", node.id()) }
+        Element::Way { way } => { format!("way#{}", way.id()) }
+        Element::Relation { relation } => { format!("relation#{}", relation.id()) }
         Element::Sentinel => {"sentinel#!".to_string()}
     }
 }
@@ -41,27 +40,27 @@ pub trait Handler {
         vec![element]
     }
 
-    fn handle_nodes(&mut self, mut elements: Vec<Node>) -> Vec<Node> {
+    fn handle_nodes(&mut self, elements: Vec<Node>) -> Vec<Node> {
         elements
     }
 
-    fn handle_ways(&mut self, mut elements: Vec<Way>) -> Vec<Way> {
+    fn handle_ways(&mut self, elements: Vec<Way>) -> Vec<Way> {
         elements
     }
 
-    fn handle_relations(&mut self, mut elements: Vec<Relation>) -> Vec<Relation> {
+    fn handle_relations(&mut self, elements: Vec<Relation>) -> Vec<Relation> {
         elements
     }
 
-    fn handle_and_flush_nodes(&mut self, mut elements: Vec<Node>) -> Vec<Node> {
+    fn handle_and_flush_nodes(&mut self, elements: Vec<Node>) -> Vec<Node> {
         self.handle_nodes(elements)
     }
 
-    fn handle_and_flush_ways(&mut self, mut elements: Vec<Way>) -> Vec<Way> {
+    fn handle_and_flush_ways(&mut self, elements: Vec<Way>) -> Vec<Way> {
         self.handle_ways(elements)
     }
 
-    fn handle_and_flush_relations(&mut self, mut elements: Vec<Relation>) -> Vec<Relation> {
+    fn handle_and_flush_relations(&mut self, elements: Vec<Relation>) -> Vec<Relation> {
         self.handle_relations(elements)
     }
 
@@ -160,7 +159,7 @@ impl HandlerChain {
 
     fn process_nodes(&mut self, mut elements: Vec<Node>) {
         for processor in &mut self.processors {
-            if (elements.len() == 0) {
+            if elements.is_empty() {
                 break
             }
             elements = processor.handle_nodes(elements);
@@ -180,7 +179,7 @@ impl HandlerChain {
 
     fn process_ways(&mut self, mut elements: Vec<Way>) {
         for processor in &mut self.processors {
-            if (elements.len() == 0) {
+            if elements.is_empty() {
                 break
             }
             elements = processor.handle_ways(elements);
@@ -200,7 +199,7 @@ impl HandlerChain {
 
     fn process_relations(&mut self, mut elements: Vec<Relation>) {
         for processor in &mut self.processors {
-            if (elements.len() == 0) {
+            if elements.is_empty() {
                 break
             }
             elements = processor.handle_relations(elements);
@@ -277,9 +276,9 @@ pub(crate) mod tests {
     pub fn simple_relation_element(id: i64, members: Vec<(MemberType, i64, &str)>, tags: Vec<(&str, &str)>) -> Element {
         let members_obj = members.iter().map(|(t, id, role)| {
             match t {
-                MemberType::Node => { Member::Node { member: MemberData::new(id.clone(), role.to_string()) } }
-                MemberType::Way => { Member::Way { member: MemberData::new(id.clone(), role.to_string()) } }
-                MemberType::Relation => { Member::Relation { member: MemberData::new(id.clone(), role.to_string()) } }
+                MemberType::Node => { Member::Node { member: MemberData::new(*id, role.to_string()) } }
+                MemberType::Way => { Member::Way { member: MemberData::new(*id, role.to_string()) } }
+                MemberType::Relation => { Member::Relation { member: MemberData::new(*id, role.to_string()) } }
             }
         }).collect();
         let tags_obj = tags.iter().map(|(k, v)| Tag::new(k.to_string(), v.to_string())).collect();
@@ -302,7 +301,7 @@ pub(crate) mod tests {
     #[derive(Debug, Default)]
     pub(crate) struct TestOnlyElementModifier;
     impl TestOnlyElementModifier {
-        fn handle_node(&mut self, mut node: &mut Node)  {
+        fn handle_node(&mut self, node: &mut Node)  {
             let id = node.id();
             let tags = node.tags_mut();
             if id % 2 == 0 {
@@ -325,7 +324,7 @@ pub(crate) mod tests {
     impl Handler for TestOnlyElementReplacer {
         fn name(&self) -> String { "TestOnlyElementReplacer".to_string() }
 
-        fn handle_nodes(&mut self, mut elements: Vec<Node>) -> Vec<Node> {
+        fn handle_nodes(&mut self, elements: Vec<Node>) -> Vec<Node> {
             elements.iter().map(|node| if node.id() == 6 {simple_node(66, vec![("who", "dimpfelmoser")])} else {node.clone()}).collect()
         }
     }
@@ -370,7 +369,7 @@ pub(crate) mod tests {
             match element {
                 Element::Node { .. } => { vec![element] }
                 Element::Way { way } => {
-                    let mut elements: Vec<Element> = way.refs().iter().map(|id| simple_node_element(id.clone(), vec![("added", "by handler")])).collect();
+                    let mut elements: Vec<Element> = way.refs().iter().map(|id| simple_node_element(*id, vec![("added", "by handler")])).collect();
                     elements.push(Element::Way { way });
                     elements
                 }
@@ -485,7 +484,7 @@ pub(crate) mod tests {
         }
 
         fn add_result(&mut self, mut result: HandlerResult) -> HandlerResult {
-            result.node_ids = self.node_ids.clone();
+            result.node_ids.clone_from(&self.node_ids);
             result
         }
     }
@@ -510,23 +509,23 @@ pub(crate) mod tests {
     impl Handler for TestOnlyOrderRecorder {
         fn name(&self) -> String { format!("TestOnlyOrderRecorder {}", self.result_key) }
 
-        fn handle_nodes(&mut self, mut elements: Vec<Node>) -> Vec<Node> {
+        fn handle_nodes(&mut self, elements: Vec<Node>) -> Vec<Node> {
             elements.iter().for_each(|element| self.handle_element(into_node_element(element.clone())));
             elements
         }
 
-        fn handle_ways(&mut self, mut elements: Vec<Way>) -> Vec<Way> {
+        fn handle_ways(&mut self, elements: Vec<Way>) -> Vec<Way> {
             elements.iter().for_each(|element| self.handle_element(into_way_element(element.clone())));
             elements
         }
 
-        fn handle_relations(&mut self, mut elements: Vec<Relation>) -> Vec<Relation> {
+        fn handle_relations(&mut self, elements: Vec<Relation>) -> Vec<Relation> {
             elements.iter().for_each(|element| self.handle_element(into_relation_element(element.clone())));
             elements
         }
 
         fn add_result(&mut self, mut result: HandlerResult) -> HandlerResult {
-            result.other.insert(format!("{}", self.name()), self.received_ids.join(", "));
+            result.other.insert(self.name().to_string(), self.received_ids.join(", "));
             result
         }
     }
@@ -620,7 +619,7 @@ pub(crate) mod tests {
             .add(ElementCounter::new("initial"))
             .add(TestOnlyOrderRecorder::new("initial"))
 
-            .add(TestOnlyElementMixedAdder::default())
+            .add(TestOnlyElementMixedAdder)
 
             .add(ElementPrinter::with_prefix("final".to_string()).with_node_ids((1..=200).collect()))
             .add(TestOnlyOrderRecorder::new("final"))
@@ -653,7 +652,7 @@ pub(crate) mod tests {
             .add(ElementCounter::new("initial"))
             .add(TestOnlyOrderRecorder::new("initial"))
 
-            .add(TestOnlyElementAdder::default())
+            .add(TestOnlyElementAdder)
 
             .add(ElementPrinter::with_prefix("final".to_string()).with_node_ids((1..=200).collect()))
             .add(TestOnlyOrderRecorder::new("final"))
@@ -687,7 +686,7 @@ pub(crate) mod tests {
             .add(ElementCounter::new("initial"))
             .add(TestOnlyOrderRecorder::new("initial"))
 
-            .add(TestOnlyElementFilter::default())
+            .add(TestOnlyElementFilter)
 
             .add(ElementPrinter::with_prefix("final".to_string()).with_node_ids((1..=200).collect()))
             .add(TestOnlyOrderRecorder::new("final"))
@@ -721,7 +720,7 @@ pub(crate) mod tests {
             .add(ElementCounter::new("initial"))
             .add(TestOnlyOrderRecorder::new("initial"))
 
-            .add(TestOnlyElementReplacer::default())
+            .add(TestOnlyElementReplacer)
 
             .add(ElementPrinter::with_prefix("final".to_string()).with_node_ids((1..=200).collect()))
             .add(TestOnlyOrderRecorder::new("final"))
@@ -759,7 +758,7 @@ pub(crate) mod tests {
             .add(ElementCounter::new("initial"))
             .add(TestOnlyOrderRecorder::new("initial"))
 
-            .add(TestOnlyElementModifier::default())
+            .add(TestOnlyElementModifier)
             .add(TagKeyBasedOsmElementsFilter::new(OsmElementTypeSelection::node_only(), vec!["added".to_string()], FilterType::AcceptMatching))
 
             .add(ElementPrinter::with_prefix("final".to_string()).with_node_ids((1..=200).collect()))
@@ -838,10 +837,10 @@ pub(crate) mod tests {
 
         assert_eq!(&result.counts.get("nodes count initial").unwrap().clone(), &4,);
         assert_eq!(&result.counts.get("nodes count final").unwrap().clone(), &2);
-        assert_eq!(result.node_ids[0], false);
-        assert_eq!(result.node_ids[1], true);
-        assert_eq!(result.node_ids[2], true);
-        assert_eq!(result.node_ids[3], false);
-        assert_eq!(result.node_ids[4], false);
+        assert!(!result.node_ids[0]);
+        assert!(result.node_ids[1]);
+        assert!(result.node_ids[2]);
+        assert!(!result.node_ids[3]);
+        assert!(!result.node_ids[4]);
     }
 }

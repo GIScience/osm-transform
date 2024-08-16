@@ -38,17 +38,17 @@ impl Handler for ElementCounter {
         vec![element]
     }
 
-    fn handle_nodes(&mut self, mut elements: Vec<Node>) -> Vec<Node> {
+    fn handle_nodes(&mut self, elements: Vec<Node>) -> Vec<Node> {
         self.nodes_count += elements.len() as u64;
         elements
     }
 
-    fn handle_ways(&mut self, mut elements: Vec<Way>) -> Vec<Way> {
+    fn handle_ways(&mut self, elements: Vec<Way>) -> Vec<Way> {
         self.ways_count += elements.len() as u64;
         elements
     }
 
-    fn handle_relations(&mut self, mut elements: Vec<Relation>) -> Vec<Relation> {
+    fn handle_relations(&mut self, elements: Vec<Relation>) -> Vec<Relation> {
         self.relations_count += elements.len() as u64;
         elements
     }
@@ -83,7 +83,7 @@ impl Default for ElementPrinter {
 impl ElementPrinter {
     pub fn with_prefix(prefix: String) -> Self {
         Self {
-            prefix: prefix,
+            prefix,
             ..Self::default()
         }
     }
