@@ -29,13 +29,11 @@ use rustc_hash::FxHashSet;
 static INIT: Once = Once::new();
 
 pub fn init(config: &Config) -> Result<(), SetLoggerError> {
-    let log_level: LevelFilter;
-    match config.debug {
-        0 => log_level = LevelFilter::Info,
-        1 => log_level = LevelFilter::Debug,
-        2 => log_level = LevelFilter::Trace,
-        _ => log_level = LevelFilter::Off,
-    }
+    let log_level: LevelFilter = match config.debug {
+        0 => LevelFilter::Info,
+        1 => LevelFilter::Debug,
+        _ => LevelFilter::Trace,
+    };
     let stdout = ConsoleAppender::builder().build();
     let config = log4rs::Config::builder()
         .appender(Appender::builder().build("stdout", Box::new(stdout)))
