@@ -496,9 +496,16 @@ mod tests {
     use osm_io::osm::model::tag::Tag;
     use proj4rs::Proj;
     use simple_logger::SimpleLogger;
+    use ctor::ctor;
 
     use crate::handler::geotiff::{BufferingElevationEnricher, format_as_elevation_string, GeoTiff, GeoTiffManager, round_f32, round_f64, transform};
     use crate::handler::Handler;
+
+    #[ctor]
+    fn init() {
+        SimpleLogger::new().init().unwrap();
+    }
+
     struct TestPoint {
         lon: f64,
         lat: f64,
@@ -527,7 +534,6 @@ mod tests {
     #[test]
     #[ignore]
     fn test_find_geotiff_id_for_wgs84_coord_srtm_ma_hd() {
-        SimpleLogger::new().init().expect("could not init logger");
         let mut geotiff_loader = GeoTiffManager::new();
         geotiff_loader.load_and_index_geotiffs("test/srtm*.tif");
         assert_eq!(2, geotiff_loader.index.get_geotiff_count());
@@ -653,7 +659,6 @@ mod tests {
     }
     #[test]
     fn test_load_geotiffs() {
-        SimpleLogger::new().init().expect("could not init logger");
         let mut geotiff_loader = GeoTiffManager::new();
         geotiff_loader.load_and_index_geotiffs("test/region*.tif");
         assert_eq!(2, geotiff_loader.index.get_geotiff_count());
@@ -661,7 +666,6 @@ mod tests {
     }
     #[test]
     fn test_find_geotiff_id_for_wgs84_coord() {
-        SimpleLogger::new().init().expect("could not init logger");
         let mut geotiff_loader = GeoTiffManager::new();
         geotiff_loader.load_and_index_geotiffs("test/region*.tif");
         assert_eq!(2, geotiff_loader.index.get_geotiff_count());
@@ -673,7 +677,6 @@ mod tests {
 
     #[test]
     fn test_find_geotiff_id_for_wgs84_coord_ma_hd() {
-        SimpleLogger::new().init().expect("could not init logger");
         let mut geotiff_loader = GeoTiffManager::new();
         geotiff_loader.load_and_index_geotiffs("test/region*.tif");
         assert_eq!(2, geotiff_loader.index.get_geotiff_count());
@@ -685,7 +688,6 @@ mod tests {
     #[test]
     #[ignore]
     fn test_find_geotiff_id_for_wgs84_coord_ma_hd_srtm() {
-        SimpleLogger::new().init().expect("could not init logger");
         let mut geotiff_loader = GeoTiffManager::new();
         geotiff_loader.load_and_index_geotiffs("test/region*.tif");
         assert_eq!(2, geotiff_loader.index.get_geotiff_count());
@@ -925,7 +927,6 @@ mod tests {
 
     #[test]
     fn buffering_elevation_enricher_test() {
-        SimpleLogger::new().init().expect("could not init logger");
         let mut handler = BufferingElevationEnricher::new(4, 5, None);
         handler.init("test/region*.tif").expect("could not init handler");
 
