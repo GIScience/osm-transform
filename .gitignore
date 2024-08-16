@@ -25,3 +25,4 @@ Cargo.lock
 
 **/*.pbf
 **/*.log
+**/bench_results_*.json
