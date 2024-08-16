@@ -13,6 +13,7 @@ use osm_io::osm::model::node::Node;
 use osm_io::osm::model::tag::Tag;
 use proj4rs::Proj;
 use rstar::{AABB, Envelope, Point, PointDistance, RTree, RTreeObject};
+use rustc_hash::FxHashMap;
 use serde::__private::de::Content::F64;
 use crate::handler::{format_element_id, into_node_element, into_vec_node_element, into_vec_relation_element, into_vec_way_element, into_way_element, Handler};
 use crate::srs::DynamicSrsResolver;
@@ -306,8 +307,8 @@ impl PointDistance for RSBoundingBox {
 
 pub(crate) struct BufferingElevationEnricher {
     geotiff_manager: GeoTiffManager,
-    nodes_for_geotiffs: HashMap<String, Vec<Node>>,
-    node_counts_for_geotiffs: HashMap<String, usize>,
+    nodes_for_geotiffs: FxHashMap<String, Vec<Node>>,
+    node_counts_for_geotiffs: FxHashMap<String, usize>,
     srs_resolver: DynamicSrsResolver,
     max_buffer_len: usize,
     max_buffered_nodes: usize,
@@ -318,8 +319,8 @@ impl BufferingElevationEnricher {
     pub fn new(max_buffer_len: usize, max_buffered_nodes: usize, skip_ele: Option<BitVec>) -> Self {
         Self {
             geotiff_manager: GeoTiffManager::new(),
-            nodes_for_geotiffs: HashMap::new(),
-            node_counts_for_geotiffs: HashMap::new(),
+            nodes_for_geotiffs: FxHashMap::default(),
+            node_counts_for_geotiffs: FxHashMap::default(),
             srs_resolver: DynamicSrsResolver::new(),
             max_buffer_len,
             max_buffered_nodes,
@@ -328,7 +329,7 @@ impl BufferingElevationEnricher {
         }
     }
     pub fn init(&mut self, file_pattern: &str) -> Result<(), Box<dyn Error>> {
-        self.geotiff_manager.load_and_index_geotiffs(file_pattern, &self.srs_resolver);
+        self.geotiff_manager.load_and_index_geotiffs(file_pattern);
         Ok(())
     }
     fn use_loader(mut self, geo_tiff_loader: GeoTiffManager) -> Self {

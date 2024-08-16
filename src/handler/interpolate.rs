@@ -1,17 +1,17 @@
-use std::collections::HashMap;
 use osm_io::osm::model::coordinate::Coordinate;
 use osm_io::osm::model::node::Node;
+use rustc_hash::FxHashMap;
 
 pub(crate) struct WaySplitter {
     pub next_node_id: i64,
-    pub location_index: HashMap<i64, Coordinate>,
+    pub location_index: FxHashMap<i64, Coordinate>,
 }
 
 impl WaySplitter {
     pub(crate) fn new() -> Self {
         Self {
             next_node_id: -1,
-            location_index: HashMap::new(),
+            location_index: FxHashMap::default(),
         }
     }
 

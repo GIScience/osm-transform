@@ -1,4 +1,3 @@
-use std::collections::HashMap;
 use std::panic::resume_unwind;
 use bit_vec::BitVec;
 use osm_io::osm::model::element::Element;
@@ -7,6 +6,7 @@ use osm_io::osm::model::relation::{Member, Relation};
 use osm_io::osm::model::tag::Tag;
 use osm_io::osm::model::way::Way;
 use regex::Regex;
+use rustc_hash::FxHashMap;
 use crate::handler::{HIGHEST_NODE_ID, into_node_element, into_relation_element, into_way_element, OsmElementTypeSelection, Handler};
 use crate::handler::predicate::{HasOneOfTagKeysPredicate, HasTagKeyValuePredicate, HasNoneOfTagKeysPredicate};
 
@@ -318,7 +318,7 @@ impl ComplexElementsFilter {
     }
 
     pub(crate) fn ors_default() -> Self{
-        let mut key_values = HashMap::new();
+        let mut key_values = FxHashMap::default();
         key_values.insert("railway".to_string(), "platform".to_string());
         key_values.insert("public_transport".to_string(), "platform".to_string());
         key_values.insert("man_made".to_string(), "pier".to_string());

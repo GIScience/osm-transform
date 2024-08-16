@@ -7,7 +7,7 @@ pub mod geotiff;
 pub(crate) mod interpolate;
 pub(crate) mod skip_ele;
 
-use std::collections::{BTreeMap, HashMap};
+use std::collections::BTreeMap;
 
 use bit_vec::BitVec;
 use osm_io::osm::model::element::Element;
@@ -15,7 +15,7 @@ use osm_io::osm::model::node::Node;
 use osm_io::osm::model::relation::Relation;
 use osm_io::osm::model::tag::Tag;
 use osm_io::osm::model::way::Way;
-
+use rustc_hash::FxHashMap;
 
 const HIGHEST_NODE_ID: i64 = 50_000_000_000;
 
@@ -95,7 +95,7 @@ impl OsmElementTypeSelection {
 #[derive(Debug)]
 pub struct HandlerResult {
     pub counts: BTreeMap<String, u64>,
-    pub other: HashMap<String, String>,
+    pub other: FxHashMap<String, String>,
     pub node_ids: BitVec,
     pub skip_ele: BitVec
 }
@@ -106,7 +106,7 @@ impl HandlerResult {
     fn with_capacity(nbits: usize) -> Self {
         HandlerResult {
             counts: btreemap! {},
-            other: hashmap! {},
+            other: FxHashMap::default(),
             node_ids: BitVec::from_elem(nbits, false),
             skip_ele: BitVec::from_elem(nbits, false),
         }

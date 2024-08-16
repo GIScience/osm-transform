@@ -8,7 +8,6 @@ pub mod handler;
 #[macro_use]
 extern crate maplit;
 
-use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;
 use std::sync::Once;
 use benchmark_rs::stopwatch::StopWatch;
@@ -72,7 +71,7 @@ fn extract_referenced_nodes(config: &Config) -> HandlerResult {
     log::info!("Starting extraction of referenced node ids...");
     let mut stopwatch = StopWatch::new();
     stopwatch.start();
-    let _ = process_with_handler(config, &mut handler_chain).expect("Extraction of referenced node ids failed");
+    process_with_handler(config, &mut handler_chain).expect("Extraction of referenced node ids failed");
     let mut handler_result = handler_chain.collect_result();
 
     log::info!("Finished extraction of referenced node ids, time: {}", stopwatch);
@@ -106,7 +105,7 @@ fn process(config: &Config, node_filter_result: Option<HandlerResult>) -> Handle
         .add(ElementCounter::new("initial"));
 
     if config.remove_metadata {
-        handler_chain = handler_chain.add(MetadataRemover::default())
+        handler_chain = handler_chain.add(MetadataRemover)
     }
 
     handler_chain = handler_chain.add(ComplexElementsFilter::ors_default());
@@ -132,12 +131,12 @@ fn process(config: &Config, node_filter_result: Option<HandlerResult>) -> Handle
         None => ()
     }
 
-    if &config.elevation_tiffs.len() > &0 {
+    if !config.elevation_tiffs.is_empty() {
         log::info!("Initializing elevation enricher");
         stopwatch.start();
         let mut elevation_enricher = BufferingElevationEnricher::new(config.elevation_batch_size, config.elevation_total_buffer_size, skip_ele);
         for elevation_glob_pattern in &config.elevation_tiffs {
-            elevation_enricher.init(elevation_glob_pattern);
+            elevation_enricher.init(elevation_glob_pattern).unwrap();
         }
         log::info!("Finished initializing elevation enricher, time: {}", stopwatch);
         handler_chain = handler_chain.add(elevation_enricher);
@@ -171,7 +170,7 @@ fn process(config: &Config, node_filter_result: Option<HandlerResult>) -> Handle
     log::info!("Starting processing of pbf elements...");
     let mut stopwatch = StopWatch::new();
     stopwatch.start();
-    let _ = process_with_handler(config, &mut handler_chain).expect("Processing failed");
+    process_with_handler(config, &mut handler_chain).expect("Processing failed");
     let mut processing_result = handler_chain.collect_result();
     log::info!("Finished processing of pbf elements, time: {}", stopwatch);
     log::info!("{}" , &processing_result.to_string());

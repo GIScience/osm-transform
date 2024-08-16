@@ -1,5 +1,5 @@
-use std::collections::HashMap;
 use osm_io::osm::model::tag::Tag;
+use rustc_hash::FxHashMap;
 
 pub(crate) struct HasOneOfTagKeysPredicate {
     pub keys: Vec<String>
@@ -12,7 +12,7 @@ impl HasOneOfTagKeysPredicate {
 
 
 pub(crate) struct HasTagKeyValuePredicate {
-    pub key_values: HashMap<String,String>
+    pub key_values: FxHashMap<String,String>
 }
 impl HasTagKeyValuePredicate {
     pub(crate) fn test(&mut self, tags: &Vec<Tag>) -> bool {
@@ -40,8 +40,8 @@ impl HasNoneOfTagKeysPredicate {
 
 #[cfg(test)]
 mod test {
-    use std::collections::HashMap;
     use osm_io::osm::model::tag::Tag;
+    use rustc_hash::FxHashMap;
     use crate::handler::predicate::{HasNoneOfTagKeysPredicate, HasOneOfTagKeysPredicate, HasTagKeyValuePredicate};
 
     #[test]
@@ -78,7 +78,7 @@ mod test {
 
     #[test]
     fn has_tag_key_value_predicate_with_no_matching_tag() {
-        let mut key_values = HashMap::new();
+        let mut key_values = FxHashMap::default();
         key_values.insert("good".to_string(), "good".to_string());
         key_values.insert("nice".to_string(), "nice".to_string());
         let mut predicate = HasTagKeyValuePredicate { key_values };
@@ -89,7 +89,7 @@ mod test {
     }
     #[test]
     fn has_tag_key_value_predicate_with_only_tag_with_wrong_value() {
-        let mut key_values = HashMap::new();
+        let mut key_values = FxHashMap::default();
         key_values.insert("good".to_string(), "good".to_string());
         key_values.insert("nice".to_string(), "nice".to_string());
         let mut predicate = HasTagKeyValuePredicate { key_values };
@@ -99,7 +99,7 @@ mod test {
     }
     #[test]
     fn has_tag_key_value_predicate_with_also_tag_with_wrong_value() {
-        let mut key_values = HashMap::new();
+        let mut key_values = FxHashMap::default();
         key_values.insert("good".to_string(), "good".to_string());
         key_values.insert("nice".to_string(), "nice".to_string());
         let mut predicate = HasTagKeyValuePredicate { key_values };
@@ -111,7 +111,7 @@ mod test {
     }
     #[test]
     fn has_tag_key_value_predicate_with_only_tag_with_matching_value() {
-        let mut key_values = HashMap::new();
+        let mut key_values = FxHashMap::default();
         key_values.insert("good".to_string(), "good".to_string());
         key_values.insert("nice".to_string(), "nice".to_string());
         let mut predicate = HasTagKeyValuePredicate { key_values };
@@ -121,7 +121,7 @@ mod test {
     }
     #[test]
     fn has_tag_key_value_predicate_with_also_tag_with_matching_value() {
-        let mut key_values = HashMap::new();
+        let mut key_values = FxHashMap::default();
         key_values.insert("good".to_string(), "good".to_string());
         key_values.insert("nice".to_string(), "nice".to_string());
         let mut predicate = HasTagKeyValuePredicate { key_values };
