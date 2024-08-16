@@ -309,7 +309,7 @@ impl GeoTiffIndex for RSGeoTiffIndex {
 
 
 #[derive(Clone, Debug)]
-struct RSBoundingBox {
+pub(crate) struct RSBoundingBox {
     id: String,
     min: [f64; 2],
     max: [f64; 2],

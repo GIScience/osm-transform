@@ -25,12 +25,12 @@ pub struct Tile {
     poly: MultiPolygon<f64>,
 }
 
-pub struct AreaHandler {
+pub(crate) struct AreaHandler {
     pub mapping: Mapping,
     grid: Vec<Tile>,
 }
 
-pub struct Mapping {
+pub(crate) struct Mapping {
     pub index: [u16; GRID_SIZE],
     pub area: BTreeMultiMap<u16, AreaIntersect>,
     pub id: BTreeMap<u16, String>,
@@ -48,7 +48,7 @@ impl Default for Mapping {
     }
 }
 
-struct AreaIntersect {
+pub(crate) struct AreaIntersect {
     id: u16,
     geo: MultiPolygon<f64>,
 }

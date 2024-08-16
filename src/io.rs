@@ -5,7 +5,7 @@ use osm_io::osm::pbf;
 use crate::Config;
 use crate::handler::HandlerChain;
 
-pub fn process_with_handler(config: &Config, handler_chain: &mut HandlerChain) -> Result<(), anyhow::Error> {
+pub (crate) fn process_with_handler(config: &Config, handler_chain: &mut HandlerChain) -> Result<(), anyhow::Error> {
     log::info!("Starting pbf io pipeline...");
     let mut stopwatch = StopWatch::new();
     stopwatch.start();
