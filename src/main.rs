@@ -1,11 +1,10 @@
 #[macro_use]
 extern crate maplit;
-use std::collections::HashSet;
 use std::path::PathBuf;
 use std::env;
 
 use clap::Parser;
-
+use rustc_hash::FxHashSet;
 use rusty_routes_transformer::{Config, init, run};
 
 
@@ -92,9 +91,9 @@ impl Args {
             elevation_total_buffer_size: self.elevation_total_buffer_size,
             debug: self.debug,
             with_node_filtering: !self.suppress_node_filtering,
-            print_node_ids: HashSet::from_iter(self.print_node_ids),
-            print_way_ids: HashSet::from_iter(self.print_way_ids),
-            print_relation_ids: HashSet::from_iter(self.print_relation_ids),
+            print_node_ids: FxHashSet::from_iter(self.print_node_ids),
+            print_way_ids: FxHashSet::from_iter(self.print_way_ids),
+            print_relation_ids: FxHashSet::from_iter(self.print_relation_ids),
             remove_metadata: !self.keep_metadata,
         }
     }

@@ -1,7 +1,7 @@
-use std::collections::HashSet;
 use std::path::PathBuf;
 use osm_io::osm::model::element::Element;
 use osm_io::osm::pbf::reader::Reader;
+use rustc_hash::FxHashSet;
 use rusty_routes_transformer::Config;
 
 fn base_config() -> Config {
@@ -14,9 +14,9 @@ fn base_config() -> Config {
         elevation_total_buffer_size: 50000,
         remove_metadata: false,
         with_node_filtering: false,
-        print_node_ids: HashSet::new(),
-        print_way_ids: HashSet::new(),
-        print_relation_ids: HashSet::new(),
+        print_node_ids: FxHashSet::default(),
+        print_way_ids: FxHashSet::default(),
+        print_relation_ids: FxHashSet::default(),
         debug: 1,
     }
 }

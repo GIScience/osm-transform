@@ -1,10 +1,8 @@
-use std::collections::HashSet;
-
 use osm_io::osm::model::element::Element;
 use osm_io::osm::model::node::Node;
 use osm_io::osm::model::relation::Relation;
 use osm_io::osm::model::way::Way;
-
+use rustc_hash::FxHashSet;
 use crate::handler::{HandlerResult, OsmElementTypeSelection, Handler};
 
 #[derive(Debug)]
@@ -66,18 +64,18 @@ impl Handler for ElementCounter {
 
 pub(crate) struct ElementPrinter {
     pub prefix: String,
-    pub node_ids: HashSet<i64>,
-    pub way_ids: HashSet<i64>,
-    pub relation_ids: HashSet<i64>,
+    pub node_ids: FxHashSet<i64>,
+    pub way_ids: FxHashSet<i64>,
+    pub relation_ids: FxHashSet<i64>,
     pub handle_types: OsmElementTypeSelection,
 }
 impl Default for ElementPrinter {
     fn default() -> Self {
         Self {
             prefix: "".to_string(),
-            node_ids: HashSet::new(),
-            way_ids: HashSet::new(),
-            relation_ids: HashSet::new(),
+            node_ids: FxHashSet::default(),
+            way_ids: FxHashSet::default(),
+            relation_ids: FxHashSet::default(),
             handle_types: OsmElementTypeSelection::none(),
         }
     }
@@ -89,21 +87,21 @@ impl ElementPrinter {
             ..Self::default()
         }
     }
-    pub(crate) fn with_node_ids(mut self, node_ids: HashSet<i64>) -> Self {
+    pub(crate) fn with_node_ids(mut self, node_ids: FxHashSet<i64>) -> Self {
         for id in node_ids {
             self.node_ids.insert(id);
             self.handle_types.node = true;
         }
         self
     }
-    pub(crate) fn with_way_ids(mut self, way_ids: HashSet<i64>) -> Self {
+    pub(crate) fn with_way_ids(mut self, way_ids: FxHashSet<i64>) -> Self {
         for id in way_ids {
             self.way_ids.insert(id);
             self.handle_types.way = true;
         }
         self
     }
-    pub(crate) fn with_relation_ids(mut self, relation_ids: HashSet<i64>) -> Self {
+    pub(crate) fn with_relation_ids(mut self, relation_ids: FxHashSet<i64>) -> Self {
         for id in relation_ids {
             self.relation_ids.insert(id);
             self.handle_types.relation = true;

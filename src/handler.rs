@@ -7,7 +7,7 @@ pub mod geotiff;
 pub(crate) mod interpolate;
 pub(crate) mod skip_ele;
 
-use std::collections::{BTreeMap, HashMap, HashSet};
+use std::collections::{BTreeMap, HashMap};
 
 use bit_vec::BitVec;
 use osm_io::osm::model::element::Element;
@@ -249,6 +249,7 @@ pub(crate) mod tests {
     use osm_io::osm::model::tag::Tag;
     use osm_io::osm::model::way::Way;
     use regex::Regex;
+    use rustc_hash::FxHashSet;
     use simple_logger::SimpleLogger;
     use crate::handler::*;
     use crate::handler::filter::*;
@@ -534,13 +535,14 @@ pub(crate) mod tests {
     #[test]
     /// Assert that it is possible to run a chain of processors.
     fn test_chain() {
+        let mut set: FxHashSet<i64> = FxHashSet::default();
+        set.insert(8);
         let mut processor_chain = HandlerChain::default()
             .add(ElementCounter::new("initial"))
             .add(TestOnlyOrderRecorder::new("initial"))
 
             .add(TestOnlyIdCollector::new(10))
-
-            .add(ElementPrinter::with_prefix("final: ".to_string()).with_node_ids(hashset! {8}))
+            .add(ElementPrinter::with_prefix("final: ".to_string()).with_node_ids(set))
             .add(TestOnlyOrderRecorder::new("final"))
             .add(ElementCounter::new("final"))
             ;

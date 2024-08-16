@@ -26,6 +26,7 @@ use crate::handler::info::{CountType, ElementCounter, ElementPrinter};
 use crate::handler::modify::MetadataRemover;
 use log::SetLoggerError;
 use crate::output::OutputHandler;
+use rustc_hash::FxHashSet;
 
 static INIT: Once = Once::new();
 
@@ -186,9 +187,9 @@ pub struct Config {
     pub elevation_tiffs: Vec<String>,
     pub with_node_filtering: bool,
     pub debug: u8,
-    pub print_node_ids: HashSet<i64>,
-    pub print_way_ids: HashSet<i64>,
-    pub print_relation_ids: HashSet<i64>,
+    pub print_node_ids: FxHashSet<i64>,
+    pub print_way_ids: FxHashSet<i64>,
+    pub print_relation_ids: FxHashSet<i64>,
     pub remove_metadata: bool,
     pub elevation_batch_size: usize,
     pub elevation_total_buffer_size: usize,
