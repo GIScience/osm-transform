@@ -25,9 +25,15 @@ RUSTFLAGS="-C target-cpu=native -C link-arg=-fuse-ld=lld -C target-feature=+avx2
 MALLOC_CONF="thp:always,metadata_thp:always"
 
 echo "Running the benchmark binaries..."
-hyperfine --runs 3 -L PBF karlsruhe-regbez-latest,baden-wuerttemberg-latest,germany-latest \
+# Create a directory to store the benchmark results
+mkdir -p bench_results
+# Get date and time
+now=$(date +"%Y-%m-%d_%H-%M-%S")
+json_file="bench_results/bench_results_${now}.json"
+hyperfine --export-json "${json_file}" --runs 3 -L PBF karlsruhe-regbez-latest,baden-wuerttemberg-latest,germany-latest \
 './rusty-routes-transformer-vector-handlers --input-pbf {PBF}.osm.pbf --output-pbf {PBF}.ors.pbf' \
 './rusty-routes-transformer-vector-handlers-cargo-opt --input-pbf {PBF}.osm.pbf --output-pbf {PBF}.ors.pbf' \
 './rusty-routes-transformer-vector-handlers-cargo-opt-build-perf --input-pbf {PBF}.osm.pbf --output-pbf {PBF}.ors.pbf' \
 './rusty-routes-transformer-add-dockerfile-cargo-opt-build-perf --input-pbf {PBF}.osm.pbf --output-pbf {PBF}.ors.pbf' \
+'./osm-transform -p {PBF}.osm.pbf' \
 './ors-preprocessor {PBF}.osm.pbf'
