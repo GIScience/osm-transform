@@ -31,7 +31,7 @@ const FILTERED_WAY_COUNT: u64 = 51u64;
 #[test]
 fn run_minimal() {
     let config = base_config();
-    rusty_routes_transformer::init(&config).expect("init in run_minimal failed");
+    rusty_routes_transformer::init(&config);
     let result = rusty_routes_transformer::run(&config);
     assert_eq!(result.counts.get("nodes count initial").unwrap(), &BAARLE_NODE_COUNT);
     assert_eq!(result.counts.get("nodes count final").unwrap(), &BAARLE_NODE_COUNT);
@@ -44,7 +44,7 @@ fn run_minimal() {
 fn run_minimal_write() {
     let mut config = base_config();
     config.output_pbf = Some(PathBuf::from("target/tmp/output-integration-test-run_minimal_write.pbf"));
-    rusty_routes_transformer::init(&config).expect("");
+    rusty_routes_transformer::init(&config);
     let result = rusty_routes_transformer::run(&config);
     assert_eq!(result.counts.get("nodes count initial").unwrap(), &BAARLE_NODE_COUNT);
     assert_eq!(result.counts.get("nodes count final").unwrap(), &BAARLE_NODE_COUNT);
@@ -63,7 +63,7 @@ fn run_all() {
     config.elevation_total_buffer_size = 500000;
     config.with_node_filtering = true;
     config.remove_metadata = true;
-    rusty_routes_transformer::init(&config).expect("");
+    rusty_routes_transformer::init(&config);
     let result = rusty_routes_transformer::run(&config);
     assert_eq!(result.counts.get("nodes count initial").unwrap(), &BAARLE_NODE_COUNT);
     assert_eq!(result.counts.get("nodes count final").unwrap(), &FILTERED_NODE_COUNT);
@@ -77,7 +77,7 @@ fn run_all() {
 fn run_country() {
     let mut config = base_config();
     config.country_csv = Some(PathBuf::from("test/mapping_test.csv"));
-    rusty_routes_transformer::init(&config).expect("");
+    rusty_routes_transformer::init(&config);
     let result = rusty_routes_transformer::run(&config);
     assert_eq!(result.counts.get("nodes count initial").unwrap(), &BAARLE_NODE_COUNT);
     assert_eq!(result.counts.get("nodes count final").unwrap(), &BAARLE_NODE_COUNT);
@@ -91,7 +91,7 @@ fn run_country() {
 fn run_node_filtering() {
     let mut config = base_config();
     config.with_node_filtering = true;
-    rusty_routes_transformer::init(&config).expect("");
+    rusty_routes_transformer::init(&config);
     let result = rusty_routes_transformer::run(&config);
     assert_eq!(result.counts.get("nodes count initial").unwrap(), &BAARLE_NODE_COUNT);
     assert_eq!(result.counts.get("nodes count final").unwrap(), &FILTERED_NODE_COUNT);
@@ -105,7 +105,7 @@ fn run_node_filtering() {
 fn run_remove_metadata() {
     let mut config = base_config();
     config.remove_metadata = true;
-    rusty_routes_transformer::init(&config).expect("");
+    rusty_routes_transformer::init(&config);
     let result = rusty_routes_transformer::run(&config);
     assert_eq!(result.counts.get("nodes count initial").unwrap(), &BAARLE_NODE_COUNT);
     assert_eq!(result.counts.get("nodes count final").unwrap(), &BAARLE_NODE_COUNT);
@@ -118,7 +118,7 @@ fn run_remove_metadata() {
 fn run_elevation() {
     let mut config = base_config();
     config.elevation_tiffs = vec!["test/*.tif".to_string()];
-    rusty_routes_transformer::init(&config).expect("init in run_elevation failed");
+    rusty_routes_transformer::init(&config);
     let result = rusty_routes_transformer::run(&config);
     assert_eq!(result.counts.get("nodes count initial").unwrap(), &BAARLE_NODE_COUNT);
     assert_eq!(result.counts.get("nodes count final").unwrap(), &BAARLE_NODE_COUNT);

@@ -22,17 +22,18 @@ use crate::handler::filter::{AllElementsFilter, ComplexElementsFilter, FilterTyp
 use crate::handler::geotiff::{BufferingElevationEnricher};
 use crate::handler::info::{ElementCounter, ElementPrinter};
 use crate::handler::modify::MetadataRemover;
-use log::SetLoggerError;
 use crate::output::OutputHandler;
 use rustc_hash::FxHashSet;
 
 static INIT: Once = Once::new();
 
-pub fn init(config: &Config) -> Result<(), SetLoggerError> {
+pub fn init(config: &Config) {
     let log_level: LevelFilter = match config.debug {
         0 => LevelFilter::Info,
         1 => LevelFilter::Debug,
-        _ => LevelFilter::Trace,
+        2 => LevelFilter::Trace,
+        3 => LevelFilter::Off,
+        _ => LevelFilter::Info,
     };
     let stdout = ConsoleAppender::builder().build();
     let config = log4rs::Config::builder()
@@ -45,7 +46,6 @@ pub fn init(config: &Config) -> Result<(), SetLoggerError> {
     INIT.call_once(|| {
         result = log4rs::init_config(config).map(|_| ());
     });
-    result
 }
 
 pub fn run(config: &Config) -> HandlerResult {
