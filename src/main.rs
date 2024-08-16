@@ -24,7 +24,7 @@ fn main() {
 
     let args = Args::parse();
     let config = args.to_config();
-    init(&config);
+    init(&config).expect("Failed to initialize logger");
     run(&config);
 }
 
