@@ -82,6 +82,7 @@ pub(crate) struct OsmElementTypeSelection {
     pub way: bool,
     pub relation: bool,
 }
+#[allow(dead_code)]
 impl OsmElementTypeSelection {
     pub(crate) fn all() -> Self { Self { node: true, way: true, relation: true } }
     pub(crate) fn node_only() -> Self { Self { node: true, way: false, relation: false } }
@@ -240,7 +241,6 @@ impl HandlerChain {
 pub(crate) mod tests {
     use std::ops::Add;
     use bit_vec::BitVec;
-    use log4rs::append::Append;
     use osm_io::osm::model::coordinate::Coordinate;
     use osm_io::osm::model::element::Element;
     use osm_io::osm::model::node::Node;
@@ -255,7 +255,9 @@ pub(crate) mod tests {
     use crate::handler::info::*;
 
     fn existing_tag() -> String { "EXISTING_TAG".to_string() }
+    #[allow(dead_code)]
     fn missing_tag() -> String { "MISSING_TAG".to_string() }
+    #[allow(dead_code)]
     pub enum MemberType { Node, Way, Relation }
     pub fn simple_node_element(id: i64, tags: Vec<(&str, &str)>) -> Element {
         let tags_obj = tags.iter().map(|(k, v)| Tag::new(k.to_string(), v.to_string())).collect();
@@ -576,7 +578,7 @@ pub(crate) mod tests {
     /// still buffered will be flushed: handled and passed to downstream processors.
     /// The test uses TestOnlyElementBufferingDuplicatingEditingProcessor for this.
     fn test_chain_with_buffer() {
-        SimpleLogger::new().init();
+        SimpleLogger::new().init().expect("Failed to initialize logger");
         let mut processor_chain = HandlerChain::default()
             .add(ElementCounter::new("initial"))
             .add(TestOnlyOrderRecorder::new("initial"))
@@ -614,7 +616,7 @@ pub(crate) mod tests {
     /// that are processed by downstream processors.
     /// The test uses TestOnlyElementMixedAdder for this.
     fn test_chain_with_mixed_element_adder() {
-        SimpleLogger::new().init();
+        SimpleLogger::new().init().expect("could not init logger");
         let mut processor_chain = HandlerChain::default()
             .add(ElementCounter::new("initial"))
             .add(TestOnlyOrderRecorder::new("initial"))
@@ -647,7 +649,7 @@ pub(crate) mod tests {
     /// that are processed by downstream processors.
     /// The test uses TestOnlyElementAdder for this.
     fn test_chain_with_element_adder() {
-        SimpleLogger::new().init();
+        SimpleLogger::new().init().expect("could not init logger");
         let mut processor_chain = HandlerChain::default()
             .add(ElementCounter::new("initial"))
             .add(TestOnlyOrderRecorder::new("initial"))
@@ -681,7 +683,7 @@ pub(crate) mod tests {
     /// Assert that it is possible to run the chain and let processors permanently filter (remove) elements.
     /// The test uses TestOnlyElementFilter for this, which filters nodes with an even id.
     fn test_chain_with_element_filter() {
-        SimpleLogger::new().init();
+        SimpleLogger::new().init().expect("could not init logger");
         let mut processor_chain = HandlerChain::default()
             .add(ElementCounter::new("initial"))
             .add(TestOnlyOrderRecorder::new("initial"))
@@ -715,7 +717,7 @@ pub(crate) mod tests {
     /// e.g. copies of received elements.
     /// The test uses TestOnlyElementReplacer for this, which replaces node#6 with a new instance.
     fn test_chain_with_element_replacer() {
-        SimpleLogger::new().init();
+        SimpleLogger::new().init().expect("could not init logger");
         let mut processor_chain = HandlerChain::default()
             .add(ElementCounter::new("initial"))
             .add(TestOnlyOrderRecorder::new("initial"))
@@ -753,7 +755,7 @@ pub(crate) mod tests {
     /// The TestOnlyElementModifier also changes values of tags "who" to upper case,
     /// which is not explicitly asserted.
     fn test_chain_with_element_modifier() {
-        SimpleLogger::new().init();
+        SimpleLogger::new().init().expect("could not init logger");
         let mut processor_chain = HandlerChain::default()
             .add(ElementCounter::new("initial"))
             .add(TestOnlyOrderRecorder::new("initial"))
@@ -792,7 +794,7 @@ pub(crate) mod tests {
 
     #[test]
     fn handler_chain() {
-        SimpleLogger::new().init();
+        SimpleLogger::new().init().expect("could not init logger");
         let chain = HandlerChain::default()
             .add(ElementCounter::new("initial"))
             .add(TagValueBasedOsmElementsFilter::new(
@@ -813,7 +815,7 @@ pub(crate) mod tests {
 
     #[test]
     fn handler_chain_with_node_id_filter() {
-        SimpleLogger::new().init();
+        SimpleLogger::new().init().expect("could not init logger");
         let mut node_ids = BitVec::from_elem(10usize, false);
         node_ids.set(1usize, true);
         node_ids.set(2usize, true);
