@@ -13,7 +13,7 @@ use osm_io::osm::model::element::Element;
 use osm_io::osm::model::node::Node;
 use osm_io::osm::model::tag::Tag;
 use serde::Deserialize;
-use wkt::{Geometry, ToWkt};
+use wkt::ToWkt;
 use wkt::Wkt;
 
 use crate::Config;
@@ -66,9 +66,9 @@ impl Default for AreaHandler {
                         let box_lon: f64 = grid_lon as f64 - 180.0;
                         let box_lat: f64 = grid_lat as f64 - 90.0;
                         let bbox = Rect::new(coord! {x: box_lon, y: box_lat},
-                                             coord! {x: box_lon + 1f64, y: box_lat + 1f64},);
+                                             coord! {x: box_lon + 1f64, y: box_lat + 1f64}, );
                         let poly = bbox.to_polygon().into();
-                        grid.push(Tile{bbox, poly});
+                        grid.push(Tile { bbox, poly });
                     }
                 }
                 grid
@@ -91,18 +91,18 @@ impl AreaHandler {
         }
 
         let file_basename = path_buf.file_stem().to_owned().unwrap_or_default().to_str().unwrap_or_default();
-        let file =  File::open(path_buf.clone())?;
+        let file = File::open(path_buf.clone())?;
         let mut rdr = ReaderBuilder::new().delimiter(b';').from_reader(file);
         let mut index: u16 = 1;
         for result in rdr.deserialize() {
             let record: Record = result?;
             let geo: Wkt<f64> = Wkt::from_str(record.geo.as_str())?;
-            let _ls = match geo.item {
-                Geometry::MultiPolygon(mp) => {
+            let _ls = match geo {
+                Wkt::MultiPolygon(mp) => {
                     let converted: MultiPolygon = mp.into();
                     self.add_area(index, &record.id, &record.name, &converted);
                 }
-                Geometry::Polygon(p) => {
+                Wkt::Polygon(p) => {
                     let converted: MultiPolygon = p.into();
                     self.add_area(index, &record.id, &record.name, &converted);
                 }
@@ -131,7 +131,7 @@ impl AreaHandler {
                 } else {
                     let tile_poly = &self.grid[i].poly;
                     self.mapping.index[i] = AREA_ID_MULTIPLE;
-                    self.mapping.area.insert(i as u16, AreaIntersect{id: index, geo: tile_poly.intersection(&area_geometry)});
+                    self.mapping.area.insert(i as u16, AreaIntersect { id: index, geo: tile_poly.intersection(&area_geometry) });
                 }
             }
         }
@@ -167,7 +167,7 @@ impl AreaHandler {
             return;
         }
         let grid_index = (node.coordinate().lat() as i32 + 90) * 360 + (node.coordinate().lon() as i32 + 180);
-        let coord = Coord {x: node.coordinate().lon(), y: node.coordinate().lat()};
+        let coord = Coord { x: node.coordinate().lon(), y: node.coordinate().lat() };
         match self.mapping.index[grid_index as usize] {
             0 => { // no area
             }
