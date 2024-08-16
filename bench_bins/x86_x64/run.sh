@@ -30,7 +30,9 @@ mkdir -p bench_results
 # Get date and time
 now=$(date +"%Y-%m-%d_%H-%M-%S")
 json_file="bench_results/bench_results_${now}.json"
-hyperfine --export-json "${json_file}" --runs 3 -L PBF karlsruhe-regbez-latest,baden-wuerttemberg-latest,germany-latest \
+markdown_file="bench_results/bench_results_${now}.md"
+hyperfine --export-json "${json_file}" --export-markdown "${markdown_file}" \
+--runs 3 -L PBF karlsruhe-regbez-latest,baden-wuerttemberg-latest,germany-latest \
 './rusty-routes-transformer-vector-handlers --input-pbf {PBF}.osm.pbf --output-pbf {PBF}.ors.pbf' \
 './rusty-routes-transformer-vector-handlers-cargo-opt --input-pbf {PBF}.osm.pbf --output-pbf {PBF}.ors.pbf' \
 './rusty-routes-transformer-vector-handlers-cargo-opt-build-perf --input-pbf {PBF}.osm.pbf --output-pbf {PBF}.ors.pbf' \
