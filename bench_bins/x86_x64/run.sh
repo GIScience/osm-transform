@@ -37,41 +37,19 @@ mkdir -p bench_results
 # Get date and time
 now=$(date +"%Y-%m-%d_%H-%M-%S")
 
-echo "Run karlsruhe-regbez-latest.osm.pbf benchmark..."
-json_file="bench_results/bench_results_karlsruhe-regbez-latest_${now}.json"
-markdown_file="bench_results/bench_results_karlsruhe-regbez-latest_${now}.md"
+json_file="bench_results/bench_results_karlsruhe_baden_wuerttemberg_${now}.json"
+markdown_file="bench_results/bench_results_karlsruhe_baden_wuerttemberg_${now}.md"
 hyperfine --export-json "${json_file}" --export-markdown "${markdown_file}" \
---runs 3 -L PBF karlsruhe-regbez-latest \
+--runs 3 -L PBF karlsruhe-regbez-latest,baden-wuerttemberg-latest \
 './rusty-routes-transformer-vector-handlers --input-pbf {PBF}.osm.pbf --output-pbf {PBF}.ors.pbf' \
 './rusty-routes-transformer-add-dockerfile-cargo-opt-build-perf --input-pbf {PBF}.osm.pbf --output-pbf {PBF}.ors.pbf' \
 './osm-transform -p {PBF}.osm.pbf' \
 './ors-preprocessor {PBF}.osm.pbf'
 
-echo "Run baden-wuerttemberg-latest.osm.pbf benchmark..."
-json_file="bench_results/bench_results_baden-wuerttemberg-latest_${now}.json"
-markdown_file="bench_results/bench_results_baden-wuerttemberg-latest_${now}.md"
+json_file="bench_results/bench_results_germany_planet${now}.json"
+markdown_file="bench_results/bench_results_germany_planet${now}.md"
 hyperfine --export-json "${json_file}" --export-markdown "${markdown_file}" \
---runs 1 -L PBF baden-wuerttemberg-latest \
-'./rusty-routes-transformer-vector-handlers --input-pbf {PBF}.osm.pbf --output-pbf {PBF}.ors.pbf' \
-'./rusty-routes-transformer-add-dockerfile-cargo-opt-build-perf --input-pbf {PBF}.osm.pbf --output-pbf {PBF}.ors.pbf' \
-'./osm-transform -p {PBF}.osm.pbf' \
-'./ors-preprocessor {PBF}.osm.pbf'
-
-echo "Run germany-latest.osm.pbf benchmark..."
-json_file="bench_results/bench_results_germany-latest_${now}.json"
-markdown_file="bench_results/bench_results_germany-latest_${now}.md"
-hyperfine --export-json "${json_file}" --export-markdown "${markdown_file}" \
---runs 1 -L PBF germany-latest \
-'./rusty-routes-transformer-vector-handlers --input-pbf {PBF}.osm.pbf --output-pbf {PBF}.ors.pbf' \
-'./rusty-routes-transformer-add-dockerfile-cargo-opt-build-perf --input-pbf {PBF}.osm.pbf --output-pbf {PBF}.ors.pbf' \
-'./osm-transform -p {PBF}.osm.pbf' \
-'./ors-preprocessor {PBF}.osm.pbf'
-
-echo "Run planet-latest.osm.pbf benchmark..."
-json_file="bench_results/bench_results_planet-latest_${now}.json"
-markdown_file="bench_results/bench_results_planet-latest_${now}.md"
-hyperfine --export-json "${json_file}" --export-markdown "${markdown_file}" \
---runs 1 -L PBF planet-latest \
+--runs 1 -L PBF germany-latest,planet-latest.osm.pbf \
 './rusty-routes-transformer-vector-handlers --input-pbf {PBF}.osm.pbf --output-pbf {PBF}.ors.pbf' \
 './rusty-routes-transformer-add-dockerfile-cargo-opt-build-perf --input-pbf {PBF}.osm.pbf --output-pbf {PBF}.ors.pbf' \
 './osm-transform -p {PBF}.osm.pbf' \
