@@ -22,7 +22,7 @@ fi
 if [ ! -f planet-latest.osm.pbf ]; then
   echo "Downloading planet-latest.osm.pbf"
   # curl with output to planet.osm.pbf and continue downloading if the download is interrupted
-  curl -L -O -C - https://planet.openstreetmap.org/pbf/planet-latest.osm.pbf
+  curl -L -O -C - https://ftp.fau.de/osm-planet/pbf/planet-latest.osm.pbf
 fi
 
 # Set environment variables. Important for the benchmark results.
@@ -41,7 +41,6 @@ json_file="bench_results/bench_results_karlsruhe_baden_wuerttemberg_${now}.json"
 markdown_file="bench_results/bench_results_karlsruhe_baden_wuerttemberg_${now}.md"
 hyperfine --export-json "${json_file}" --export-markdown "${markdown_file}" \
 --runs 3 -L PBF karlsruhe-regbez-latest,baden-wuerttemberg-latest \
-'./rusty-routes-transformer-vector-handlers --input-pbf {PBF}.osm.pbf --output-pbf {PBF}.ors.pbf' \
 './rusty-routes-transformer-add-dockerfile-cargo-opt-build-perf --input-pbf {PBF}.osm.pbf --output-pbf {PBF}.ors.pbf' \
 './osm-transform -p {PBF}.osm.pbf' \
 './ors-preprocessor {PBF}.osm.pbf'
@@ -50,7 +49,6 @@ json_file="bench_results/bench_results_germany_planet${now}.json"
 markdown_file="bench_results/bench_results_germany_planet${now}.md"
 hyperfine --export-json "${json_file}" --export-markdown "${markdown_file}" \
 --runs 1 -L PBF germany-latest,planet-latest.osm.pbf \
-'./rusty-routes-transformer-vector-handlers --input-pbf {PBF}.osm.pbf --output-pbf {PBF}.ors.pbf' \
 './rusty-routes-transformer-add-dockerfile-cargo-opt-build-perf --input-pbf {PBF}.osm.pbf --output-pbf {PBF}.ors.pbf' \
 './osm-transform -p {PBF}.osm.pbf' \
 './ors-preprocessor {PBF}.osm.pbf'
