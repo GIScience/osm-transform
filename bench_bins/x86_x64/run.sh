@@ -37,18 +37,18 @@ mkdir -p bench_results
 # Get date and time
 now=$(date +"%Y-%m-%d_%H-%M-%S")
 
-json_file="bench_results/bench_results_karlsruhe_baden_wuerttemberg_${now}.json"
-markdown_file="bench_results/bench_results_karlsruhe_baden_wuerttemberg_${now}.md"
-hyperfine --export-json "${json_file}" --export-markdown "${markdown_file}" \
---runs 3 -L PBF karlsruhe-regbez-latest,baden-wuerttemberg-latest \
-'./rusty-routes-transformer-add-dockerfile-cargo-opt-build-perf --input-pbf {PBF}.osm.pbf --output-pbf {PBF}.ors.pbf' \
-'./osm-transform -p {PBF}.osm.pbf' \
-'./ors-preprocessor {PBF}.osm.pbf'
+#json_file="bench_results/bench_results_karlsruhe_baden_wuerttemberg_${now}.json"
+#markdown_file="bench_results/bench_results_karlsruhe_baden_wuerttemberg_${now}.md"
+#hyperfine --export-json "${json_file}" --export-markdown "${markdown_file}" \
+#--runs 3 -L PBF karlsruhe-regbez-latest,baden-wuerttemberg-latest \
+#'./rusty-routes-transformer-add-dockerfile-cargo-opt-build-perf --input-pbf {PBF}.osm.pbf --output-pbf {PBF}.ors.pbf' \
+#'./osm-transform -p {PBF}.osm.pbf' \
+#'./ors-preprocessor {PBF}.osm.pbf'
 
 json_file="bench_results/bench_results_germany_planet${now}.json"
 markdown_file="bench_results/bench_results_germany_planet${now}.md"
 hyperfine --export-json "${json_file}" --export-markdown "${markdown_file}" \
---runs 1 -L PBF germany-latest,planet-latest.osm.pbf \
+--runs 1 -L PBF germany-latest,planet-latest \
 './rusty-routes-transformer-add-dockerfile-cargo-opt-build-perf --input-pbf {PBF}.osm.pbf --output-pbf {PBF}.ors.pbf' \
 './osm-transform -p {PBF}.osm.pbf' \
 './ors-preprocessor {PBF}.osm.pbf'
