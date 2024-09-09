@@ -28,7 +28,7 @@ impl Handler for NodeBuffer {
 
 #[test]
 fn test_libosmium() {
-    let file = "/home/jules/HeiGIT/repos/rust-parquet-osm-transform/benches/files/karlsruhe-regbez-latest.osm.pbf";
+    let file = "test/karlsruhe-regbez-latest.osm.pbf";
     println!("Current file name: {:?}", file);
     let mut nodes_single = Arc::new(AtomicUsize::new(0));
     let mut ways_single = Arc::new(AtomicUsize::new(0));

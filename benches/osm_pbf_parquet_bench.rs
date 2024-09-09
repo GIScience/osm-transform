@@ -7,7 +7,7 @@ pub fn criterion_benchmark(c: &mut Criterion) {
     c.bench_function("Bench 3", |b| {
         b.iter(|| {
             let args = Args::new(
-                "/home/jules/HeiGIT/repos/rust-parquet-osm-transform/benches/files/karlsruhe-regbez-latest.osm.pbf".to_string(),
+                "test/karlsruhe-regbez-latest.osm.pbf".to_string(),
                 "./test/bench-out/".to_string(),
                 0,
             );

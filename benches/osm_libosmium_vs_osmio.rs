@@ -73,7 +73,7 @@ impl Handler for AllBuffer {
 fn bench_libosmium_vs_osmio(c: &mut Criterion) {
     let mut group = c.benchmark_group("OSMIO Benchmark");
 
-    let file = "/home/jules/HeiGIT/repos/rust-parquet-osm-transform/benches/files/karlsruhe-regbez-latest.osm.pbf";
+    let file = "test/karlsruhe-regbez-latest.osm.pbf";
     println!("Current file name: {:?}", file);
     let nodes_single = Arc::new(AtomicUsize::new(0));
     let ways_single = Arc::new(AtomicUsize::new(0));

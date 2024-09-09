@@ -7,7 +7,7 @@ use std::sync::Arc;
 
 
 fn bench_count(c: &mut Criterion) {
-    let file = PathBuf::from("/home/jules/HeiGIT/repos/rust-parquet-osm-transform/benches/files/karlsruhe-regbez-latest.osm.pbf");
+    let file = PathBuf::from("test/karlsruhe-regbez-latest.osm.pbf");
     // print the current working directory
     println!("Current working directory: {:?}", std::env::current_dir().unwrap());
     #[cfg(feature = "rust-zlib")]

@@ -19,7 +19,7 @@ use serde::de::IntoDeserializer;
 fn bench_count(c: &mut Criterion) {
     let mut group = c.benchmark_group("OSMIO Benchmark");
 
-    let input_path = PathBuf::from("/home/jules/HeiGIT/repos/rust-parquet-osm-transform/benches/files/karlsruhe-regbez-latest.osm.pbf");
+    let input_path = PathBuf::from("test/karlsruhe-regbez-latest.osm.pbf");
     #[cfg(feature = "rust-zlib")]
     println!("Using rust-zlib (miniz_oxide)");
     #[cfg(feature = "zlib")]
