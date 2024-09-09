@@ -60,7 +60,7 @@ chrono = "0.4.37"
 osm-pbf-parquet = { git = "https://github.com/brad-richardson/osm-pbf-parquet.git" }
 osmpbf = { git = "https://github.com/b-r-u/osmpbf.git", features = ["rust-zlib"] }
 num_cpus = "1.16.0"
-libosmium = "0.3.1"
+libosmium = { git = "https://github.com/aoles/libosmium" }
 
 
 [[bench]]
