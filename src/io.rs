@@ -19,19 +19,9 @@ pub fn process_with_handler(config: &Config, handler_chain: &mut HandlerChain) -
     let reader = pbf::reader::Reader::new(&config.input_pbf)?;
 
     for element in reader.elements()? {
-        match element {
-            Element::Node { node } => {
-                handler_chain.process_node(node)
-            },
-            Element::Way { way } => {
-                handler_chain.process_way(way)
-            },
-            Element::Relation { relation } => {
-                handler_chain.process_relation(relation)
-            },
-            _ => (),
-        }
+        handler_chain.process(element);
     }
+    handler_chain.flush();
     log::info!("Finished pbf io pipeline, time: {}", stopwatch);
     Ok(())
 }

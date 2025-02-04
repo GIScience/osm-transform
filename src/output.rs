@@ -8,7 +8,7 @@ use osm_io::osm::pbf;
 use osm_io::osm::pbf::compression_type::CompressionType;
 use osm_io::osm::pbf::file_info::FileInfo;
 
-use crate::handler::{Handler, HandlerResult};
+use crate::handler::{Handler, HandlerResult, into_node_element, into_relation_element, into_way_element};
 
 pub struct OutputHandler {
     pub writer: pbf::writer::Writer,
@@ -31,23 +31,53 @@ impl OutputHandler {
     pub fn close(&mut self) {
         self.writer.close().expect("Failed to close writer");
     }
+    fn handle_node(&mut self, node: Node) -> Vec<Element> {
+        self.writer.write_element(Element::Node { node }).expect("Failed to write node");
+        vec![]
+    }
+
+    fn handle_way(&mut self, way: Way) -> Vec<Element> {
+        self.writer.write_element(Element::Way { way }).expect("Failed to write way");
+        vec![]
+    }
+
+
+    fn handle_relation(&mut self, relation: Relation) -> Vec<Element> {
+        self.writer.write_element(Element::Relation { relation }).expect("Failed to write relation");
+        vec![]
+    }
 }
 
 impl Handler for OutputHandler {
-    fn handle_node(&mut self, node: Node) -> Option<Node> {
-        self.writer.write_element(Element::Node { node }).expect("Failed to write node");
-        None
+    fn name(&self) -> String { "OutputHandler".to_string() }
+    fn handle_element(&mut self, element: Element) -> Vec<Element> {
+        match element {
+            Element::Node { node } => self.handle_node(node),
+            Element::Way { way } => self.handle_way(way),
+            Element::Relation { relation } => self.handle_relation(relation),
+            Element::Sentinel => vec![]
+        }
     }
 
-    fn handle_way(&mut self, way: Way) -> Option<Way> {
-        self.writer.write_element(Element::Way { way }).expect("Failed to write way");
-        None
+    fn handle_nodes(&mut self, elements: Vec<Node>) -> Vec<Node> {
+        for element in elements {
+            self.writer.write_element(into_node_element(element)).expect("Failed to write node");
+        }
+        Vec::new()
     }
 
+    fn handle_ways(&mut self, elements: Vec<Way>) -> Vec<Way> {
+        for element in elements {
+            self.writer.write_element(into_way_element(element)).expect("Failed to write way");
+        }
+        Vec::new()
+    }
 
-    fn handle_relation(&mut self, relation: Relation) -> Option<Relation> {
-        self.writer.write_element(Element::Relation { relation }).expect("Failed to write relation");
-        None
+    fn handle_relations(&mut self, elements: Vec<Relation>) -> Vec<Relation> {
+        for element in elements {
+            self.writer.write_element(into_relation_element(element)).expect("Failed to write relation");
+        }
+        Vec::new()
     }
 
     fn add_result(&mut self, result: HandlerResult) -> HandlerResult {

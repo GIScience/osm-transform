@@ -9,6 +9,7 @@ use btreemultimap::BTreeMultiMap;
 use csv::{ReaderBuilder, WriterBuilder};
 use geo::{BoundingRect, Contains, Coord, coord, Intersects, MultiPolygon, Rect};
 use geo::BooleanOps;
+use osm_io::osm::model::element::Element;
 use osm_io::osm::model::node::Node;
 use osm_io::osm::model::tag::Tag;
 use serde::Deserialize;
@@ -16,7 +17,7 @@ use wkt::{Geometry, ToWkt};
 use wkt::Wkt;
 
 use crate::Config;
-use crate::handler::Handler;
+use crate::handler::{Handler, into_node_element};
 
 const GRID_SIZE: usize = 64800;
 const AREA_ID_MULTIPLE: u16 = u16::MAX;
@@ -160,13 +161,10 @@ impl AreaHandler {
         }
         wtr.flush().expect("failed to flush");
     }
-}
-
-impl Handler for AreaHandler {
-    fn handle_node(&mut self, node: Node) -> Option<Node> {
+    fn handle_node(&mut self, node: &mut Node) {
         let mut result: Vec<String> = Vec::new();
         if node.coordinate().lat() >= 90.0 || node.coordinate().lat() <= -90.0 {
-            return None;
+            return;
         }
         let grid_index = (node.coordinate().lat() as i32 + 90) * 360 + (node.coordinate().lon() as i32 + 180);
         let coord = Coord {x: node.coordinate().lon(), y: node.coordinate().lat()};
@@ -187,45 +185,18 @@ impl Handler for AreaHandler {
         }
         let mut node = node;
         node.tags_mut().push(Tag::new("country".to_string(), result.join(",")));
-        Some(node)
+    }
+}
+
+impl Handler for AreaHandler {
+    fn name(&self) -> String { "AreaHandler".to_string() }
+    fn handle_nodes(&mut self, mut elements: Vec<Node>) -> Vec<Node> {
+        elements.iter_mut().for_each(|node| self.handle_node(node));
+        elements
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use std::collections::HashSet;
-    use crate::area::AreaHandler;
-    use crate::handler::{CountType, ElementCounter, HandlerChain, OsmElementTypeSelection};
-    use crate::io::process_with_handler;
-
-    use super::*;
-
-    #[test]
-    #[ignore] // fixme
-    fn test_area_handler() {
-        let config = Config {
-            input_pbf: PathBuf::from("test/baarle_small.pbf"),
-            output_pbf:  Some(PathBuf::from("output.pbf")),
-            country_csv: Some(PathBuf::from("test/mapping_test.csv")),
-            debug: 0,
-            with_node_filtering: false,
-            print_node_ids: HashSet::new(),
-            print_way_ids: HashSet::new(),
-            print_relation_ids: HashSet::new(),
-            remove_metadata: true
-        };
-
-        let mut area_handler = AreaHandler::new();
-        area_handler.load(config.country_csv.clone().unwrap()).expect("Area handler failed to load CSV file");
-
-        let mut handler_chain = HandlerChain::default()
-            .add(ElementCounter::new(OsmElementTypeSelection {node:true, way:false, relation:false}, CountType::ALL))
-            .add(area_handler)
-            .add(ElementCounter::new(OsmElementTypeSelection {node:true, way:false, relation:false}, CountType::ACCEPTED));
-
-        let _ = process_with_handler(&config, &mut handler_chain).expect("process_with_handler failed");
-        let result = handler_chain.collect_result();
-        println!("result: {:?}", result )
-    }
-
+    //TODO: Add unit tests for AreaHandler
 }

@@ -1,8 +1,12 @@
 pub mod io;
 pub mod area;
-pub mod handler;
 pub mod output;
 pub mod osm_model;
+pub mod srs;
+pub mod handler;
+
+#[macro_use]
+extern crate maplit;
 
 use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;
@@ -13,7 +17,13 @@ use log::LevelFilter;
 use regex::Regex;
 use crate::io::process_with_handler;
 use area::AreaHandler;
-use crate::handler::{HandlerChain, ComplexElementsFilter, OsmElementTypeSelection, ElementCounter, CountType, HandlerResult, AllElementsFilter, ReferencedNodeIdCollector, NodeIdFilter, TagFilterByKey, FilterType, ElementPrinter, MetadataRemover};
+use crate::handler::{HandlerChain, HandlerResult, OsmElementTypeSelection};
+use crate::handler::collect::{ReferencedNodeIdCollector};
+use crate::handler::filter::{AllElementsFilter, ComplexElementsFilter, FilterType, NodeIdFilter, TagFilterByKey};
+use crate::handler::geotiff::{BufferingElevationEnricher};
+use crate::handler::info::{CountType, ElementCounter, ElementPrinter};
+use crate::handler::modify::MetadataRemover;
+
 use crate::output::OutputHandler;
 
 
@@ -44,11 +54,11 @@ pub fn run(config: &Config) -> HandlerResult{
 }
 fn extract_referenced_nodes(config: &Config) -> HandlerResult {
     let mut handler_chain = HandlerChain::default()
-        .add(ElementCounter::new(OsmElementTypeSelection::all(), CountType::ALL))
+        .add(ElementCounter::new("initial"))
         .add(AllElementsFilter{handle_types: OsmElementTypeSelection::node_only()})
         .add(ComplexElementsFilter::ors_default())
         .add(ReferencedNodeIdCollector::default())
-        .add(ElementCounter::new(OsmElementTypeSelection::all(), CountType::ACCEPTED))
+        .add(ElementCounter::new("final"))
         ;
 
     log::info!("Starting extraction of referenced node ids...");
@@ -56,19 +66,37 @@ fn extract_referenced_nodes(config: &Config) -> HandlerResult {
     stopwatch.start();
     let _ = process_with_handler(config, &mut handler_chain).expect("Extraction of referenced node ids failed");
     let mut handler_result = handler_chain.collect_result();
+
     log::info!("Finished extraction of referenced node ids, time: {}", stopwatch);
-    log::info!("{}" , &handler_result.to_string());
+    if log::log_enabled!(log::Level::Trace)  {
+        log::trace!("Generating node-id statistics...");
+        log::trace!("{}" , &handler_result.to_string_with_node_ids());
+    }
+    else {
+        log::info!("{}" , &handler_result.to_string());
+    }
     stopwatch.reset();
     handler_result
 }
 
 fn process(config: &Config, node_filter_result: Option<HandlerResult>) -> HandlerResult {
+    let mut node_ids = None;
+    let mut skip_ele = None;
+
+    match node_filter_result {
+        None => {}
+        Some(result) => {
+            node_ids = Some(result.node_ids);
+            skip_ele = Some(result.skip_ele);
+        }
+    }
+
     let mut handler_chain = HandlerChain::default()
-        .add(ElementPrinter::with_prefix("input:----------------\n".to_string())
+        .add(ElementPrinter::with_prefix("\ninput:----------------\n".to_string())
             .with_node_ids(config.print_node_ids.clone())
             .with_way_ids(config.print_way_ids.clone())
             .with_relation_ids(config.print_relation_ids.clone()))
-        .add(ElementCounter::new(OsmElementTypeSelection::all(), CountType::ALL));
+        .add(ElementCounter::new("initial"));
 
     if config.remove_metadata {
         handler_chain = handler_chain.add(MetadataRemover::default())
@@ -76,14 +104,10 @@ fn process(config: &Config, node_filter_result: Option<HandlerResult>) -> Handle
 
     handler_chain = handler_chain.add(ComplexElementsFilter::ors_default());
 
-    match node_filter_result {
-        None => {}
-        Some(result) => {
-            log::debug!("Cloning result node_ids with len={}", result.node_ids.len());
-            let node_id_filter = NodeIdFilter { node_ids: result.node_ids.clone() };
-            log::debug!("node_id_filter has node_ids with len={}", node_id_filter.node_ids.len());
-            handler_chain = handler_chain.add(node_id_filter);
-        }
+    if node_ids.is_some() {
+        let node_id_filter = NodeIdFilter { node_ids: node_ids.unwrap() };
+        log::debug!("node_id_filter has node_ids with len={}", node_id_filter.node_ids.len());
+        handler_chain = handler_chain.add(node_id_filter);
     }
 
     let mut stopwatch = StopWatch::new();
@@ -101,16 +125,26 @@ fn process(config: &Config, node_filter_result: Option<HandlerResult>) -> Handle
         None => ()
     }
 
-    //todo add elevation processing
+    if &config.elevation_tiffs.len() > &0 {
+        log::info!("Initializing elevation enricher");
+        stopwatch.start();
+        let mut elevation_enricher = BufferingElevationEnricher::new(config.elevation_batch_size, config.elevation_total_buffer_size, skip_ele);
+        for elevation_glob_pattern in &config.elevation_tiffs {
+            elevation_enricher.init(elevation_glob_pattern);
+        }
+        log::info!("Finished initializing elevation enricher, time: {}", stopwatch);
+        handler_chain = handler_chain.add(elevation_enricher);
+        stopwatch.reset();
+    }
 
     handler_chain = handler_chain.add(TagFilterByKey::new(
         OsmElementTypeSelection::all(),
         Regex::new("(.*:)?source(:.*)?|(.*:)?note(:.*)?|url|created_by|fixme|wikipedia").unwrap(),
         FilterType::RemoveMatching));
 
-    handler_chain = handler_chain.add(ElementCounter::new(OsmElementTypeSelection::all(), CountType::ACCEPTED));
+    handler_chain = handler_chain.add(ElementCounter::new("final"));
 
-    handler_chain = handler_chain.add(ElementPrinter::with_prefix("output:----------------\n".to_string())
+    handler_chain = handler_chain.add(ElementPrinter::with_prefix("\noutput:----------------\n".to_string())
         .with_node_ids(config.print_node_ids.clone())
         .with_way_ids(config.print_way_ids.clone())
         .with_relation_ids(config.print_relation_ids.clone()));
@@ -143,10 +177,13 @@ pub struct Config {
     pub input_pbf: PathBuf,
     pub country_csv: Option<PathBuf>,
     pub output_pbf: Option<PathBuf>,
+    pub elevation_tiffs: Vec<String>,
     pub with_node_filtering: bool,
     pub debug: u8,
     pub print_node_ids: HashSet<i64>,
     pub print_way_ids: HashSet<i64>,
     pub print_relation_ids: HashSet<i64>,
     pub remove_metadata: bool,
+    pub elevation_batch_size: usize,
+    pub elevation_total_buffer_size: usize,
 }
