@@ -98,11 +98,10 @@ impl SplittingOutputHandler {
         file_info.with_writingprogram_str("rusty-routes");
 
         let base_name = output_path.file_stem().expect("Failed to get file stem").to_str().expect("Failed to convert file stem to string");
-        let nodes_path = PathBuf::from(format!("{}nodes.pbf", base_name));
-        let ways_relations_path = PathBuf::from(format!("{}ways_relations.pbf", base_name));
+        let ways_relations_path = PathBuf::from(format!("{}_ways_relations.pbf", base_name));
 
         Self {
-            node_writer: pbf::writer::Writer::from_file_info(nodes_path, file_info.clone(), CompressionType::Zlib).expect("Failed to create node output writer"),
+            node_writer: pbf::writer::Writer::from_file_info(output_path, file_info.clone(), CompressionType::Zlib).expect("Failed to create node output writer"),
             way_relation_writer: pbf::writer::Writer::from_file_info(ways_relations_path, file_info.clone(), CompressionType::Zlib).expect("Failed to create way_relation output writer"),
         }
     }
