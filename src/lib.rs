@@ -24,7 +24,7 @@ use crate::handler::geotiff::{BufferingElevationEnricher};
 use crate::handler::info::{CountType, ElementCounter, ElementPrinter};
 use crate::handler::modify::MetadataRemover;
 
-use crate::output::OutputHandler;
+use crate::output::{SimpleOutputHandler, SplittingOutputHandler};
 
 
 pub fn init(config: &Config) {
@@ -149,13 +149,20 @@ fn process(config: &Config, node_filter_result: Option<HandlerResult>) -> Handle
         .with_way_ids(config.print_way_ids.clone())
         .with_relation_ids(config.print_relation_ids.clone()));
 
+
     match &config.output_pbf {
         Some(path_buf) => {
             log::info!("Initializing ouput handler");
             stopwatch.start();
-            let mut output_handler = OutputHandler::new(path_buf.clone());
-            output_handler.init();
-            handler_chain = handler_chain.add(output_handler);
+            if config.elevation_way_splitting {
+                let mut output_handler = SplittingOutputHandler::new(path_buf.clone());
+                output_handler.init();
+                handler_chain = handler_chain.add(output_handler);
+            } else {
+                let mut output_handler = SimpleOutputHandler::new(path_buf.clone());
+                output_handler.init();
+                handler_chain = handler_chain.add(output_handler);
+            }
             stopwatch.reset();
         }
         None => {}
@@ -186,4 +193,5 @@ pub struct Config {
     pub remove_metadata: bool,
     pub elevation_batch_size: usize,
     pub elevation_total_buffer_size: usize,
+    pub elevation_way_splitting: bool,
 }

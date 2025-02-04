@@ -36,7 +36,7 @@ pub fn into_vec_relation_element(relation: Relation) -> Vec<Element> { vec![into
 pub trait Handler {
 
     fn name(&self) -> String;
-
+    #[deprecated]
     fn handle_element(&mut self, element: Element) -> Vec<Element> {
         vec![element]
     }
@@ -65,6 +65,7 @@ pub trait Handler {
         self.handle_relations(elements)
     }
 
+    #[deprecated]
     fn handle_and_flush_elements(&mut self, elements: Vec<Element>) -> Vec<Element> {
         let mut handeled = vec![];
         for element in elements {

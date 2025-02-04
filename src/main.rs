@@ -43,6 +43,10 @@ pub struct Args {
     #[arg(short = 'B', long, default_value = "50000000")]
     pub elevation_total_buffer_size: usize,
 
+    /// Split ways at elevation changes.
+    #[arg(long)]
+    pub elevation_way_splitting: bool,
+
     /// Turn debugging information on.
     #[arg(short = 'd', long, action = clap::ArgAction::Count)]
     pub debug: u8,
@@ -65,8 +69,7 @@ pub struct Args {
 
     /// Do NOT remove metadata 'version', 'timestamp', 'changeset', 'uid', 'user'
     #[arg(long)]
-    pub keep_metadata: bool
-
+    pub keep_metadata: bool,
 }
 impl Args {
     pub fn to_config(mut self) -> Config {
@@ -77,6 +80,7 @@ impl Args {
             elevation_tiffs: self.elevation_tiffs,
             elevation_batch_size: self.elevation_batch_size,
             elevation_total_buffer_size: self.elevation_total_buffer_size,
+            elevation_way_splitting: self.elevation_way_splitting,
             debug: self.debug,
             with_node_filtering: ! self.suppress_node_filtering,
             print_node_ids: HashSet::from_iter(self.print_node_ids),
