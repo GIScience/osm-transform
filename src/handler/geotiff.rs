@@ -299,15 +299,19 @@ pub(crate) struct BufferingElevationEnricher {
     nodes_for_geotiffs: HashMap<String, Vec<Node>>,
     srs_resolver: DynamicSrsResolver,
     max_buffer_len: usize,
+    total_buffered_nodes_max: usize,
+    total_buffered_nodes_count: usize,
     skip_ele: Option<BitVec>,
 }
 impl BufferingElevationEnricher {
-    pub fn new(max_buffer_len: usize, max_buffered_nodes: usize, skip_ele: Option<BitVec>) -> Self {
+    pub fn new(max_buffer_len: usize, total_buffered_nodes_max: usize, skip_ele: Option<BitVec>) -> Self {
         Self {
             geotiff_manager: GeoTiffManager::new(),
             nodes_for_geotiffs: HashMap::new(),
             srs_resolver: DynamicSrsResolver::new(),
+            total_buffered_nodes_count: 0,
             max_buffer_len,
+            total_buffered_nodes_max,
             skip_ele: skip_ele,
         }
     }
@@ -326,7 +330,7 @@ impl BufferingElevationEnricher {
 
         let geotiff_name = geotiffs.first().unwrap().to_string();
         self.nodes_for_geotiffs.entry(geotiff_name.clone()).or_insert_with(Vec::new).push(node); //todo avoid clone String
-
+        self.total_buffered_nodes_count = self.total_buffered_nodes_count + 1;
         (Some(geotiff_name), None)
     }
 
@@ -337,6 +341,7 @@ impl BufferingElevationEnricher {
         log::debug!("Handling and flushing buffer with {} buffered nodes for geotiff '{}'", buffer_vec.len(), buffer_name);
         let geotiff = &mut self.geotiff_manager.load_geotiff(buffer_name.as_str(), &self.srs_resolver).expect("could not load geotiff");
         buffer_vec.iter_mut().for_each(|node| if !self.skip_elevation(node) { self.add_elevation_tag(geotiff, node) });
+        self.total_buffered_nodes_count = self.total_buffered_nodes_count - buffer_vec.len();
         buffer_vec
     }
 
@@ -380,10 +385,10 @@ impl BufferingElevationEnricher {
                         }
                     }
                     Some(buffer_vec) => {
-                        if buffer_vec.len() >= self.max_buffer_len {
+                        if buffer_vec.len() > self.max_buffer_len {
                             self.handle_and_flush_buffer(buffer_name) //elevation setzen, zrückgeben
                         } else {
-                            vec![]
+                            self.flush_largest_buffers_when_total_max_reached()
                         }
                     }
                 }
@@ -391,11 +396,44 @@ impl BufferingElevationEnricher {
         }
     }
 
+    fn flush_largest_buffers_when_total_max_reached(&mut self) -> Vec<Node> {
+        if self.total_buffered_nodes_count > self.total_buffered_nodes_max {
+            let buffer_lengths = self.get_buffer_lengths_sorted_desc();
+            // let num_buffers_to_flush = (buffer_lengths.len() as f64 * 0.5) as usize;
+            let num_buffers_to_flush = buffer_lengths.len() / 2;
+            let buffers_to_flush = self.get_most_filled_buffers(num_buffers_to_flush);
+            log::debug!("maximum number of {} cached nodes reached - flushing the {} most filled buffers", self.total_buffered_nodes_max, num_buffers_to_flush);
+            return self.handle_and_flush_buffers(buffers_to_flush);
+        }
+        vec![]
+    }
+
+    fn get_most_filled_buffers(&mut self, num_buffers: usize) -> Vec<String> {
+        let buffer_lengths = self.get_buffer_lengths_sorted_desc();
+        buffer_lengths.iter().take(num_buffers).map(|(k, _)| k.to_string()).collect()
+    }
+
+    fn get_buffer_lengths_sorted_desc(&mut self) -> Vec<(&String, usize)> {
+        let mut key_lengths: Vec<(&String, usize)> = self.nodes_for_geotiffs.iter()
+            .map(|(key, value)| (key, value.len()))
+            .collect();
+        key_lengths.sort_by(|a, b| b.1.cmp(&a.1));
+        key_lengths
+    }
+
     fn skip_elevation(&mut self, node: &Node) -> bool {
         if self.skip_ele.is_some() {
             return self.skip_ele.as_ref().unwrap().get(node.id() as usize).unwrap_or(false);
         }
         false
+    }
+
+    fn handle_and_flush_buffers(&mut self, buffers: Vec<String>) -> Vec<Node> {
+        let mut result = Vec::new();
+        for buffer_name in buffers {
+            result.extend(self.handle_and_flush_buffer(buffer_name));
+        }
+        result
     }
 }
 
@@ -432,6 +470,7 @@ mod tests {
 
     use epsg::CRS;
     use georaster::geotiff::{GeoTiffReader, RasterValue};
+    use itertools::Itertools;
     use osm_io::osm::model::coordinate::Coordinate;
     use osm_io::osm::model::node::Node;
     use osm_io::osm::model::tag::Tag;
@@ -920,5 +959,33 @@ mod tests {
         ]);
         validate_has_ids(&probably_3_elements, vec![5, 10, 22]);
         validate_all_have_elevation_tag(&probably_3_elements);
+    }
+
+    #[test]
+    fn buffering_elevation_enricher_total_max_reached() {
+        let _ = SimpleLogger::new().init();
+        let mut handler = BufferingElevationEnricher::new(5, 6, None);
+        let _ = handler.init("test/region*.tif");
+
+        // The first elements should be buffered in the buffers for their tiffs
+        assert_eq!(0usize, handler.handle_node(simple_node_element_limburg(1, vec![])).len());
+        assert_eq!(0usize, handler.handle_node(simple_node_element_limburg(2, vec![])).len());
+        assert_eq!(0usize, handler.handle_node(simple_node_element_limburg(3, vec![])).len());
+        assert_eq!(0usize, handler.handle_node(simple_node_element_limburg(4, vec![])).len());
+        assert_eq!(0usize, handler.handle_node(simple_node_element_hd_ma(5, vec![])).len());
+        assert_eq!(0usize, handler.handle_node(simple_node_element_hd_ma(6, vec![])).len());
+
+        // Now let's check the buffer sizes
+        assert_eq!(vec!["test/region_limburg_an_der_lahn.tif", "test/region_heidelberg_mannheim.tif"], handler.get_most_filled_buffers(5));
+        assert_eq!(vec!["test/region_limburg_an_der_lahn.tif", "test/region_heidelberg_mannheim.tif"], handler.get_most_filled_buffers(2));
+        assert_eq!(vec!["test/region_limburg_an_der_lahn.tif"], handler.get_most_filled_buffers(1));
+
+        // The next element should trigger the flush of the limburg buffer, which is the most filled one
+        // assert_eq!(0usize, handler.handle_node(simple_node_element_hd_ma(7, vec![])).len());
+        let expected_flushed_limburg_nodes = handler.handle_node(simple_node_element_hd_ma(7, vec![]));
+        assert_eq!(4usize, expected_flushed_limburg_nodes.len());
+        let expected_ids = vec![1, 2, 3, 4];
+        let actual_ids: Vec<i64> = expected_flushed_limburg_nodes.iter().map(|node| node.id()).collect();
+        assert!(expected_ids.iter().all(|id| actual_ids.contains(id)), "Not all expected IDs are present");
     }
 }
