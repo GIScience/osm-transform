@@ -244,14 +244,7 @@ pub(crate) struct NodeIdFilter {
     pub(crate) node_ids: BitVec
 }
 impl NodeIdFilter {
-    fn default() -> Self {
-        Self::with_capacity(HIGHEST_NODE_ID as usize)
-    }
-    fn with_capacity(nbits: usize) -> Self {
-        NodeIdFilter {
-            node_ids: BitVec::from_elem(nbits, false)
-        }
-    }
+
     fn handle_node(&mut self, node: Node) -> Vec<Element> {
         match self.node_ids.get(node.id().clone() as usize).unwrap_or(false) {
             true => {

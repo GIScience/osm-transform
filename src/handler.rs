@@ -7,7 +7,7 @@ pub mod geotiff;
 pub(crate) mod interpolate;
 pub(crate) mod skip_ele;
 
-use std::collections::{BTreeMap, HashMap, HashSet};
+use std::collections::{BTreeMap, HashMap};
 
 use bit_vec::BitVec;
 use osm_io::osm::model::element::Element;
@@ -41,7 +41,7 @@ pub trait Handler {
         vec![element]
     }
 
-    fn handle_nodes(&mut self, mut elements: Vec<Node>) -> Vec<Node> {
+    fn handle_nodes(&mut self, elements: Vec<Node>) -> Vec<Node> {
         elements
     }
 
@@ -49,19 +49,19 @@ pub trait Handler {
         elements
     }
 
-    fn handle_relations(&mut self, mut elements: Vec<Relation>) -> Vec<Relation> {
+    fn handle_relations(&mut self, elements: Vec<Relation>) -> Vec<Relation> {
         elements
     }
 
-    fn handle_and_flush_nodes(&mut self, mut elements: Vec<Node>) -> Vec<Node> {
+    fn handle_and_flush_nodes(&mut self, elements: Vec<Node>) -> Vec<Node> {
         self.handle_nodes(elements)
     }
 
-    fn handle_and_flush_ways(&mut self, mut elements: Vec<Way>) -> Vec<Way> {
+    fn handle_and_flush_ways(&mut self, elements: Vec<Way>) -> Vec<Way> {
         self.handle_ways(elements)
     }
 
-    fn handle_and_flush_relations(&mut self, mut elements: Vec<Relation>) -> Vec<Relation> {
+    fn handle_and_flush_relations(&mut self, elements: Vec<Relation>) -> Vec<Relation> {
         self.handle_relations(elements)
     }
 
@@ -576,7 +576,7 @@ pub(crate) mod tests {
     /// still buffered will be flushed: handled and passed to downstream processors.
     /// The test uses TestOnlyElementBufferingDuplicatingEditingProcessor for this.
     fn test_chain_with_buffer() {
-        SimpleLogger::new().init();
+        let _ = SimpleLogger::new().init();
         let mut processor_chain = HandlerChain::default()
             .add(ElementCounter::new("initial"))
             .add(TestOnlyOrderRecorder::new("initial"))
@@ -614,7 +614,7 @@ pub(crate) mod tests {
     /// that are processed by downstream processors.
     /// The test uses TestOnlyElementMixedAdder for this.
     fn test_chain_with_mixed_element_adder() {
-        SimpleLogger::new().init();
+        let _ = SimpleLogger::new().init();
         let mut processor_chain = HandlerChain::default()
             .add(ElementCounter::new("initial"))
             .add(TestOnlyOrderRecorder::new("initial"))
@@ -647,7 +647,7 @@ pub(crate) mod tests {
     /// that are processed by downstream processors.
     /// The test uses TestOnlyElementAdder for this.
     fn test_chain_with_element_adder() {
-        SimpleLogger::new().init();
+        let _ = SimpleLogger::new().init();
         let mut processor_chain = HandlerChain::default()
             .add(ElementCounter::new("initial"))
             .add(TestOnlyOrderRecorder::new("initial"))
@@ -681,7 +681,7 @@ pub(crate) mod tests {
     /// Assert that it is possible to run the chain and let processors permanently filter (remove) elements.
     /// The test uses TestOnlyElementFilter for this, which filters nodes with an even id.
     fn test_chain_with_element_filter() {
-        SimpleLogger::new().init();
+        let _ = SimpleLogger::new().init();
         let mut processor_chain = HandlerChain::default()
             .add(ElementCounter::new("initial"))
             .add(TestOnlyOrderRecorder::new("initial"))
@@ -715,7 +715,7 @@ pub(crate) mod tests {
     /// e.g. copies of received elements.
     /// The test uses TestOnlyElementReplacer for this, which replaces node#6 with a new instance.
     fn test_chain_with_element_replacer() {
-        SimpleLogger::new().init();
+        let _ = SimpleLogger::new().init();
         let mut processor_chain = HandlerChain::default()
             .add(ElementCounter::new("initial"))
             .add(TestOnlyOrderRecorder::new("initial"))
@@ -753,7 +753,7 @@ pub(crate) mod tests {
     /// The TestOnlyElementModifier also changes values of tags "who" to upper case,
     /// which is not explicitly asserted.
     fn test_chain_with_element_modifier() {
-        SimpleLogger::new().init();
+        let _ = SimpleLogger::new().init();
         let mut processor_chain = HandlerChain::default()
             .add(ElementCounter::new("initial"))
             .add(TestOnlyOrderRecorder::new("initial"))
@@ -792,7 +792,7 @@ pub(crate) mod tests {
 
     #[test]
     fn handler_chain() {
-        SimpleLogger::new().init();
+        let _ = SimpleLogger::new().init();
         let chain = HandlerChain::default()
             .add(ElementCounter::new("initial"))
             .add(TagValueBasedOsmElementsFilter::new(
@@ -813,7 +813,7 @@ pub(crate) mod tests {
 
     #[test]
     fn handler_chain_with_node_id_filter() {
-        SimpleLogger::new().init();
+        let _ = SimpleLogger::new().init();
         let mut node_ids = BitVec::from_elem(10usize, false);
         node_ids.set(1usize, true);
         node_ids.set(2usize, true);

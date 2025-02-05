@@ -16,7 +16,6 @@ use crate::handler::Handler;
 use crate::srs::DynamicSrsResolver;
 
 pub struct GeoTiff {
-    file_path: String,
     proj_wgs_84: Proj,
     proj_tiff: Proj,
     top_left_x: f64,
@@ -165,7 +164,7 @@ impl GeoTiffManager {
     pub fn load_geotiff(&mut self, file_path: &str, srs_resolver: &DynamicSrsResolver) -> Result<GeoTiff, Box<dyn Error>> {
         log::debug!("Loading geotiff {}", file_path);
         let img_file = BufReader::new(File::open(file_path).expect("Could not open input file"));
-        let mut geotiffreader = GeoTiffReader::open(img_file).expect("Could not read input file as tiff");
+        let geotiffreader = GeoTiffReader::open(img_file).expect("Could not read input file as tiff");
 
         let origin = geotiffreader.origin().unwrap();
         let pixel_size = geotiffreader.pixel_size().unwrap();
@@ -179,7 +178,6 @@ impl GeoTiffManager {
         let proj_tiff = Proj::from_epsg_code(proj_tiff as u16).unwrap(); //as u16 should not be necessary, SrsResolver should return u16
 
         let geo_tiff = GeoTiff {
-            file_path: file_path.to_string(),
             proj_wgs_84: proj_wgs84,
             proj_tiff: proj_tiff,
             top_left_x: origin[0],
@@ -194,12 +192,6 @@ impl GeoTiffManager {
     }
     fn find_geotiff_id_for_wgs84_coord(&mut self, lon: f64, lat: f64) -> Vec<String> {
         self.index.find_geotiff_id_for_wgs84_coord(lon, lat)
-    }
-    fn get_geotiff_by_id(&mut self, geotiff_id: &str) -> Option<String> {
-        self.index.get_geotiff_by_id(geotiff_id)
-    }
-    fn get_geotiff_count(&mut self) -> usize {
-        self.index.get_geotiff_count()
     }
 }
 
@@ -305,11 +297,8 @@ impl PointDistance for RSBoundingBox {
 pub(crate) struct BufferingElevationEnricher {
     geotiff_manager: GeoTiffManager,
     nodes_for_geotiffs: HashMap<String, Vec<Node>>,
-    node_counts_for_geotiffs: HashMap<String, usize>,
     srs_resolver: DynamicSrsResolver,
     max_buffer_len: usize,
-    max_buffered_nodes: usize,
-    all_buffers_flushed: bool,
     skip_ele: Option<BitVec>,
 }
 impl BufferingElevationEnricher {
@@ -317,21 +306,14 @@ impl BufferingElevationEnricher {
         Self {
             geotiff_manager: GeoTiffManager::new(),
             nodes_for_geotiffs: HashMap::new(),
-            node_counts_for_geotiffs: HashMap::new(),
             srs_resolver: DynamicSrsResolver::new(),
             max_buffer_len,
-            max_buffered_nodes,
-            all_buffers_flushed: false,
             skip_ele: skip_ele,
         }
     }
     pub fn init(&mut self, file_pattern: &str) -> Result<(), Box<dyn Error>> {
         self.geotiff_manager.load_and_index_geotiffs(file_pattern, &self.srs_resolver);
         Ok(())
-    }
-    fn use_loader(mut self, geo_tiff_loader: GeoTiffManager) -> Self {
-        self.geotiff_manager = geo_tiff_loader;
-        self
     }
 
     /// Only add node to (new) buffer, nothing else.
@@ -358,7 +340,7 @@ impl BufferingElevationEnricher {
         buffer_vec
     }
 
-    fn add_elevation_tag(&mut self, mut geotiff: &mut GeoTiff, mut node: &mut Node) {
+    fn add_elevation_tag(&mut self, geotiff: &mut GeoTiff, node: &mut Node) {
         let result = geotiff.get_string_value_for_wgs_84(node.coordinate().lon(), node.coordinate().lat());
         match result {
             None => {
@@ -428,11 +410,11 @@ impl Handler for BufferingElevationEnricher {
         result
     }
 
-    fn handle_and_flush_nodes(&mut self, mut elements: Vec<Node> ) -> Vec<Node> {
+    fn handle_and_flush_nodes(&mut self, elements: Vec<Node> ) -> Vec<Node> {
         log::debug!("{}: handle_and_flush_nodes called", self.name());
         let mut result = self.handle_nodes(elements);
 
-        let mut buffers: Vec<String> = self.nodes_for_geotiffs.iter()
+        let buffers: Vec<String> = self.nodes_for_geotiffs.iter()
             .map(|(k, v)| k.to_string())
             .collect();
         for buffer_name in buffers {
@@ -485,7 +467,7 @@ mod tests {
     #[test]
     #[ignore]
     fn test_find_geotiff_id_for_wgs84_coord_srtm_ma_hd() {
-        SimpleLogger::new().init();
+        let _ = SimpleLogger::new().init();
         let srs_resolver = DynamicSrsResolver::new();
         let mut geotiff_loader = GeoTiffManager::new();
         geotiff_loader.load_and_index_geotiffs("test/srtm*.tif", &srs_resolver);
@@ -555,7 +537,6 @@ mod tests {
         let img_file = BufReader::new(File::open(file_path).expect("Could not open input file"));
         let mut geotiffreader = GeoTiffReader::open(img_file).expect("Could not read input file as tiff");
         GeoTiff {
-            file_path: file_path.to_string(),
             proj_wgs_84: Proj::from_epsg_code(4326).unwrap(),
             proj_tiff: proj_tiff,
             top_left_x: 0.0,
@@ -582,17 +563,6 @@ mod tests {
         let tags_obj = tags.iter().map(|(k, v)| Tag::new(k.to_string(), v.to_string())).collect();
         Node::new(id, 1, wgs84_coordinate_hd_river().as_coordinate(), 1, 1, 1, "a".to_string(), true, tags_obj)
     }
-    fn validate_node_id(id: i64, element_option: &Option<&Element>) {
-        if element_option.is_none() {
-            panic!("expected some element")
-        }
-        match element_option.unwrap() {
-            Element::Node { node } => {
-                assert_eq!(id, node.id())
-            }
-            _ => panic!("expected a node element")
-        }
-    }
     fn validate_has_ids(elements: &Vec<Node>, ids: Vec<i64>) {
         let element_ids = elements.into_iter().map(|node| node.id()).collect::<Vec<_>>();
         assert!(element_ids.iter().all(|id| ids.contains(id)));
@@ -611,7 +581,7 @@ mod tests {
     }
     #[test]
     fn test_load_geotiffs() {
-        SimpleLogger::new().init();
+        let _ = SimpleLogger::new().init();
         let srs_resolver = DynamicSrsResolver::new();
         let mut geotiff_loader = GeoTiffManager::new();
         geotiff_loader.load_and_index_geotiffs("test/region*.tif", &srs_resolver);
@@ -620,7 +590,7 @@ mod tests {
     }
     #[test]
     fn test_find_geotiff_id_for_wgs84_coord() {
-        SimpleLogger::new().init();
+        let _ = SimpleLogger::new().init();
         let srs_resolver = DynamicSrsResolver::new();
         let mut geotiff_loader = GeoTiffManager::new();
         geotiff_loader.load_and_index_geotiffs("test/region*.tif", &srs_resolver);
@@ -633,7 +603,7 @@ mod tests {
 
     #[test]
     fn test_find_geotiff_id_for_wgs84_coord_ma_hd() {
-        SimpleLogger::new().init();
+        let _ = SimpleLogger::new().init();
         let srs_resolver = DynamicSrsResolver::new();
         let mut geotiff_loader = GeoTiffManager::new();
         geotiff_loader.load_and_index_geotiffs("test/region*.tif", &srs_resolver);
@@ -646,7 +616,7 @@ mod tests {
     #[test]
     #[ignore]
     fn test_find_geotiff_id_for_wgs84_coord_ma_hd_srtm() {
-        SimpleLogger::new().init();
+        let _ = SimpleLogger::new().init();
         let srs_resolver = DynamicSrsResolver::new();
         let mut geotiff_loader = GeoTiffManager::new();
         geotiff_loader.load_and_index_geotiffs("test/region*.tif", &srs_resolver);
@@ -749,11 +719,11 @@ mod tests {
     }
     fn proj_methods(value: &str, source: &str, srs_resolver: &DynamicSrsResolver) {
         println!("\n{value} ({source}):");
-        dbg!(Proj::from_proj_string(value));
-        dbg!(Proj::from_user_string(value));
-        dbg!(CRS::try_from(value.to_string()));
-        dbg!(epsg::references::get_name(value));
-        dbg!(srs_resolver.get_epsg(value.to_string()));
+        let _ = dbg!(Proj::from_proj_string(value));
+        let _ = dbg!(Proj::from_user_string(value));
+        let _ = dbg!(CRS::try_from(value.to_string()));
+        let _ = dbg!(epsg::references::get_name(value));
+        let _ = dbg!(srs_resolver.get_epsg(value.to_string()));
     }
 
     #[test]
@@ -810,7 +780,7 @@ mod tests {
         //values taken from https://github.com/3liz/proj4rs/
         let mut point_3d = (198236.3200000003, 453407.8560000006, 0.0);
         dbg!(&point_3d);
-        proj4rs::transform::transform(
+        let _ = proj4rs::transform::transform(
             &Proj::from_epsg_code(5174).expect("not found"),
             &Proj::from_epsg_code(4326).expect("not found"),
             &mut point_3d);
@@ -916,9 +886,9 @@ mod tests {
 
     #[test]
     fn buffering_elevation_enricher_test() {
-        SimpleLogger::new().init();
+        let _ = SimpleLogger::new().init();
         let mut handler = BufferingElevationEnricher::new(4, 5, None);
-        handler.init("test/region*.tif");
+        let _ = handler.init("test/region*.tif");
 
         // The first elements should be buffered in the buffer for their tiff
         assert_eq!(0usize, handler.handle_node(simple_node_element_limburg(1, vec![])).len());

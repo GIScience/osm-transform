@@ -21,6 +21,13 @@ pub fn process_with_handler(config: &Config, handler_chain: &mut HandlerChain) -
 
 #[cfg(test)]
 mod tests {
+    use std::path::PathBuf;
+    use osm_io::osm::model::coordinate::Coordinate;
+    use osm_io::osm::model::element::Element;
+    use osm_io::osm::model::node::Node;
+    use osm_io::osm::model::tag::Tag;
+    use osm_io::osm::pbf::compression_type::CompressionType;
+    use osm_io::osm::pbf::file_info::FileInfo;
     use pbf::reader::Reader;
 
     use super::*;

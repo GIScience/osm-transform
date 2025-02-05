@@ -1,5 +1,3 @@
-#[macro_use]
-extern crate maplit;
 use std::collections::HashSet;
 use std::path::PathBuf;
 
@@ -72,7 +70,7 @@ pub struct Args {
     pub keep_metadata: bool,
 }
 impl Args {
-    pub fn to_config(mut self) -> Config {
+    pub fn to_config(self) -> Config {
         Config {
             input_pbf: self.input_pbf,
             country_csv: self.country_csv,

@@ -12,6 +12,7 @@ fn base_config() -> Config {
         elevation_tiffs: vec![],
         elevation_batch_size: 10000,
         elevation_total_buffer_size: 50000,
+        elevation_way_splitting: false,
         remove_metadata: false,
         with_node_filtering: false,
         print_node_ids: HashSet::new(),

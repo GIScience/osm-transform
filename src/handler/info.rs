@@ -7,11 +7,6 @@ use osm_io::osm::model::way::Way;
 
 use crate::handler::{HandlerResult, OsmElementTypeSelection, Handler};
 
-#[derive(Debug)]
-pub(crate) enum CountType {
-    ALL,
-    ACCEPTED,
-}
 pub(crate) struct ElementCounter {
     pub nodes_count: u64,
     pub ways_count: u64,
@@ -110,21 +105,6 @@ impl ElementPrinter {
         }
         self
     }
-    pub(crate) fn print_node(mut self, id: i64) -> Self {
-        self.handle_types.node = true;
-        self.node_ids.insert(id);
-        self
-    }
-    pub(crate) fn print_way(mut self, id: i64) -> Self {
-        self.handle_types.way = true;
-        self.way_ids.insert(id);
-        self
-    }
-    pub(crate) fn print_relation(mut self, id: i64) -> Self {
-        self.handle_types.relation = true;
-        self.relation_ids.insert(id);
-        self
-    }
 
     fn handle_node(&mut self, node: &Node) {
         if self.handle_types.node && self.node_ids.contains(&node.id()) {
@@ -197,6 +177,27 @@ impl Handler for ElementPrinter {
             Element::Sentinel => { vec![] }
         }
     }
+
+    fn handle_nodes(&mut self, elements: Vec<Node>) -> Vec<Node> {
+        for node in &elements {
+            self.handle_node(node);
+        }
+        elements
+    }
+
+    fn handle_ways(&mut self, elements: Vec<Way>) -> Vec<Way> {
+        for way in &elements {
+            self.handle_way(way);
+        }
+        elements
+    }
+
+    fn handle_relations(&mut self, elements: Vec<Relation>) -> Vec<Relation> {
+        for relation in &elements {
+            self.handle_relation(relation);
+        }
+        elements
+    }
 }
 
 #[cfg(test)]
@@ -207,7 +208,7 @@ mod test {
 
     #[test]
     fn element_printer(){
-        let mut printer = ElementPrinter::default().print_node(2);
+        let mut printer = ElementPrinter::with_prefix("test".to_string()).with_node_ids( vec![1, 2].into_iter().collect() );
 
         // has only one bad key => should be filtered
         assert_eq!(printer.handle_element(simple_node_element(1, vec![("building", "x")])).len(), 1);

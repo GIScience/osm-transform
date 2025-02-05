@@ -1,7 +1,6 @@
 pub mod io;
 pub mod area;
 pub mod output;
-pub mod osm_model;
 pub mod srs;
 pub mod handler;
 
@@ -65,7 +64,7 @@ fn extract_referenced_nodes(config: &Config) -> HandlerResult {
     let mut stopwatch = StopWatch::new();
     stopwatch.start();
     let _ = process_with_handler(config, &mut handler_chain).expect("Extraction of referenced node ids failed");
-    let mut handler_result = handler_chain.collect_result();
+    let handler_result = handler_chain.collect_result();
 
     log::info!("Finished extraction of referenced node ids, time: {}", stopwatch);
     if log::log_enabled!(log::Level::Trace)  {
@@ -172,7 +171,7 @@ fn process(config: &Config, node_filter_result: Option<HandlerResult>) -> Handle
     let mut stopwatch = StopWatch::new();
     stopwatch.start();
     let _ = process_with_handler(config, &mut handler_chain).expect("Processing failed");
-    let mut processing_result = handler_chain.collect_result();
+    let processing_result = handler_chain.collect_result();
     log::info!("Finished processing of pbf elements, time: {}", stopwatch);
     log::info!("{}" , &processing_result.to_string());
     stopwatch.reset();
