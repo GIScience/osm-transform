@@ -6,7 +6,7 @@ use osm_io::osm::model::relation::Relation;
 use osm_io::osm::model::tag::Tag;
 use osm_io::osm::model::way::Way;
 use regex::Regex;
-use crate::handler::{HIGHEST_NODE_ID, into_node_element, into_relation_element, into_way_element, OsmElementTypeSelection, Handler};
+use crate::handler::{into_node_element, into_relation_element, into_way_element, OsmElementTypeSelection, Handler};
 use crate::handler::predicate::{HasOneOfTagKeysPredicate, HasTagKeyValuePredicate, HasNoneOfTagKeysPredicate};
 
 #[derive(Debug)]

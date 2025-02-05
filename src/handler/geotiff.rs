@@ -356,7 +356,7 @@ impl BufferingElevationEnricher {
 
     fn handle_node(&mut self, node: Node) -> Vec<Node> {
         let node_id = node.id();
-        let (buffer_option, node_option) = self.buffer_node(node); //nur puffern, nichts tun
+        let (buffer_option, node_option) = self.buffer_node(node);
         match buffer_option {
             None => {
                 if log::log_enabled!(log::Level::Trace) {
@@ -433,7 +433,6 @@ mod tests {
     use epsg::CRS;
     use georaster::geotiff::{GeoTiffReader, RasterValue};
     use osm_io::osm::model::coordinate::Coordinate;
-    use osm_io::osm::model::element::Element;
     use osm_io::osm::model::node::Node;
     use osm_io::osm::model::tag::Tag;
     use proj4rs::Proj;

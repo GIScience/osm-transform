@@ -7833,7 +7833,7 @@ mod tests {
 
   #[test]
     fn get_epsg_dynamic_srs_resolver(){
-        let mut srs_resolver = DynamicSrsResolver::new();
+        let srs_resolver = DynamicSrsResolver::new();
         assert_eq!(srs_resolver.get_epsg("ETRS89 / UTM zone 32N".to_string()).unwrap(), 25832);
         assert_eq!(srs_resolver.get_epsg("WGS 84".to_string()).unwrap(), 4326);
     }

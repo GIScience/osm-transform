@@ -54,7 +54,6 @@ impl Handler for SkipElevationNodeCollector {
 
 #[cfg(test)]
 mod test {
-    use log4rs::append::Append;
     use crate::handler::skip_ele::SkipElevationNodeCollector;
     use crate::handler::tests::{simple_way};
     const TUNNEL: (&str, &str) = ("tunnel", "avalanche_protector");

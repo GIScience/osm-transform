@@ -13,7 +13,6 @@ use bit_vec::BitVec;
 use osm_io::osm::model::element::Element;
 use osm_io::osm::model::node::Node;
 use osm_io::osm::model::relation::Relation;
-use osm_io::osm::model::tag::Tag;
 use osm_io::osm::model::way::Way;
 
 
@@ -242,7 +241,6 @@ impl HandlerChain {
 pub(crate) mod tests {
     use std::ops::Add;
     use bit_vec::BitVec;
-    use log4rs::append::Append;
     use osm_io::osm::model::coordinate::Coordinate;
     use osm_io::osm::model::element::Element;
     use osm_io::osm::model::node::Node;
