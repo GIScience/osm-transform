@@ -44,7 +44,7 @@ pub trait Handler {
         elements
     }
 
-    fn handle_ways(&mut self, mut elements: Vec<Way>) -> Vec<Way> {
+    fn handle_ways(&mut self, elements: Vec<Way>) -> Vec<Way> {
         elements
     }
 
@@ -300,7 +300,7 @@ pub(crate) mod tests {
     #[derive(Debug, Default)]
     pub(crate) struct TestOnlyElementModifier;
     impl TestOnlyElementModifier {
-        fn handle_node(&mut self, mut node: &mut Node)  {
+        fn handle_node(&mut self, node: &mut Node)  {
             let id = node.id();
             let tags = node.tags_mut();
             if id % 2 == 0 {
@@ -323,7 +323,7 @@ pub(crate) mod tests {
     impl Handler for TestOnlyElementReplacer {
         fn name(&self) -> String { "TestOnlyElementReplacer".to_string() }
 
-        fn handle_nodes(&mut self, mut elements: Vec<Node>) -> Vec<Node> {
+        fn handle_nodes(&mut self, elements: Vec<Node>) -> Vec<Node> {
             elements.iter().map(|node| if node.id() == 6 {simple_node(66, vec![("who", "dimpfelmoser")])} else {node.clone()}).collect()
         }
     }
@@ -508,17 +508,17 @@ pub(crate) mod tests {
     impl Handler for TestOnlyOrderRecorder {
         fn name(&self) -> String { format!("TestOnlyOrderRecorder {}", self.result_key) }
 
-        fn handle_nodes(&mut self, mut elements: Vec<Node>) -> Vec<Node> {
+        fn handle_nodes(&mut self, elements: Vec<Node>) -> Vec<Node> {
             elements.iter().for_each(|element| self.handle_element(into_node_element(element.clone())));
             elements
         }
 
-        fn handle_ways(&mut self, mut elements: Vec<Way>) -> Vec<Way> {
+        fn handle_ways(&mut self, elements: Vec<Way>) -> Vec<Way> {
             elements.iter().for_each(|element| self.handle_element(into_way_element(element.clone())));
             elements
         }
 
-        fn handle_relations(&mut self, mut elements: Vec<Relation>) -> Vec<Relation> {
+        fn handle_relations(&mut self, elements: Vec<Relation>) -> Vec<Relation> {
             elements.iter().for_each(|element| self.handle_element(into_relation_element(element.clone())));
             elements
         }

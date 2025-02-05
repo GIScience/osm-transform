@@ -37,7 +37,7 @@ impl WaySplitter {
         let n = (n - 1.0) as usize;
         let mut v = Vec::with_capacity(n);
 
-        for i in 0..n {
+        for _i in 0..n {
             x += sx;
             y += sy;
             v.push(Coordinate::new(x, y));

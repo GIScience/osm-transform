@@ -208,7 +208,7 @@ pub trait GeoTiffIndex {
 }
 
 
-pub struct RSGeoTiffIndex {
+pub(crate) struct RSGeoTiffIndex {
     pub(crate) rtree: RTree<RSBoundingBox>,
 }
 impl RSGeoTiffIndex {
@@ -262,7 +262,7 @@ impl GeoTiffIndex for RSGeoTiffIndex {
 
 
 #[derive(Clone, Debug)]
-struct RSBoundingBox {
+pub(crate) struct RSBoundingBox {
     id: String,
     min: [f64; 2],
     max: [f64; 2],
@@ -282,7 +282,7 @@ impl RTreeObject for RSBoundingBox
     }
 }
 impl PointDistance for RSBoundingBox {
-    fn distance_2(&self, point: &<Self::Envelope as Envelope>::Point) -> <<Self::Envelope as Envelope>::Point as Point>::Scalar {
+    fn distance_2(&self, _point: &<Self::Envelope as Envelope>::Point) -> <<Self::Envelope as Envelope>::Point as Point>::Scalar {
         log::warn!("distance_2 was called - but is not implemented");
         todo!()
     }
@@ -453,7 +453,7 @@ impl Handler for BufferingElevationEnricher {
         let mut result = self.handle_nodes(elements);
 
         let buffers: Vec<String> = self.nodes_for_geotiffs.iter()
-            .map(|(k, v)| k.to_string())
+            .map(|(k, _v)| k.to_string())
             .collect();
         for buffer_name in buffers {
             result.extend(self.handle_and_flush_buffer(buffer_name));
@@ -470,7 +470,6 @@ mod tests {
 
     use epsg::CRS;
     use georaster::geotiff::{GeoTiffReader, RasterValue};
-    use itertools::Itertools;
     use osm_io::osm::model::coordinate::Coordinate;
     use osm_io::osm::model::node::Node;
     use osm_io::osm::model::tag::Tag;
@@ -500,8 +499,7 @@ mod tests {
         fn lon(&self) -> f64 { self.lon }
         fn lat(&self) -> f64 { self.lat }
     }
-    fn as_coord(tup: (f64, f64)) -> Coordinate {Coordinate::new(tup.1, tup.0)}
-    fn as_tuple_lon_lat(coordinate: Coordinate) -> (f64, f64) { (coordinate.lon(), coordinate.lat()) }
+
     #[test]
     #[ignore]
     fn test_find_geotiff_id_for_wgs84_coord_srtm_ma_hd() {
@@ -562,18 +560,18 @@ mod tests {
     fn wgs84_coordinate_hamburg_elbphilharmonie() -> TestPoint {TestPoint::new(9.984270930290224, 53.54137211789218)}
     fn create_geotiff_limburg() -> GeoTiff {
         let mut tiff_loader = GeoTiffManager::new();
-        let mut geotiff = tiff_loader.load_geotiff("test/region_limburg_an_der_lahn.tif", &DynamicSrsResolver::new()).expect("got error");
+        let geotiff = tiff_loader.load_geotiff("test/region_limburg_an_der_lahn.tif", &DynamicSrsResolver::new()).expect("got error");
         geotiff
     }
     fn create_geotiff_ma_hd() -> GeoTiff {
         let mut tiff_loader = GeoTiffManager::new();
-        let mut geotiff = tiff_loader.load_geotiff("test/region_heidelberg_mannheim.tif", &DynamicSrsResolver::new()).expect("got error");
+        let geotiff = tiff_loader.load_geotiff("test/region_heidelberg_mannheim.tif", &DynamicSrsResolver::new()).expect("got error");
         geotiff
     }
 
     fn create_fake_geotiff(proj_tiff: Proj, file_path: &str) -> GeoTiff {
         let img_file = BufReader::new(File::open(file_path).expect("Could not open input file"));
-        let mut geotiffreader = GeoTiffReader::open(img_file).expect("Could not read input file as tiff");
+        let geotiffreader = GeoTiffReader::open(img_file).expect("Could not read input file as tiff");
         GeoTiff {
             proj_wgs_84: Proj::from_epsg_code(4326).unwrap(),
             proj_tiff: proj_tiff,
@@ -737,7 +735,7 @@ mod tests {
 
     #[test]
     fn experiment_from_user_string() {
-        let mut srs_resolver = DynamicSrsResolver::new();
+        let srs_resolver = DynamicSrsResolver::new();
         proj_methods("ETRS89 / UTM zone 32N|ETRS89|",
                      "geotiffreader.geo_params", &srs_resolver);
         proj_methods("ETRS89 / UTM zone 32N",
@@ -775,7 +773,7 @@ mod tests {
 
     #[test]
     fn transform_4326_to_4326() {
-        let mut point_3d = transform(
+        let point_3d = transform(
             &Proj::from_epsg_code(4326).expect("not found"),
             &Proj::from_epsg_code(4326).expect("not found"),
             wgs84_coordinate_limburg_traffic_circle().lon(), wgs84_coordinate_limburg_traffic_circle().lat()).expect("transformation error");
@@ -784,7 +782,7 @@ mod tests {
     }
     #[test]
     fn transform_25832_to_4326() {
-        let mut point_3d = transform(
+        let point_3d = transform(
             &Proj::from_epsg_code(25832).expect("not found"),
             &Proj::from_epsg_code(4326).expect("not found"),
             433305.7043197789f64, 5581899.216447188f64).expect("transformation error");
@@ -793,7 +791,7 @@ mod tests {
     }
     #[test]
     fn transform_4326_to_25832() {
-        let mut point_3d = transform(
+        let point_3d = transform(
             &Proj::from_epsg_code(4326).expect("not found"),
             &Proj::from_epsg_code(25832).expect("not found"),
             wgs84_coordinate_limburg_traffic_circle().lon(), wgs84_coordinate_limburg_traffic_circle().lat()).expect("transformation error");
@@ -804,7 +802,7 @@ mod tests {
 
     #[test]
     fn transform_4326_to_25832_2() {
-        let mut point_3d = transform(
+        let point_3d = transform(
             &Proj::from_epsg_code(4326).expect("not found"),
             &Proj::from_epsg_code(25832).expect("not found"),
             8.06f64, 50.28f64).expect("transformation error");
@@ -831,14 +829,14 @@ mod tests {
     }
     #[test]
     fn wgs_84_to_tiff_coord_4326() {
-        let mut geotiff = create_fake_geotiff(Proj::from_epsg_code(4326).unwrap(), "test/region_limburg_an_der_lahn.tif");
+        let geotiff = create_fake_geotiff(Proj::from_epsg_code(4326).unwrap(), "test/region_limburg_an_der_lahn.tif");
         let tiff_coord = geotiff.wgs_84_to_tiff_coord(wgs84_coordinate_limburg_traffic_circle().lon(), wgs84_coordinate_limburg_traffic_circle().lat());
         assert_eq!(tiff_coord.0, 8.06185930f64);
         assert_eq!(tiff_coord.1, 50.38536322f64);
     }
     #[test]
     fn wgs_84_to_tiff_coord_25832() {
-        let mut geotiff = create_fake_geotiff(Proj::from_epsg_code(25832).unwrap(), "test/region_limburg_an_der_lahn.tif");
+        let geotiff = create_fake_geotiff(Proj::from_epsg_code(25832).unwrap(), "test/region_limburg_an_der_lahn.tif");
         let tiff_coord = geotiff.wgs_84_to_tiff_coord(wgs84_coordinate_limburg_traffic_circle().lon(), wgs84_coordinate_limburg_traffic_circle().lat());
         assert!(are_floats_close(tiff_coord.0, 433305.7043197789f64, 1e-2));
         assert!(are_floats_close(tiff_coord.1, 5581899.216447188f64, 1e-2));
