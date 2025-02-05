@@ -10,6 +10,7 @@ use crate::handler::{into_node_element, into_relation_element, into_way_element,
 use crate::handler::predicate::{HasOneOfTagKeysPredicate, HasTagKeyValuePredicate, HasNoneOfTagKeysPredicate};
 
 #[derive(Debug)]
+#[allow(dead_code)]
 pub(crate) enum FilterType {
     AcceptMatching,
     RemoveMatching,
@@ -22,6 +23,7 @@ pub(crate) struct TagValueBasedOsmElementsFilter {
     pub filter_type: FilterType,
 }
 impl TagValueBasedOsmElementsFilter {
+    #[allow(dead_code)]
     pub(crate) fn new(handle_types: OsmElementTypeSelection, tag_key: String, tag_value_regex: Regex, filter_type: FilterType) -> Self {
         Self {
             handle_types,
@@ -77,6 +79,8 @@ pub(crate) struct TagKeyBasedOsmElementsFilter {
     pub filter_type: FilterType,
 }
 impl TagKeyBasedOsmElementsFilter {
+    #[allow(dead_code)]
+
     pub(crate) fn new(handle_types: OsmElementTypeSelection, tag_keys: Vec<String>, filter_type: FilterType) -> Self {
         Self {
             handle_types,

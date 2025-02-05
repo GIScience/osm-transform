@@ -17,6 +17,7 @@ impl SkipElevationNodeCollector {
         }
     }
 
+    #[allow(dead_code)]
     pub(crate) fn default() -> Self {Self::new(HIGHEST_NODE_ID as usize, Self::DEFAULT_KEYS.to_vec())
     }
 

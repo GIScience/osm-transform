@@ -483,6 +483,7 @@ mod tests {
         lon: f64,
         lat: f64,
     }
+    #[allow(dead_code)]
     impl TestPoint {
         fn new(lon: f64, lat: f64) -> Self {
             Self { lon, lat }

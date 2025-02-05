@@ -83,6 +83,7 @@ pub(crate) struct OsmElementTypeSelection {
     pub way: bool,
     pub relation: bool,
 }
+#[allow(dead_code)]
 impl OsmElementTypeSelection {
     pub(crate) fn all() -> Self { Self { node: true, way: true, relation: true } }
     pub(crate) fn node_only() -> Self { Self { node: true, way: false, relation: false } }
@@ -238,6 +239,7 @@ impl HandlerChain {
 
 
 #[cfg(test)]
+#[allow(unused_variables)]
 pub(crate) mod tests {
     use std::ops::Add;
     use bit_vec::BitVec;
@@ -254,7 +256,9 @@ pub(crate) mod tests {
     use crate::handler::info::*;
 
     fn existing_tag() -> String { "EXISTING_TAG".to_string() }
+    #[allow(dead_code)]
     fn missing_tag() -> String { "MISSING_TAG".to_string() }
+    #[allow(dead_code)]
     pub enum MemberType { Node, Way, Relation }
     pub fn simple_node_element(id: i64, tags: Vec<(&str, &str)>) -> Element {
         let tags_obj = tags.iter().map(|(k, v)| Tag::new(k.to_string(), v.to_string())).collect();

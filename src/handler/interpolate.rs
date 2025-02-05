@@ -2,11 +2,13 @@ use std::collections::HashMap;
 use osm_io::osm::model::coordinate::Coordinate;
 use osm_io::osm::model::node::Node;
 
+#[allow(dead_code)]
 pub(crate) struct WaySplitter {
     pub next_node_id: i64,
     pub location_index: HashMap<i64, Coordinate>,
 }
 
+#[allow(dead_code)]
 impl WaySplitter {
     pub(crate) fn new() -> Self {
         Self {
