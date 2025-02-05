@@ -1,7 +1,4 @@
-use std::error::Error;
 use std::collections::HashMap;
-use std::fs::File;
-use csv::ReaderBuilder;
 
 
 // This struct should not be necessary. Replace with a correct implementation from a geo library.

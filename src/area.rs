@@ -9,15 +9,13 @@ use btreemultimap::BTreeMultiMap;
 use csv::{ReaderBuilder, WriterBuilder};
 use geo::{BoundingRect, Contains, Coord, coord, Intersects, MultiPolygon, Rect};
 use geo::BooleanOps;
-use osm_io::osm::model::element::Element;
 use osm_io::osm::model::node::Node;
 use osm_io::osm::model::tag::Tag;
 use serde::Deserialize;
 use wkt::{Geometry, ToWkt};
 use wkt::Wkt;
 
-use crate::Config;
-use crate::handler::{Handler, into_node_element};
+use crate::handler::Handler;
 
 const GRID_SIZE: usize = 64800;
 const AREA_ID_MULTIPLE: u16 = u16::MAX;
@@ -183,7 +181,7 @@ impl AreaHandler {
                 result.push(self.mapping.id[&x].to_string())
             }
         }
-        let mut node = node;
+        let node = node;
         node.tags_mut().push(Tag::new("country".to_string(), result.join(",")));
     }
 }

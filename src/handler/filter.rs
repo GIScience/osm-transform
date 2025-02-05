@@ -1,9 +1,8 @@
 use std::collections::HashMap;
-use std::panic::resume_unwind;
 use bit_vec::BitVec;
 use osm_io::osm::model::element::Element;
 use osm_io::osm::model::node::Node;
-use osm_io::osm::model::relation::{Member, Relation};
+use osm_io::osm::model::relation::Relation;
 use osm_io::osm::model::tag::Tag;
 use osm_io::osm::model::way::Way;
 use regex::Regex;
@@ -218,21 +217,21 @@ impl Handler for AllElementsFilter {
         }
     }
 
-    fn handle_nodes(&mut self, mut elements:Vec<Node>) -> Vec<Node> {
+    fn handle_nodes(&mut self, elements:Vec<Node>) -> Vec<Node> {
         match self.handle_types.node {
             true => { Vec::new() }
             false => { elements }
         }
     }
 
-    fn handle_ways(&mut self, mut elements: Vec<Way>) -> Vec<Way> {
+    fn handle_ways(&mut self, elements: Vec<Way>) -> Vec<Way> {
         match self.handle_types.way {
             true => { Vec::new() }
             false => { elements }
         }
     }
 
-    fn handle_relations(&mut self, mut elements: Vec<Relation>) -> Vec<Relation> {
+    fn handle_relations(&mut self, elements: Vec<Relation>) -> Vec<Relation> {
         match self.handle_types.relation {
             true => { Vec::new() }
             false => { elements }

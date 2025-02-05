@@ -161,7 +161,7 @@ impl HandlerChain {
 
     fn process_nodes(&mut self, mut elements: Vec<Node>) {
         for processor in &mut self.processors {
-            if (elements.len() == 0) {
+            if elements.len() == 0 {
                 break
             }
             elements = processor.handle_nodes(elements);
@@ -181,7 +181,7 @@ impl HandlerChain {
 
     fn process_ways(&mut self, mut elements: Vec<Way>) {
         for processor in &mut self.processors {
-            if (elements.len() == 0) {
+            if elements.len() == 0 {
                 break
             }
             elements = processor.handle_ways(elements);
@@ -201,7 +201,7 @@ impl HandlerChain {
 
     fn process_relations(&mut self, mut elements: Vec<Relation>) {
         for processor in &mut self.processors {
-            if (elements.len() == 0) {
+            if elements.len() == 0 {
                 break
             }
             elements = processor.handle_relations(elements);

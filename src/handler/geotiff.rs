@@ -1,4 +1,4 @@
-use std::collections::{BTreeMap, HashMap};
+use std::collections::HashMap;
 use std::error::Error;
 use std::fs::File;
 use std::io::BufReader;
@@ -8,13 +8,11 @@ use bit_vec::BitVec;
 use georaster::geotiff::{GeoTiffReader, RasterValue};
 use glob::glob;
 use log::error;
-use osm_io::osm::model::element::Element;
 use osm_io::osm::model::node::Node;
 use osm_io::osm::model::tag::Tag;
 use proj4rs::Proj;
 use rstar::{AABB, Envelope, Point, PointDistance, RTree, RTreeObject};
-use serde::__private::de::Content::F64;
-use crate::handler::{format_element_id, into_node_element, into_vec_node_element, into_vec_relation_element, into_vec_way_element, into_way_element, Handler};
+use crate::handler::Handler;
 use crate::srs::DynamicSrsResolver;
 
 pub struct GeoTiff {

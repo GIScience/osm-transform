@@ -1,14 +1,7 @@
-use std::path::PathBuf;
 
 use anyhow;
 use benchmark_rs::stopwatch::StopWatch;
-use osm_io::osm::model::coordinate::Coordinate;
-use osm_io::osm::model::element::Element;
-use osm_io::osm::model::node::Node;
-use osm_io::osm::model::tag::Tag;
 use osm_io::osm::pbf;
-use osm_io::osm::pbf::compression_type::CompressionType;
-use osm_io::osm::pbf::file_info::FileInfo;
 use crate::Config;
 use crate::handler::HandlerChain;
 

@@ -8,7 +8,7 @@ pub mod handler;
 #[macro_use]
 extern crate maplit;
 
-use std::collections::{HashMap, HashSet};
+use std::collections::HashSet;
 use std::path::PathBuf;
 use benchmark_rs::stopwatch::StopWatch;
 use log4rs::append::console::ConsoleAppender;
@@ -18,10 +18,10 @@ use regex::Regex;
 use crate::io::process_with_handler;
 use area::AreaHandler;
 use crate::handler::{HandlerChain, HandlerResult, OsmElementTypeSelection};
-use crate::handler::collect::{ReferencedNodeIdCollector};
+use crate::handler::collect::ReferencedNodeIdCollector;
 use crate::handler::filter::{AllElementsFilter, ComplexElementsFilter, FilterType, NodeIdFilter, TagFilterByKey};
-use crate::handler::geotiff::{BufferingElevationEnricher};
-use crate::handler::info::{CountType, ElementCounter, ElementPrinter};
+use crate::handler::geotiff::BufferingElevationEnricher;
+use crate::handler::info::{ElementCounter, ElementPrinter};
 use crate::handler::modify::MetadataRemover;
 
 use crate::output::{SimpleOutputHandler, SplittingOutputHandler};
@@ -130,7 +130,7 @@ fn process(config: &Config, node_filter_result: Option<HandlerResult>) -> Handle
         stopwatch.start();
         let mut elevation_enricher = BufferingElevationEnricher::new(config.elevation_batch_size, config.elevation_total_buffer_size, skip_ele);
         for elevation_glob_pattern in &config.elevation_tiffs {
-            elevation_enricher.init(elevation_glob_pattern);
+            let _ = elevation_enricher.init(elevation_glob_pattern);
         }
         log::info!("Finished initializing elevation enricher, time: {}", stopwatch);
         handler_chain = handler_chain.add(elevation_enricher);
