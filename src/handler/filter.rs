@@ -1,12 +1,11 @@
 use std::collections::HashMap;
 use bit_vec::BitVec;
-use osm_io::osm::model::element::Element;
 use osm_io::osm::model::node::Node;
 use osm_io::osm::model::relation::Relation;
 use osm_io::osm::model::tag::Tag;
 use osm_io::osm::model::way::Way;
 use regex::Regex;
-use crate::handler::{into_node_element, into_relation_element, into_way_element, OsmElementTypeSelection, Handler};
+use crate::handler::{OsmElementTypeSelection, Handler};
 use crate::handler::predicate::{HasOneOfTagKeysPredicate, HasTagKeyValuePredicate, HasNoneOfTagKeysPredicate};
 
 #[derive(Debug)]
@@ -138,24 +137,6 @@ impl TagFilterByKey {
             filter_type,
         }
     }
-    fn handle_node(&mut self, mut node: Node) -> Vec<Element> {
-        if self.handle_types.node  {
-            self.filter_tags(&mut node.tags_mut());
-        }
-        vec![into_node_element(node)]
-    }
-    fn handle_way(&mut self, mut way: Way) -> Vec<Element> {
-        if self.handle_types.way  {
-            self.filter_tags(&mut way.tags_mut());
-        }
-        vec![into_way_element(way)]
-    }
-    fn handle_relation(&mut self, mut relation: Relation) -> Vec<Element> {
-        if self.handle_types.relation  {
-            self.filter_tags(&mut relation.tags_mut());
-        }
-        vec![into_relation_element(relation)]
-    }
     fn filter_tags(&mut self, tags: &mut Vec<Tag>) {
         match self.filter_type {
             FilterType::AcceptMatching => {
@@ -171,13 +152,32 @@ impl Handler for TagFilterByKey {
     fn name(&self) -> String {
         "TagFilterByKey".to_string()
     }
-    fn handle_element(&mut self, element: Element) -> Vec<Element> {
-        match element {
-            Element::Node { node } => { self.handle_node(node) }
-            Element::Way { way } => { self.handle_way(way) }
-            Element::Relation { relation } => { self.handle_relation(relation) }
-            Element::Sentinel => vec![]
+
+    fn handle_nodes(&mut self, mut nodes: Vec<Node>) -> Vec<Node> {
+        if self.handle_types.node {
+            for node in nodes.iter_mut() {
+                self.filter_tags(node.tags_mut());
+            }
         }
+        nodes
+    }
+
+    fn handle_ways(&mut self, mut ways: Vec<Way>) -> Vec<Way> {
+        if self.handle_types.way {
+            for way in ways.iter_mut() {
+                self.filter_tags( way.tags_mut());
+            }
+        }
+        ways
+    }
+
+    fn handle_relations(&mut self, mut relations: Vec<Relation>) -> Vec<Relation> {
+        if self.handle_types.relation {
+            for relation in relations.iter_mut() {
+                self.filter_tags(&mut relation.tags_mut());
+            }
+        }
+        relations
     }
 }
 
@@ -186,39 +186,9 @@ impl Handler for TagFilterByKey {
 pub(crate) struct AllElementsFilter {
     pub handle_types: OsmElementTypeSelection,
 }
-impl AllElementsFilter {
-    fn handle_node(&mut self, node: Node) -> Vec<Element> {
-        match self.handle_types.node {
-            true => {vec![]}
-            false => {vec![into_node_element(node)]}
-        }
-    }
-
-    fn handle_way(&mut self, way: Way) -> Vec<Element> {
-        match self.handle_types.way {
-            true => {vec![]}
-            false => {vec![into_way_element(way)]}
-        }
-    }
-
-    fn handle_relation(&mut self, relation: Relation) -> Vec<Element> {
-        match self.handle_types.relation {
-            true => {vec![]}
-            false => {vec![into_relation_element(relation)]}
-        }
-    }
-}
 impl Handler for AllElementsFilter {
     fn name(&self) -> String {
         "AllElementsFilter".to_string()
-    }
-    fn handle_element(&mut self, element: Element) -> Vec<Element> {
-        match element {
-            Element::Node { node } => { self.handle_node(node) }
-            Element::Way { way } => { self.handle_way(way) }
-            Element::Relation { relation } => { self.handle_relation(relation) }
-            Element::Sentinel => vec![]
-        }
     }
 
     fn handle_nodes(&mut self, elements:Vec<Node>) -> Vec<Node> {
@@ -249,19 +219,6 @@ pub(crate) struct NodeIdFilter {
 }
 impl NodeIdFilter {
 
-    fn handle_node(&mut self, node: Node) -> Vec<Element> {
-        match self.node_ids.get(node.id().clone() as usize).unwrap_or(false) {
-            true => {
-                log::trace!("node {} found in bitmap", &node.id().clone());
-                vec![into_node_element(node)]
-            }
-            false => {
-                log::trace!("node {} is not in bitmap - filtering", &node.id().clone());
-                vec![]
-            }
-        }
-    }
-
     fn is_node_referenced(& self, id: i64) -> bool {
         match self.node_ids.get(id as usize).unwrap_or(false) {
             true => {
@@ -280,13 +237,6 @@ impl Handler for NodeIdFilter {
     fn name(&self) -> String {
         "NodeIdFilter".to_string()
     }
-    fn handle_element(&mut self, element: Element) -> Vec<Element> {
-        match element {
-            Element::Node { node } => { self.handle_node(node) }
-            _ => vec![element]
-        }
-    }
-
     fn handle_nodes(&mut self, mut elements: Vec<Node>) -> Vec<Node> {
         elements.retain(|node| self.is_node_referenced(node.id()));
         elements
@@ -369,44 +319,10 @@ impl ComplexElementsFilter {
             }
         }
     }
-
-    fn handle_way(&mut self, way: Way) -> Vec<Element> {
-        match self.accept_by_tags(&way.tags()) {
-            true => {
-                log::trace!("accepting way {}", way.id());
-                vec![into_way_element(way)]
-            }
-            false => {
-                log::trace!("removing way {}", way.id());
-                vec![]
-            }
-        }
-    }
-    fn handle_relation(&mut self, relation: Relation) -> Vec<Element> {
-        match self.accept_by_tags(&relation.tags()) {
-            true => {
-                log::trace!("accepting relation {}", relation.id());
-                vec![into_relation_element(relation)]
-            }
-            false => {
-                log::trace!("removing relation {}", relation.id());
-                vec![]
-            }
-        }
-    }
 }
 impl Handler for ComplexElementsFilter {
     fn name(&self) -> String {
         "ComplexElementsFilter".to_string()
-    }
-
-    fn handle_element(&mut self, element: Element) -> Vec<Element> {
-        match element {
-            Element::Node { node } => { vec![into_node_element(node)] }
-            Element::Way { way} => { self.handle_way(way) }
-            Element::Relation { relation } => { self.handle_relation(relation) }
-            _ => vec![]
-        }
     }
 
     fn handle_ways(&mut self, mut elements: Vec<Way>) -> Vec<Way> {
@@ -423,7 +339,6 @@ impl Handler for ComplexElementsFilter {
 #[cfg(test)]
 mod test {
     use osm_io::osm::model::coordinate::Coordinate;
-    use osm_io::osm::model::element::Element;
     use osm_io::osm::model::node::Node;
     use osm_io::osm::model::tag::Tag;
     use osm_io::osm::model::way::Way;
@@ -438,26 +353,21 @@ mod test {
             Regex::new(".*bad.*").unwrap(),
             FilterType::RemoveMatching);
 
-        let handled_nodes = tag_filter.handle_node(Node::new(1, 1, Coordinate::new(1.0f64, 1.1f64), 1, 1, 1, "a".to_string(), true,
+        let handled_nodes = tag_filter.handle_nodes(vec![Node::new(1, 1, Coordinate::new(1.0f64, 1.1f64), 1, 1, 1, "a".to_string(), true,
                                                              vec![
                                                                  Tag::new("bad".to_string(), "hotzenplotz".to_string()),
                                                                  Tag::new("good".to_string(), "kasper".to_string()),
                                                                  Tag::new("more-bad".to_string(), "vader".to_string()),
                                                                  Tag::new("more-good".to_string(), "grandma".to_string()),
                                                                  Tag::new("badest".to_string(), "voldemort".to_string()),
-                                                             ]));
+                                                             ])]);
         assert_eq!(1, handled_nodes.len());
-        match handled_nodes.get(0).unwrap() {
-            Element::Node { node } => {
-                assert_eq!(node.tags().len(), 2);
-                assert_eq!(node.tags()[0].k(), &"good");
-                assert_eq!(node.tags()[0].v(), &"kasper");
-                assert_eq!(node.tags()[1].k(), &"more-good");
-                assert_eq!(node.tags()[1].v(), &"grandma");
-            }
-            _ => {panic!("only one node expected!")}
-        }
-
+        let node = handled_nodes.get(0).unwrap();
+        assert_eq!(node.tags().len(), 2);
+        assert_eq!(node.tags()[0].k(), &"good");
+        assert_eq!(node.tags()[0].v(), &"kasper");
+        assert_eq!(node.tags()[1].k(), &"more-good");
+        assert_eq!(node.tags()[1].v(), &"grandma");
     }
 
     #[test]
@@ -467,7 +377,7 @@ mod test {
             Regex::new("(.*:)?source(:.*)?|(.*:)?note(:.*)?|url|created_by|fixme|wikipedia").unwrap(),
             FilterType::RemoveMatching);
 
-        let handled_nodes = tag_filter.handle_node(Node::new(1, 1, Coordinate::new(1.0f64, 1.1f64), 1, 1, 1, "a".to_string(), true,
+        let handled_nodes = tag_filter.handle_nodes(vec![Node::new(1, 1, Coordinate::new(1.0f64, 1.1f64), 1, 1, 1, "a".to_string(), true,
                                                              vec![
                                                                  Tag::new("closed:source".to_string(), "bad".to_string()),
                                                                  Tag::new("source".to_string(), "bad".to_string()),
@@ -480,16 +390,12 @@ mod test {
                                                                  Tag::new("fixme".to_string(), "bad".to_string()),
                                                                  Tag::new("wikipedia".to_string(), "bad".to_string()),
                                                                  Tag::new("wikimedia".to_string(), "good".to_string()),
-                                                             ]));
+                                                             ])]);
         assert_eq!(1, handled_nodes.len());
-        match handled_nodes.get(0).unwrap() {
-            Element::Node { node } => {
-                assert_eq!(node.tags().len(), 1);
-                for tag in node.tags() {
-                    assert_eq!(tag.v(), "good")
-                }
-            }
-            _ => { panic!("just one node expected!") }
+        let node = handled_nodes.get(0).unwrap();
+        assert_eq!(node.tags().len(), 1);
+        for tag in node.tags() {
+            assert_eq!(tag.v(), "good")
         }
     }
 
@@ -500,27 +406,23 @@ mod test {
             Regex::new(".*good.*").unwrap(),
             FilterType::AcceptMatching);
 
-        let handled_nodes = tag_filter.handle_node(Node::new(1, 1, Coordinate::new(1.0f64, 1.1f64), 1, 1, 1, "a".to_string(), true,
+        let handled_nodes = tag_filter.handle_nodes(vec![Node::new(1, 1, Coordinate::new(1.0f64, 1.1f64), 1, 1, 1, "a".to_string(), true,
                                                              vec![
                                                                  Tag::new("bad".to_string(), "hotzenplotz".to_string()),
                                                                  Tag::new("good".to_string(), "kasper".to_string()),
                                                                  Tag::new("more-bad".to_string(), "vader".to_string()),
                                                                  Tag::new("more-good".to_string(), "grandma".to_string()),
                                                                  Tag::new("badest".to_string(), "voldemort".to_string()),
-                                                             ]));
+                                                             ])]);
         assert_eq!(1, handled_nodes.len());
         // let node = &handled_nodes[0];
-        match handled_nodes.get(0).unwrap() {
-            Element::Node { node } => {
-                assert_eq!(node.tags().len(), 2);
-                assert_eq!(node.tags().len(), 2);
-                assert_eq!(node.tags()[0].k(), &"good");
-                assert_eq!(node.tags()[0].v(), &"kasper");
-                assert_eq!(node.tags()[1].k(), &"more-good");
-                assert_eq!(node.tags()[1].v(), &"grandma");
-            }
-            _ => {panic!("expected one node")}
-        }
+        let node = handled_nodes.get(0).unwrap();
+        assert_eq!(node.tags().len(), 2);
+        assert_eq!(node.tags().len(), 2);
+        assert_eq!(node.tags()[0].k(), &"good");
+        assert_eq!(node.tags()[0].v(), &"kasper");
+        assert_eq!(node.tags()[1].k(), &"more-good");
+        assert_eq!(node.tags()[1].v(), &"grandma");
     }
     #[test]
     fn test_tag_filter_by_key_with_node_not_handled() {
@@ -529,19 +431,15 @@ mod test {
             Regex::new(".*").unwrap(),
             FilterType::RemoveMatching);
 
-        let handled_nodes = tag_filter.handle_node(Node::new(1, 1, Coordinate::new(1.0f64, 1.1f64), 1, 1, 1, "a".to_string(), true,
+        let handled_nodes = tag_filter.handle_nodes(vec![Node::new(1, 1, Coordinate::new(1.0f64, 1.1f64), 1, 1, 1, "a".to_string(), true,
                                                              vec![
                                                                  Tag::new("a".to_string(), "1".to_string()),
                                                                  Tag::new("b".to_string(), "2".to_string()),
                                                                  Tag::new("c".to_string(), "3".to_string()),
-                                                             ]));
+                                                             ])]);
         assert_eq!(1, handled_nodes.len());
-        match handled_nodes.get(0).unwrap() {
-            Element::Node { node } => {
-                assert_eq!(node.tags().len(), 3);
-            }
-            _ => {panic!("expected one node")}
-        }
+        let node = handled_nodes.get(0).unwrap();
+        assert_eq!(node.tags().len(), 3);
     }
     #[test]
     fn test_tag_filter_by_key_with_node_handled() {
@@ -550,19 +448,15 @@ mod test {
             Regex::new(".*").unwrap(),
             FilterType::RemoveMatching);
 
-        let handled_nodes = tag_filter.handle_node(Node::new(1, 1, Coordinate::new(1.0f64, 1.1f64), 1, 1, 1, "a".to_string(), true,
+        let handled_nodes = tag_filter.handle_nodes(vec![Node::new(1, 1, Coordinate::new(1.0f64, 1.1f64), 1, 1, 1, "a".to_string(), true,
                                                              vec![
                                                                  Tag::new("a".to_string(), "1".to_string()),
                                                                  Tag::new("b".to_string(), "2".to_string()),
                                                                  Tag::new("c".to_string(), "3".to_string()),
-                                                             ]));
+                                                             ])]);
         assert_eq!(handled_nodes.len(), 1);
-        match handled_nodes.get(0).unwrap() {
-            Element::Node { node } => {
-                assert_eq!(node.tags().len(), 0);
-            }
-            _ => {panic!("expected one node")}
-        }
+        let node = handled_nodes.get(0).unwrap();
+        assert_eq!(node.tags().len(), 0);
     }
     #[test]
     fn filter_elements_remove_by_keys() {
@@ -622,53 +516,53 @@ mod test {
     fn complex_filter_with_ors_default() {
         let mut filter = ComplexElementsFilter::ors_default();
         // has key to keep and key-value to keep, bad key 'building' should not take effect => should be accepted
-        assert_eq!(filter.handle_way(Way::new(1, 1, 1, 1, 1, "a".to_string(), true, vec![],
+        assert_eq!(filter.handle_ways(vec![Way::new(1, 1, 1, 1, 1, "a".to_string(), true, vec![],
                                               vec![
                                                   Tag::new("route".to_string(), "xyz".to_string()),
                                                   Tag::new("railway".to_string(), "platform".to_string()),
                                                   Tag::new("building".to_string(), "x".to_string()),
-                                              ])).len(), 1);
+                                              ])]).len(), 1);
 
         // has key to keep, bad key 'building' should not take effect => should be accepted
-        assert_eq!(filter.handle_way(Way::new(2, 1, 1, 1, 1, "a".to_string(), true, vec![],
+        assert_eq!(filter.handle_ways(vec![Way::new(2, 1, 1, 1, 1, "a".to_string(), true, vec![],
                                               vec![
                                                   Tag::new("route".to_string(), "xyz".to_string()),
                                                   Tag::new("building".to_string(), "x".to_string()),
-                                              ])).len(), 1);
+                                              ])]).len(), 1);
 
         // has key-value to keep, bad key 'building' should not take effect => should be accepted
-        assert_eq!(filter.handle_way(Way::new(3, 1, 1, 1, 1, "a".to_string(), true, vec![],
+        assert_eq!(filter.handle_ways(vec![Way::new(3, 1, 1, 1, 1, "a".to_string(), true, vec![],
                                               vec![
                                                   Tag::new("railway".to_string(), "platform".to_string()),
                                                   Tag::new("building".to_string(), "x".to_string()),
-                                              ])).len(), 1);
+                                              ])]).len(), 1);
 
         // has no key or key-value to keep, but also no bad key => should be accepted
-        assert_eq!(filter.handle_way(Way::new(4, 1, 1, 1, 1, "a".to_string(), true, vec![],
+        assert_eq!(filter.handle_ways(vec![Way::new(4, 1, 1, 1, 1, "a".to_string(), true, vec![],
                                               vec![
                                                   Tag::new("railway".to_string(), "wrong-value".to_string()),
                                                   Tag::new("something".to_string(), "else".to_string()),
-                                              ])).len(), 1);
+                                              ])]).len(), 1);
 
         // has no key or key-value to keep, some other key, but also one bad key => should be filtered
-        assert_eq!(filter.handle_way(Way::new(5, 1, 1, 1, 1, "a".to_string(), true, vec![],
+        assert_eq!(filter.handle_ways(vec![Way::new(5, 1, 1, 1, 1, "a".to_string(), true, vec![],
                                               vec![
                                                   Tag::new("railway".to_string(), "wrong-value".to_string()),
                                                   Tag::new("something".to_string(), "else".to_string()),
                                                   Tag::new("building".to_string(), "x".to_string()),
-                                              ])).len(), 0);
+                                              ])]).len(), 0);
 
         // has only one bad key => should be filtered
-        assert_eq!(filter.handle_way(Way::new(6, 1, 1, 1, 1, "a".to_string(), true, vec![],
+        assert_eq!(filter.handle_ways(vec![Way::new(6, 1, 1, 1, 1, "a".to_string(), true, vec![],
                                               vec![
                                                   Tag::new("building".to_string(), "x".to_string()),
-                                              ])).len(), 0);
+                                              ])]).len(), 0);
 
         // has only one other key => should be accepted
-        assert_eq!(filter.handle_way(Way::new(7, 1, 1, 1, 1, "a".to_string(), true, vec![],
+        assert_eq!(filter.handle_ways(vec![Way::new(7, 1, 1, 1, 1, "a".to_string(), true, vec![],
                                               vec![
                                                   Tag::new("something".to_string(), "x".to_string()),
-                                              ])).len(), 1);
+                                              ])]).len(), 1);
     }
 
 }

@@ -64,15 +64,6 @@ pub trait Handler {
         self.handle_relations(elements)
     }
 
-    #[deprecated]
-    fn handle_and_flush_elements(&mut self, elements: Vec<Element>) -> Vec<Element> {
-        let mut handeled = vec![];
-        for element in elements {
-            handeled.append(&mut self.handle_element(element));
-        }
-        handeled
-    }
-
     fn add_result(&mut self, result: HandlerResult) -> HandlerResult {
         result
     }
@@ -363,25 +354,6 @@ pub(crate) mod tests {
         }
     }
 
-    ///Receive one way, return a way and a new node for each ref of the way.
-    #[derive(Debug, Default)]
-    pub(crate) struct TestOnlyElementMixedAdder;
-    impl Handler for TestOnlyElementMixedAdder {
-        fn name(&self) -> String { "TestOnlyElementMixedAdder".to_string() }
-        fn handle_element(&mut self, element: Element) -> Vec<Element> {
-            match element {
-                Element::Node { .. } => { vec![element] }
-                Element::Way { way } => {
-                    let mut elements: Vec<Element> = way.refs().iter().map(|id| simple_node_element(id.clone(), vec![("added", "by handler")])).collect();
-                    elements.push(Element::Way { way });
-                    elements
-                }
-                Element::Relation { .. } => { vec![element] }
-                Element::Sentinel => { vec![] }
-            }
-        }
-    }
-
     #[derive(Default, Debug)]
     pub(crate) struct TestOnlyElementBufferingDuplicatingEditingProcessor { //store received elements, when receiving the 5th, emit all 5 and start buffering again. flush: emit currently buffered. handling the elements (changing) happens before emitting
         nodes: Vec<Node>,
@@ -462,15 +434,6 @@ pub(crate) mod tests {
     }
     impl Handler for TestOnlyIdCollector {
         fn name(&self) -> String { "TestOnlyIdCollector".to_string() }
-        fn handle_element(&mut self, element: Element) -> Vec<Element> {
-            match element {
-                Element::Node { ref node } => { self.node_ids.set(node.id() as usize, true); }
-                Element::Way { ref way } => { self.node_ids.set(way.id() as usize, true); }
-                Element::Relation { ref relation } => { self.node_ids.set(relation.id() as usize, true); }
-                Element::Sentinel => {}
-            }
-            vec![element]
-        }
         fn handle_nodes(&mut self, elements: Vec<Node>) -> Vec<Node> {
             elements.iter().for_each(|element| self.node_ids.set(element.id() as usize, true));
             elements
@@ -607,40 +570,6 @@ pub(crate) mod tests {
         assert_eq!(&result.counts.get("ways count final").unwrap().clone(), &1,);
         assert_eq!(&result.other.get("TestOnlyOrderRecorder initial").unwrap().clone(), "node#1, node#2, node#6, node#8, way#23, relation#66");
         assert_eq!(&result.other.get("TestOnlyOrderRecorder final").unwrap().clone(), "node#1, node#101, node#2, node#102, node#6, node#106, node#8, node#108, way#23, relation#66");
-    }
-
-    #[test]
-    #[ignore]//this functionality is unsupported in current handler implementation
-    /// Assert that it is possible to run the chain and let processors receive one element
-    /// and add additional elements of a different type to the processing chain
-    /// that are processed by downstream processors.
-    /// The test uses TestOnlyElementMixedAdder for this.
-    fn test_chain_with_mixed_element_adder() {
-        let _ = SimpleLogger::new().init();
-        let mut processor_chain = HandlerChain::default()
-            .add(ElementCounter::new("initial"))
-            .add(TestOnlyOrderRecorder::new("initial"))
-
-            .add(TestOnlyElementMixedAdder::default())
-
-            .add(ElementPrinter::with_prefix("final".to_string()).with_node_ids((1..=200).collect()))
-            .add(TestOnlyOrderRecorder::new("final"))
-            .add(ElementCounter::new("final"))
-            ;
-
-        processor_chain.process(simple_way_element(22, vec![], vec![]));
-        processor_chain.process(simple_way_element(23, vec![1, 2, 8, 6], vec![("way", "kasper-hotzenplotz")]));
-        processor_chain.flush();
-        let result = processor_chain.collect_result();
-
-        assert_eq!(&result.counts.get("nodes count initial").unwrap().clone(), &0,);
-        assert_eq!(&result.counts.get("nodes count final").unwrap().clone(), &4);
-        assert_eq!(&result.counts.get("relations count initial").unwrap().clone(), &0,);
-        assert_eq!(&result.counts.get("relations count final").unwrap().clone(), &0,);
-        assert_eq!(&result.counts.get("ways count initial").unwrap().clone(), &2,);
-        assert_eq!(&result.counts.get("ways count final").unwrap().clone(), &2,);
-        assert_eq!(&result.other.get("TestOnlyOrderRecorder initial").unwrap().clone(), "way#22, way#23");
-        assert_eq!(&result.other.get("TestOnlyOrderRecorder final").unwrap().clone(), "way#22, node#1, node#2, node#8, node#6, way#23");
     }
 
     #[test]

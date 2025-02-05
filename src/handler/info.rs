@@ -1,6 +1,5 @@
 use std::collections::HashSet;
 
-use osm_io::osm::model::element::Element;
 use osm_io::osm::model::node::Node;
 use osm_io::osm::model::relation::Relation;
 use osm_io::osm::model::way::Way;
@@ -25,15 +24,6 @@ impl ElementCounter {
 }
 impl Handler for ElementCounter {
     fn name(&self) -> String { format!("ElementCounter {}", self.result_key) }
-    fn handle_element(&mut self, element: Element) -> Vec<Element> {
-        match element {
-            Element::Node { .. } => { self.nodes_count += 1; }
-            Element::Way { .. } => { self.ways_count += 1; }
-            Element::Relation { .. } => { self.relations_count += 1; }
-            Element::Sentinel => {}
-        }
-        vec![element]
-    }
 
     fn handle_nodes(&mut self, elements: Vec<Node>) -> Vec<Node> {
         self.nodes_count += elements.len() as u64;
@@ -160,23 +150,6 @@ impl ElementPrinter {
 }
 impl Handler for ElementPrinter {
     fn name(&self) -> String { format!("ElementPrinter {}", self.prefix) }
-    fn handle_element(&mut self, element: Element) -> Vec<Element> {
-        match element {
-            Element::Node { node } => {
-                self.handle_node(&node);
-                vec![Element::Node { node }]
-            }
-            Element::Way { way } => {
-                self.handle_way(&way);
-                vec![Element::Way { way }]
-            }
-            Element::Relation { relation } => {
-                self.handle_relation(&relation);
-                vec![Element::Relation { relation }]
-            }
-            Element::Sentinel => { vec![] }
-        }
-    }
 
     fn handle_nodes(&mut self, elements: Vec<Node>) -> Vec<Node> {
         for node in &elements {
@@ -204,16 +177,16 @@ impl Handler for ElementPrinter {
 mod test {
     use crate::handler::info::ElementPrinter;
     use crate::handler::Handler;
-    use crate::handler::tests::simple_node_element;
+    use crate::handler::tests::{simple_node};
 
     #[test]
     fn element_printer(){
         let mut printer = ElementPrinter::with_prefix("test".to_string()).with_node_ids( vec![1, 2].into_iter().collect() );
 
         // has only one bad key => should be filtered
-        assert_eq!(printer.handle_element(simple_node_element(1, vec![("building", "x")])).len(), 1);
+        assert_eq!(printer.handle_nodes(vec![simple_node(1, vec![("building", "x")])]).len(), 1);
         // has only one other key => should be accepted
-        assert_eq!(printer.handle_element(simple_node_element(2, vec![("something", "x")])).len(), 1);
+        assert_eq!(printer.handle_nodes(vec![simple_node(2, vec![("something", "x")])]).len(), 1);
     }
 
 }
