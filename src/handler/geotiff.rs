@@ -30,11 +30,6 @@ pub struct GeoTiff {
 }
 
 impl GeoTiff {
-    pub(crate) fn get_string_value_for_wgs_84(&mut self, lon: f64, lat: f64) -> Option<String> {
-        let raster_value = self.get_value_for_wgs_84(lon, lat);
-        format_as_elevation_string(raster_value)
-    }
-
     pub(crate) fn get_value_for_wgs_84(&mut self, lon: f64, lat: f64) -> RasterValue {
         let tiff_coord = &self.wgs_84_to_tiff_coord(lon, lat);
         let pixel_coord = &self.tiff_to_pixel_coord(tiff_coord.0, tiff_coord.1);
@@ -113,6 +108,27 @@ fn format_as_elevation_string(raster_value: RasterValue) -> Option<String> {
         RasterValue::I16(val) => { return Some(val.to_string()) }
         RasterValue::I32(val) => { return Some(val.to_string()) }
         RasterValue::I64(val) => { return Some(val.to_string()) }
+        RasterValue::Rgb8(_, _, _) => { return None }
+        RasterValue::Rgba8(_, _, _, _) => { return None }
+        RasterValue::Rgb16(_, _, _) => { return None }
+        RasterValue::Rgba16(_, _, _, _) => { return None }
+        _ => { return None }
+    }
+}
+
+fn format_as_elevation_value(raster_value: &RasterValue) -> Option<f64> {
+    match raster_value {
+        RasterValue::NoData => { return None }
+        RasterValue::U8(val) => { return Some(*val as f64) }
+        RasterValue::U16(val) => { return Some(*val as f64) }
+        RasterValue::U32(val) => { return Some(*val as f64) }
+        RasterValue::U64(val) => { return Some(*val as f64) }
+        RasterValue::F32(val) => { return Some(*val as f64) }
+        RasterValue::F64(val) => { return Some(*val) }
+        RasterValue::I8(val) => { return Some(*val as f64) }
+        RasterValue::I16(val) => { return Some(*val as f64) }
+        RasterValue::I32(val) => { return Some(*val as f64) }
+        RasterValue::I64(val) => { return Some(*val as f64) }
         RasterValue::Rgb8(_, _, _) => { return None }
         RasterValue::Rgba8(_, _, _, _) => { return None }
         RasterValue::Rgb16(_, _, _) => { return None }
@@ -311,6 +327,12 @@ impl PointDistance for RSBoundingBox {
 }
 
 
+struct LocationElevation {
+    lon: f64,
+    lat: f64,
+    ele: f64
+}
+
 pub(crate) struct BufferingElevationEnricher {
     geotiff_manager: GeoTiffManager,
     nodes_for_geotiffs: HashMap<String, Vec<Node>>,
@@ -318,12 +340,15 @@ pub(crate) struct BufferingElevationEnricher {
     total_buffered_nodes_max: usize,
     total_buffered_nodes_count: usize,
     skip_ele: Option<BitVec>,
+
+    node_cache: HashMap<i64, LocationElevation>
 }
 impl BufferingElevationEnricher {
     pub fn new(geotiff_manager: GeoTiffManager, max_buffer_len: usize, total_buffered_nodes_max: usize, skip_ele: Option<BitVec>) -> Self {
         Self {
             geotiff_manager,
             nodes_for_geotiffs: HashMap::new(),
+            node_cache: HashMap::new(),
             total_buffered_nodes_count: 0,
             max_buffer_len,
             total_buffered_nodes_max,
@@ -351,14 +376,29 @@ impl BufferingElevationEnricher {
         let mut buffer_vec = self.nodes_for_geotiffs.remove(&buffer_name).expect("buffer not found");
         log::debug!("Handling and flushing buffer with {} buffered nodes for geotiff '{}'", buffer_vec.len(), buffer_name);
         let geotiff = &mut self.geotiff_manager.load_geotiff(buffer_name.as_str()).expect("could not load geotiff");
-        buffer_vec.iter_mut().for_each(|node| if !self.skip_elevation(node) { self.add_elevation_tag(geotiff, node) });
+        buffer_vec.iter_mut().for_each(|node| if !self.skip_elevation(node) { self.add_elevation(geotiff, node) });
         self.total_buffered_nodes_count = self.total_buffered_nodes_count - buffer_vec.len();
         buffer_vec
     }
 
-    fn add_elevation_tag(&mut self, geotiff: &mut GeoTiff, node: &mut Node) {
-        let result = geotiff.get_string_value_for_wgs_84(node.coordinate().lon(), node.coordinate().lat());
-        match result {
+    fn add_elevation(&mut self, geotiff: &mut GeoTiff, node: &mut Node) {
+        let lon = node.coordinate().lon();
+        let lat = node.coordinate().lat();
+        let raster_value = geotiff.get_value_for_wgs_84(lon, lat);
+
+        let result_value = format_as_elevation_value(&raster_value);
+        match result_value {
+            None => {
+                if log::log_enabled!(log::Level::Trace) {
+                    log::warn!("no elevation value for node#{}", node.id());
+                }
+            }
+            Some(ele) => {
+                self.node_cache.insert(node.id(), LocationElevation { lon, lat, ele });
+            }
+        }
+        let result_string = format_as_elevation_string(raster_value);
+        match result_string {
             None => {
                 if log::log_enabled!(log::Level::Trace) {
                     log::warn!("no elevation value for node#{}", node.id());
@@ -472,7 +512,6 @@ impl Handler for BufferingElevationEnricher {
         result
     }
 }
-
 
 #[cfg(test)]
 mod tests {
@@ -982,5 +1021,21 @@ mod tests {
         let expected_ids = vec![1, 2, 3, 4];
         let actual_ids: Vec<i64> = expected_flushed_limburg_nodes.iter().map(|node| node.id()).collect();
         assert!(expected_ids.iter().all(|id| actual_ids.contains(id)), "Not all expected IDs are present");
+    }
+
+    #[test]
+    fn node_cache_is_filled() {
+        let mut handler = BufferingElevationEnricher::new(GeoTiffManager::with_file_pattern("test/region*.tif"),5, 6, None);
+
+        // The first elements should be buffered in the buffers for their tiffs
+        assert_eq!(0usize, handler.handle_node(simple_node_element_limburg(1, vec![])).len());
+        assert_eq!(0usize, handler.handle_node(simple_node_element_limburg(2, vec![])).len());
+        assert_eq!(0usize, handler.handle_node(simple_node_element_limburg(3, vec![])).len());
+        assert_eq!(0usize, handler.handle_node(simple_node_element_limburg(4, vec![])).len());
+        assert_eq!(0usize, handler.handle_node(simple_node_element_hd_ma(5, vec![])).len());
+        assert_eq!(6usize, handler.handle_and_flush_nodes(vec![simple_node_element_hd_ma(6, vec![])]).len());
+
+        // Now let's check the buffer sizes
+        assert_eq!(6usize, handler.node_cache.len());
     }
 }

@@ -132,17 +132,13 @@ fn process(config: &Config, node_filter_result: Option<HandlerResult>) -> Handle
     }
 
     if &config.elevation_tiffs.len() > &0 {
-
         stopwatch.start();
         log::info!("Initializing elevation geotiff_manager");
         let geotiff_manager: GeoTiffManager = GeoTiffManager::with_file_patterns(config.elevation_tiffs.clone());
         log::info!("Finished initializing geotiff_manager, time: {}", stopwatch);
         stopwatch.reset();
-
         let elevation_enricher = BufferingElevationEnricher::new(geotiff_manager, config.elevation_batch_size, config.elevation_total_buffer_size, skip_ele);
         handler_chain = handler_chain.add(elevation_enricher);
-
-        //todo add ElevationBasedWaySplitter
     }
 
     handler_chain = handler_chain.add(TagFilterByKey::new(
