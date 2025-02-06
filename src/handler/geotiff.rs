@@ -123,21 +123,36 @@ fn format_as_elevation_string(raster_value: RasterValue) -> Option<String> {
 
 pub struct GeoTiffManager {
     index: Box<dyn GeoTiffIndex>,
+    srs_resolver: DynamicSrsResolver
 }
 impl GeoTiffManager {
     pub fn new() -> Self {
         Self {
-            index: Box::new(RSGeoTiffIndex::new())
+            index: Box::new(RSGeoTiffIndex::new()),
+            srs_resolver: DynamicSrsResolver::new()
         }
     }
-    pub fn load_and_index_geotiffs(&mut self, files_pattern: &str, srs_resolver: &DynamicSrsResolver) {
+    pub fn with_file_patterns(file_patterns: Vec<String>) -> Self {
+        let mut geotiff_manager = Self::new();
+        for file_pattern in file_patterns {
+            geotiff_manager.index_geotiffs(&file_pattern);
+        }
+        geotiff_manager
+    }
+    pub fn with_file_pattern(file_pattern: &str) -> Self {
+        let mut geotiff_manager = Self::new();
+        geotiff_manager.index_geotiffs(file_pattern);
+        geotiff_manager
+    }
+
+    fn index_geotiffs(&mut self, files_pattern: &str) {
         match glob(files_pattern) {
             Ok(paths) => {
                 for entry in paths {
                     match entry {
                         Ok(path) => {
                             if path.is_file() {
-                                let geotiff = self.load_geotiff(path.to_str().unwrap(), srs_resolver);
+                                let geotiff = self.load_geotiff(path.to_str().unwrap());
                                 match geotiff {
                                     Ok(geotiff) => {
                                         self.index_geotiff(path, geotiff);
@@ -157,11 +172,13 @@ impl GeoTiffManager {
     }
 
     fn index_geotiff(&mut self, path: PathBuf, geotiff: GeoTiff) {
-        self.index.add_geotiff(geotiff, path.to_str().unwrap());
-        log::debug!("Successfully indexed geotiff file {:?}", path);
+        if self.index.get_geotiff_by_id(path.to_str().unwrap()).is_none() {
+            self.index.add_geotiff(geotiff, path.to_str().unwrap());
+            log::debug!("Successfully indexed geotiff file {:?}", path);
+        }
     }
 
-    pub fn load_geotiff(&mut self, file_path: &str, srs_resolver: &DynamicSrsResolver) -> Result<GeoTiff, Box<dyn Error>> {
+    pub fn load_geotiff(&mut self, file_path: &str) -> Result<GeoTiff, Box<dyn Error>> {
         log::debug!("Loading geotiff {}", file_path);
         let img_file = BufReader::new(File::open(file_path).expect("Could not open input file"));
         let geotiffreader = GeoTiffReader::open(img_file).expect("Could not read input file as tiff");
@@ -172,7 +189,7 @@ impl GeoTiffManager {
         let dimensions = geotiffreader.images().get(0).expect("no image in tiff").dimensions.unwrap();
 
         let geo_params: Vec<&str> = geo_params.split("|").collect();
-        let proj_tiff = srs_resolver.get_epsg(geo_params[0].to_string()).expect("not found");
+        let proj_tiff = self.srs_resolver.get_epsg(geo_params[0].to_string()).expect("not found");
 
         let proj_wgs84 = Proj::from_epsg_code(4326).unwrap();
         let proj_tiff = Proj::from_epsg_code(proj_tiff as u16).unwrap(); //as u16 should not be necessary, SrsResolver should return u16
@@ -297,27 +314,21 @@ impl PointDistance for RSBoundingBox {
 pub(crate) struct BufferingElevationEnricher {
     geotiff_manager: GeoTiffManager,
     nodes_for_geotiffs: HashMap<String, Vec<Node>>,
-    srs_resolver: DynamicSrsResolver,
     max_buffer_len: usize,
     total_buffered_nodes_max: usize,
     total_buffered_nodes_count: usize,
     skip_ele: Option<BitVec>,
 }
 impl BufferingElevationEnricher {
-    pub fn new(max_buffer_len: usize, total_buffered_nodes_max: usize, skip_ele: Option<BitVec>) -> Self {
+    pub fn new(geotiff_manager: GeoTiffManager, max_buffer_len: usize, total_buffered_nodes_max: usize, skip_ele: Option<BitVec>) -> Self {
         Self {
-            geotiff_manager: GeoTiffManager::new(),
+            geotiff_manager,
             nodes_for_geotiffs: HashMap::new(),
-            srs_resolver: DynamicSrsResolver::new(),
             total_buffered_nodes_count: 0,
             max_buffer_len,
             total_buffered_nodes_max,
             skip_ele: skip_ele,
         }
-    }
-    pub fn init(&mut self, file_pattern: &str) -> Result<(), Box<dyn Error>> {
-        self.geotiff_manager.load_and_index_geotiffs(file_pattern, &self.srs_resolver);
-        Ok(())
     }
 
     /// Only add node to (new) buffer, nothing else.
@@ -339,7 +350,7 @@ impl BufferingElevationEnricher {
     fn handle_and_flush_buffer(&mut self, buffer_name: String) -> Vec<Node> {
         let mut buffer_vec = self.nodes_for_geotiffs.remove(&buffer_name).expect("buffer not found");
         log::debug!("Handling and flushing buffer with {} buffered nodes for geotiff '{}'", buffer_vec.len(), buffer_name);
-        let geotiff = &mut self.geotiff_manager.load_geotiff(buffer_name.as_str(), &self.srs_resolver).expect("could not load geotiff");
+        let geotiff = &mut self.geotiff_manager.load_geotiff(buffer_name.as_str()).expect("could not load geotiff");
         buffer_vec.iter_mut().for_each(|node| if !self.skip_elevation(node) { self.add_elevation_tag(geotiff, node) });
         self.total_buffered_nodes_count = self.total_buffered_nodes_count - buffer_vec.len();
         buffer_vec
@@ -505,13 +516,7 @@ mod tests {
     #[ignore]
     fn test_find_geotiff_id_for_wgs84_coord_srtm_ma_hd() {
         let _ = SimpleLogger::new().init();
-        let srs_resolver = DynamicSrsResolver::new();
-        let mut geotiff_loader = GeoTiffManager::new();
-        geotiff_loader.load_and_index_geotiffs("test/srtm*.tif", &srs_resolver);
-        assert_eq!(2, geotiff_loader.index.get_geotiff_count());
-        geotiff_loader.load_and_index_geotiffs("test/region*.tif", &srs_resolver);
-        assert_eq!(4, geotiff_loader.index.get_geotiff_count());
-        geotiff_loader.load_and_index_geotiffs("test/*gmted*.tif", &srs_resolver);
+        let mut geotiff_loader = GeoTiffManager::with_file_patterns(vec!["test/srtm*.tif".to_string(), "test/region*.tif".to_string(), "test/*gmted*.tif".to_string()]);
         assert_eq!(6, geotiff_loader.index.get_geotiff_count());
 
         let test_point = wgs84_coordinate_hd_river();
@@ -561,12 +566,12 @@ mod tests {
     fn wgs84_coordinate_hamburg_elbphilharmonie() -> TestPoint {TestPoint::new(9.984270930290224, 53.54137211789218)}
     fn create_geotiff_limburg() -> GeoTiff {
         let mut tiff_loader = GeoTiffManager::new();
-        let geotiff = tiff_loader.load_geotiff("test/region_limburg_an_der_lahn.tif", &DynamicSrsResolver::new()).expect("got error");
+        let geotiff = tiff_loader.load_geotiff("test/region_limburg_an_der_lahn.tif").expect("got error");
         geotiff
     }
     fn create_geotiff_ma_hd() -> GeoTiff {
         let mut tiff_loader = GeoTiffManager::new();
-        let geotiff = tiff_loader.load_geotiff("test/region_heidelberg_mannheim.tif", &DynamicSrsResolver::new()).expect("got error");
+        let geotiff = tiff_loader.load_geotiff("test/region_heidelberg_mannheim.tif").expect("got error");
         geotiff
     }
 
@@ -619,18 +624,14 @@ mod tests {
     #[test]
     fn test_load_geotiffs() {
         let _ = SimpleLogger::new().init();
-        let srs_resolver = DynamicSrsResolver::new();
-        let mut geotiff_loader = GeoTiffManager::new();
-        geotiff_loader.load_and_index_geotiffs("test/region*.tif", &srs_resolver);
+        let mut geotiff_loader = GeoTiffManager::with_file_pattern("test/region*.tif");
         assert_eq!(2, geotiff_loader.index.get_geotiff_count());
         assert!(geotiff_loader.index.get_geotiff_by_id("test/region_limburg_an_der_lahn.tif").is_some());
     }
     #[test]
     fn test_find_geotiff_id_for_wgs84_coord() {
         let _ = SimpleLogger::new().init();
-        let srs_resolver = DynamicSrsResolver::new();
-        let mut geotiff_loader = GeoTiffManager::new();
-        geotiff_loader.load_and_index_geotiffs("test/region*.tif", &srs_resolver);
+        let mut geotiff_loader = GeoTiffManager::with_file_pattern("test/region*.tif");
         assert_eq!(2, geotiff_loader.index.get_geotiff_count());
         let test_point = wgs84_coordinate_limburg_vienna_house();
         let geotiffs = geotiff_loader.index.find_geotiff_id_for_wgs84_coord(test_point.lon(), test_point.lat());
@@ -641,9 +642,7 @@ mod tests {
     #[test]
     fn test_find_geotiff_id_for_wgs84_coord_ma_hd() {
         let _ = SimpleLogger::new().init();
-        let srs_resolver = DynamicSrsResolver::new();
-        let mut geotiff_loader = GeoTiffManager::new();
-        geotiff_loader.load_and_index_geotiffs("test/region*.tif", &srs_resolver);
+        let mut geotiff_loader = GeoTiffManager::with_file_pattern("test/region*.tif");
         assert_eq!(2, geotiff_loader.index.get_geotiff_count());
         let test_point = wgs84_coordinate_hd_river();
         let geotiffs = geotiff_loader.index.find_geotiff_id_for_wgs84_coord(test_point.lon(), test_point.lat());
@@ -654,13 +653,12 @@ mod tests {
     #[ignore]
     fn test_find_geotiff_id_for_wgs84_coord_ma_hd_srtm() {
         let _ = SimpleLogger::new().init();
-        let srs_resolver = DynamicSrsResolver::new();
         let mut geotiff_loader = GeoTiffManager::new();
-        geotiff_loader.load_and_index_geotiffs("test/region*.tif", &srs_resolver);
+        geotiff_loader.index_geotiffs("test/region*.tif");
         assert_eq!(2, geotiff_loader.index.get_geotiff_count());
-        geotiff_loader.load_and_index_geotiffs("test/*gmted*.tif", &srs_resolver);
+        geotiff_loader.index_geotiffs("test/*gmted*.tif");
         assert_eq!(4, geotiff_loader.index.get_geotiff_count());
-        geotiff_loader.load_and_index_geotiffs("test/srtm*.tif", &srs_resolver);
+        geotiff_loader.index_geotiffs("test/srtm*.tif");
         assert_eq!(6, geotiff_loader.index.get_geotiff_count());
 
         let test_point = wgs84_coordinate_hd_river();
@@ -924,8 +922,7 @@ mod tests {
     #[test]
     fn buffering_elevation_enricher_test() {
         let _ = SimpleLogger::new().init();
-        let mut handler = BufferingElevationEnricher::new(4, 5, None);
-        let _ = handler.init("test/region*.tif");
+        let mut handler = BufferingElevationEnricher::new(GeoTiffManager::with_file_pattern("test/region*.tif"), 4, 5, None);
 
         // The first elements should be buffered in the buffer for their tiff
         assert_eq!(0usize, handler.handle_node(simple_node_element_limburg(1, vec![])).len());
@@ -963,8 +960,7 @@ mod tests {
     #[test]
     fn buffering_elevation_enricher_total_max_reached() {
         let _ = SimpleLogger::new().init();
-        let mut handler = BufferingElevationEnricher::new(5, 6, None);
-        let _ = handler.init("test/region*.tif");
+        let mut handler = BufferingElevationEnricher::new(GeoTiffManager::with_file_pattern("test/region*.tif"),5, 6, None);
 
         // The first elements should be buffered in the buffers for their tiffs
         assert_eq!(0usize, handler.handle_node(simple_node_element_limburg(1, vec![])).len());

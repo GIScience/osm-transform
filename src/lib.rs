@@ -20,7 +20,7 @@ use area::AreaHandler;
 use crate::handler::{HandlerChain, HandlerResult, OsmElementTypeSelection};
 use crate::handler::collect::ReferencedNodeIdCollector;
 use crate::handler::filter::{AllElementsFilter, ComplexElementsFilter, FilterType, NodeIdFilter, TagFilterByKey};
-use crate::handler::geotiff::BufferingElevationEnricher;
+use crate::handler::geotiff::{BufferingElevationEnricher, GeoTiffManager};
 use crate::handler::info::{ElementCounter, ElementPrinter};
 use crate::handler::modify::MetadataRemover;
 
@@ -132,15 +132,17 @@ fn process(config: &Config, node_filter_result: Option<HandlerResult>) -> Handle
     }
 
     if &config.elevation_tiffs.len() > &0 {
-        log::info!("Initializing elevation enricher");
+
         stopwatch.start();
-        let mut elevation_enricher = BufferingElevationEnricher::new(config.elevation_batch_size, config.elevation_total_buffer_size, skip_ele);
-        for elevation_glob_pattern in &config.elevation_tiffs {
-            let _ = elevation_enricher.init(elevation_glob_pattern);
-        }
-        log::info!("Finished initializing elevation enricher, time: {}", stopwatch);
-        handler_chain = handler_chain.add(elevation_enricher);
+        log::info!("Initializing elevation geotiff_manager");
+        let geotiff_manager: GeoTiffManager = GeoTiffManager::with_file_patterns(config.elevation_tiffs.clone());
+        log::info!("Finished initializing geotiff_manager, time: {}", stopwatch);
         stopwatch.reset();
+
+        let elevation_enricher = BufferingElevationEnricher::new(geotiff_manager, config.elevation_batch_size, config.elevation_total_buffer_size, skip_ele);
+        handler_chain = handler_chain.add(elevation_enricher);
+
+        //todo add ElevationBasedWaySplitter
     }
 
     handler_chain = handler_chain.add(TagFilterByKey::new(
