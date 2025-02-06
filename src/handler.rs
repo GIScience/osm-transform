@@ -35,10 +35,6 @@ pub fn into_vec_relation_element(relation: Relation) -> Vec<Element> { vec![into
 pub trait Handler {
 
     fn name(&self) -> String;
-    #[deprecated]
-    fn handle_element(&mut self, element: Element) -> Vec<Element> {
-        vec![element]
-    }
 
     fn handle_nodes(&mut self, elements: Vec<Node>) -> Vec<Node> {
         elements
