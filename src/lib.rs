@@ -7,6 +7,7 @@ pub mod handler;
 #[macro_use]
 extern crate maplit;
 
+use std::sync::Once;
 use std::collections::HashSet;
 use std::path::PathBuf;
 use benchmark_rs::stopwatch::StopWatch;
@@ -25,22 +26,28 @@ use crate::handler::modify::MetadataRemover;
 
 use crate::output::{SimpleOutputHandler, SplittingOutputHandler};
 
+// Initialize only once to prevent integration tests from trying
+// to allocate the logger/console multiple times when run in 
+// parallel.
+static INIT: Once = Once::new();
 
 pub fn init(config: &Config) {
-    let log_level: LevelFilter;
-    match config.debug {
-        0 => log_level = LevelFilter::Info,
-        1 => log_level = LevelFilter::Debug,
-        2 => log_level = LevelFilter::Trace,
-        _ => log_level = LevelFilter::Off,
-    }
-    let stdout = ConsoleAppender::builder().build();
-    let config = log4rs::Config::builder()
-        .appender(Appender::builder().build("stdout", Box::new(stdout)))
-        .logger(Logger::builder().build("rusty_routes_transformer", log_level))
-        .build(Root::builder().appender("stdout").build(LevelFilter::Off))
-        .unwrap();
-    let _handle = log4rs::init_config(config).unwrap();
+    INIT.call_once(|| {
+        let log_level: LevelFilter;
+        match config.debug {
+            0 => log_level = LevelFilter::Info,
+            1 => log_level = LevelFilter::Debug,
+            2 => log_level = LevelFilter::Trace,
+            _ => log_level = LevelFilter::Off,
+        }
+        let stdout = ConsoleAppender::builder().build();
+        let config = log4rs::Config::builder()
+            .appender(Appender::builder().build("stdout", Box::new(stdout)))
+            .logger(Logger::builder().build("rusty_routes_transformer", log_level))
+            .build(Root::builder().appender("stdout").build(LevelFilter::Off))
+            .unwrap();
+        let _handle = log4rs::init_config(config).unwrap();
+    });
 }
 
 pub fn run(config: &Config) -> HandlerResult{
