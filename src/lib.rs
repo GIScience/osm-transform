@@ -35,10 +35,10 @@ pub fn init(config: &Config) {
     INIT.call_once(|| {
         let log_level: LevelFilter;
         match config.debug {
-            0 => log_level = LevelFilter::Info,
-            1 => log_level = LevelFilter::Debug,
-            2 => log_level = LevelFilter::Trace,
-            _ => log_level = LevelFilter::Off,
+            0 => log_level = LevelFilter::Off,
+            1 => log_level = LevelFilter::Info,
+            2 => log_level = LevelFilter::Debug,
+            _ => log_level = LevelFilter::Trace,
         }
         let stdout = ConsoleAppender::builder().build();
         let config = log4rs::Config::builder()

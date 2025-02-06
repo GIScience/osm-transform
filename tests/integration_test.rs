@@ -18,7 +18,7 @@ fn base_config() -> Config {
         print_node_ids: HashSet::new(),
         print_way_ids: HashSet::new(),
         print_relation_ids: HashSet::new(),
-        debug: 1,
+        debug: 0,
     }
 }
 
