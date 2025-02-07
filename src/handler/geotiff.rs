@@ -378,18 +378,21 @@ impl BufferingElevationEnricher {
         let lon = node.coordinate().lon();
         let lat = node.coordinate().lat();
         let raster_value = geotiff.get_value_for_wgs_84(lon, lat);
+        self.add_elevation_to_cache(node, lon, lat, &raster_value);
+        Self::add_elevation_tag(node, raster_value);
+    }
 
+    fn add_elevation_to_cache(&mut self, node: &mut Node, lon: f64, lat: f64, raster_value: &RasterValue) {
         let result_value = format_as_elevation_value(&raster_value);
         match result_value {
-            None => {
-                if log::log_enabled!(log::Level::Trace) {
-                    log::warn!("no elevation value for node#{}", node.id());
-                }
-            }
+            None => {}
             Some(ele) => {
-                self.node_cache.insert(node.id(), LocationElevation { lon, lat, ele });
+                self.node_cache.insert(node.id(), LocationWithElevation { lon, lat, ele });
             }
         }
+    }
+
+    fn add_elevation_tag(node: &mut Node, raster_value: RasterValue) {
         let result_string = format_as_elevation_string(raster_value);
         match result_string {
             None => {
