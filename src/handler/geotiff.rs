@@ -224,8 +224,8 @@ impl GeoTiffManager {
         };
         Ok(geo_tiff)
     }
-    fn find_geotiff_id_for_wgs84_coord(&mut self, lon: f64, lat: f64) -> Vec<String> {
-        self.index.find_geotiff_id_for_wgs84_coord(lon, lat)
+    fn find_geotiff_id_for_wgs84_coord(&mut self, lon: f64, lat: f64) -> Option<String> {
+        self.index.find_geotiff_id_for_wgs84_coord(lon, lat).first().map(|s| s.to_string())
     }
 }
 
@@ -352,15 +352,14 @@ impl BufferingElevationEnricher {
     /// Only add node to (new) buffer, nothing else.
     /// Handling and flushing is triggered by the trait methods.
     fn buffer_node(&mut self, node: Node) -> (Option<String>, Option<Node>) {
-        let geotiffs = self.geotiff_manager.find_geotiff_id_for_wgs84_coord(node.coordinate().lon(), node.coordinate().lat());
-        if geotiffs.is_empty() {
+        let geotiff_name = self.geotiff_manager.find_geotiff_id_for_wgs84_coord(node.coordinate().lon(), node.coordinate().lat());
+        if geotiff_name.is_none() {
             return (None, Some(node));
         }
 
-        let geotiff_name = geotiffs.first().unwrap().to_string();
-        self.nodes_for_geotiffs.entry(geotiff_name.clone()).or_insert_with(Vec::new).push(node); //todo avoid clone String
+        self.nodes_for_geotiffs.entry(geotiff_name.clone().unwrap().to_string()).or_insert_with(Vec::new).push(node);
         self.total_buffered_nodes_count = self.total_buffered_nodes_count + 1;
-        (Some(geotiff_name), None)
+        (geotiff_name, None)
     }
 
     /// Load geotiff for this buffer and add elevation to all nodes in buffer,
