@@ -10,10 +10,13 @@ use glob::glob;
 use log::error;
 use osm_io::osm::model::coordinate::Coordinate;
 use osm_io::osm::model::node::Node;
+use osm_io::osm::model::relation::Relation;
 use osm_io::osm::model::tag::Tag;
+use osm_io::osm::model::way::Way;
 use proj4rs::Proj;
 use rstar::{AABB, Envelope, Point, PointDistance, RTree, RTreeObject};
 use crate::handler::Handler;
+use crate::handler::interpolate::WaySplitter;
 use crate::srs::DynamicSrsResolver;
 
 pub struct GeoTiff {
@@ -334,7 +337,8 @@ pub(crate) struct BufferingElevationEnricher {
     total_buffered_nodes_max: usize,
     total_buffered_nodes_count: usize,
     skip_ele: Option<BitVec>,
-    node_cache: HashMap<i64, LocationWithElevation>
+    node_cache: HashMap<i64, LocationWithElevation>,
+    next_node_id: i64,
 }
 impl BufferingElevationEnricher {
     pub fn new(geotiff_manager: GeoTiffManager, max_buffer_len: usize, total_buffered_nodes_max: usize, skip_ele: Option<BitVec>) -> Self {
@@ -448,6 +452,39 @@ impl BufferingElevationEnricher {
         }
     }
 
+    pub(crate) fn handle_way(&mut self, way: &Way) -> Vec<Node> {
+        if way.refs().len() < 2 {
+            return vec![];
+        }
+        let mut intermediate_nodes = vec![];
+        for from_idx in 0..way.refs().len()-2 {
+            let from_node_id = way.refs()[from_idx];
+            let to_node_id = way.refs()[from_idx+1];
+            let from_location = self.node_cache.get(&from_node_id).unwrap();
+            let to_location = self.node_cache.get(&to_node_id).unwrap();
+
+            let intermediate_locations = WaySplitter::compute_intermediate_locations(from_location.lat, from_location.lon, to_location.lat, to_location.lon, (10f64, 10f64));
+            intermediate_locations.iter().for_each(|location| {
+                let node = Node::new(self.next_node_id(), 0, Coordinate::new(location.lat(), location.lon()), 0, 0, 0, String::default(), true, vec![
+                    Tag::new("ele".to_string(), location.ele().to_string())
+                ]);
+                intermediate_nodes.push(node);
+            });
+        }
+        intermediate_nodes
+    }
+
+    pub(crate) fn handle_intermediate_locations(&mut self, intermediate_locations: Vec<LocationWithElevation>) {
+        for mut intermediate_location in intermediate_locations {
+            let geotiff_name = self.geotiff_manager.find_geotiff_id_for_wgs84_coord(intermediate_location.lon(), intermediate_location.lat());
+            let mut geotiff = self.geotiff_manager.load_geotiff(geotiff_name.unwrap().as_str()).expect("could not load geotiff");
+
+            let raster_value = geotiff.get_value_for_wgs_84(intermediate_location.lon(), intermediate_location.lat());
+            let ele = format_as_elevation_value(&raster_value).unwrap();
+            intermediate_location.ele = ele;
+        }
+    }
+
     fn flush_largest_buffers_when_total_max_reached(&mut self) -> Vec<Node> {
         if self.total_buffered_nodes_count > self.total_buffered_nodes_max {
             let buffer_lengths = self.get_buffer_lengths_sorted_desc();
@@ -492,6 +529,17 @@ impl BufferingElevationEnricher {
 impl Handler for BufferingElevationEnricher {
     fn name(&self) -> String { "BufferingElevationEnricher".to_string() }
 
+    fn handle_elements(&mut self, mut nodes: Vec<Node>, mut ways: Vec<Way>, mut relations: Vec<Relation>) -> (Vec<Node>, Vec<Way>, Vec<Relation>) {
+        if nodes.len()>0 { nodes = self.handle_nodes(nodes); }
+        if ways.len()>0 {
+            for way in ways.iter() {
+                nodes.extend(self.handle_way(way));
+            }
+        }
+        if relations.len()>0 { relations = self.handle_relations(relations); }
+        (nodes, ways, relations)
+    }
+
     fn handle_nodes(&mut self, nodes: Vec<Node>) -> Vec<Node> {
         let mut result = Vec::new();
         for node in nodes {
@@ -500,6 +548,12 @@ impl Handler for BufferingElevationEnricher {
         result
     }
 
+    fn handle_ways(&mut self, ways: Vec<Way>) -> Vec<Way> {
+        for way in ways.iter() {
+            self.handle_way(way);
+        }
+        ways
+    }
     fn handle_and_flush_nodes(&mut self, elements: Vec<Node> ) -> Vec<Node> {
         log::debug!("{}: handle_and_flush_nodes called", self.name());
         let mut result = self.handle_nodes(elements);
