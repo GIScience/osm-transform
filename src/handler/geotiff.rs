@@ -8,6 +8,7 @@ use bit_vec::BitVec;
 use georaster::geotiff::{GeoTiffReader, RasterValue};
 use glob::glob;
 use log::error;
+use osm_io::osm::model::coordinate::Coordinate;
 use osm_io::osm::model::node::Node;
 use osm_io::osm::model::tag::Tag;
 use proj4rs::Proj;
@@ -326,13 +327,6 @@ impl PointDistance for RSBoundingBox {
     }
 }
 
-
-struct LocationElevation {
-    lon: f64,
-    lat: f64,
-    ele: f64
-}
-
 pub(crate) struct BufferingElevationEnricher {
     geotiff_manager: GeoTiffManager,
     nodes_for_geotiffs: HashMap<String, Vec<Node>>,
@@ -340,8 +334,7 @@ pub(crate) struct BufferingElevationEnricher {
     total_buffered_nodes_max: usize,
     total_buffered_nodes_count: usize,
     skip_ele: Option<BitVec>,
-
-    node_cache: HashMap<i64, LocationElevation>
+    node_cache: HashMap<i64, LocationWithElevation>
 }
 impl BufferingElevationEnricher {
     pub fn new(geotiff_manager: GeoTiffManager, max_buffer_len: usize, total_buffered_nodes_max: usize, skip_ele: Option<BitVec>) -> Self {
@@ -513,6 +506,39 @@ impl Handler for BufferingElevationEnricher {
     }
 }
 
+
+pub(crate) struct LocationWithElevation {
+    lon: f64,
+    lat: f64,
+    ele: f64,
+}
+#[allow(dead_code)]
+impl LocationWithElevation {
+    pub(crate) fn from_lon_lat(lon: f64, lat: f64) -> Self {
+        Self {
+            lon,
+            lat,
+            ele: 0.0
+        }
+    }
+    pub(crate) fn from_coordinate(coordinate: Coordinate) -> Self {
+        Self::from_lon_lat(coordinate.lon(), coordinate.lat() )
+    }
+    pub(crate) fn with_elevation(&mut self, ele: f64) -> &mut Self {
+        self.ele = ele;
+        self
+    }
+    pub(crate) fn get_coordinate(&self) -> Coordinate {
+        Coordinate::new(self.lat, self.lon)
+    }
+    pub(crate) fn get_tuple_lon_lat(&self) -> (f64, f64) {
+        (self.lon, self.lat)
+    }
+    pub(crate) fn lon(&self) -> f64 { self.lon }
+    pub(crate) fn lat(&self) -> f64 { self.lat }
+    pub(crate) fn ele(&self) -> f64 { self.ele }
+}
+
 #[cfg(test)]
 mod tests {
     use std::fs::File;
@@ -520,36 +546,14 @@ mod tests {
 
     use epsg::CRS;
     use georaster::geotiff::{GeoTiffReader, RasterValue};
-    use osm_io::osm::model::coordinate::Coordinate;
     use osm_io::osm::model::node::Node;
     use osm_io::osm::model::tag::Tag;
     use proj4rs::Proj;
     use simple_logger::SimpleLogger;
 
-    use crate::handler::geotiff::{BufferingElevationEnricher, format_as_elevation_string, GeoTiff, GeoTiffManager, round_f32, round_f64, transform};
+    use crate::handler::geotiff::{BufferingElevationEnricher, format_as_elevation_string, GeoTiff, GeoTiffManager, round_f32, round_f64, transform, LocationWithElevation};
     use crate::handler::Handler;
     use crate::srs::DynamicSrsResolver;
-    struct TestPoint {
-        lon: f64,
-        lat: f64,
-    }
-    #[allow(dead_code)]
-    impl TestPoint {
-        fn new(lon: f64, lat: f64) -> Self {
-            Self { lon, lat }
-        }
-        fn from_coordinate(coordinate: Coordinate) -> Self {
-            Self { lon: coordinate.lon(), lat: coordinate.lat() }
-        }
-        fn as_coordinate(&self) -> Coordinate {
-            Coordinate::new(self.lat, self.lon)
-        }
-        fn as_tuple_lon_lat(&self) -> (f64, f64) {
-            (self.lon, self.lat)
-        }
-        fn lon(&self) -> f64 { self.lon }
-        fn lat(&self) -> f64 { self.lat }
-    }
 
     #[test]
     #[ignore]
@@ -597,12 +601,12 @@ mod tests {
         assert_eq!(geotiffs[0], "test/srtm_38_02.tif");
         assert_eq!(geotiffs[1], "test/50N000E_20101117_gmted_mea075.tif");
     }
-    fn wgs84_coord_hd_mountain() -> TestPoint {TestPoint::new(8.726878, 49.397500)}
-    fn wgs84_coordinate_hd_river() -> TestPoint {TestPoint::new(8.682461, 49.411029)}
-    fn wgs84_coordinate_limburg_vienna_house() -> TestPoint {TestPoint::new(8.06, 50.39)}
-    fn wgs84_coordinate_limburg_traffic_circle() -> TestPoint {TestPoint::new(8.06185930, 50.38536322)}
+    fn wgs84_coord_hd_mountain() -> LocationWithElevation { LocationWithElevation::from_lon_lat(8.726878, 49.397500)}
+    fn wgs84_coordinate_hd_river() -> LocationWithElevation { LocationWithElevation::from_lon_lat(8.682461, 49.411029)}
+    fn wgs84_coordinate_limburg_vienna_house() -> LocationWithElevation { LocationWithElevation::from_lon_lat(8.06, 50.39)}
+    fn wgs84_coordinate_limburg_traffic_circle() -> LocationWithElevation { LocationWithElevation::from_lon_lat(8.06185930, 50.38536322)}
 
-    fn wgs84_coordinate_hamburg_elbphilharmonie() -> TestPoint {TestPoint::new(9.984270930290224, 53.54137211789218)}
+    fn wgs84_coordinate_hamburg_elbphilharmonie() -> LocationWithElevation { LocationWithElevation::from_lon_lat(9.984270930290224, 53.54137211789218)}
     fn create_geotiff_limburg() -> GeoTiff {
         let mut tiff_loader = GeoTiffManager::new();
         let geotiff = tiff_loader.load_geotiff("test/region_limburg_an_der_lahn.tif").expect("got error");
@@ -638,11 +642,11 @@ mod tests {
     }
     pub fn simple_node_element_limburg(id: i64, tags: Vec<(&str, &str)>) -> Node {
         let tags_obj = tags.iter().map(|(k, v)| Tag::new(k.to_string(), v.to_string())).collect();
-        Node::new(id, 1, wgs84_coordinate_limburg_vienna_house().as_coordinate(), 1, 1, 1, "a".to_string(), true, tags_obj)
+        Node::new(id, 1, wgs84_coordinate_limburg_vienna_house().get_coordinate(), 1, 1, 1, "a".to_string(), true, tags_obj)
     }
     pub fn simple_node_element_hd_ma(id: i64, tags: Vec<(&str, &str)>) -> Node {
         let tags_obj = tags.iter().map(|(k, v)| Tag::new(k.to_string(), v.to_string())).collect();
-        Node::new(id, 1, wgs84_coordinate_hd_river().as_coordinate(), 1, 1, 1, "a".to_string(), true, tags_obj)
+        Node::new(id, 1, wgs84_coordinate_hd_river().get_coordinate(), 1, 1, 1, "a".to_string(), true, tags_obj)
     }
     fn validate_has_ids(elements: &Vec<Node>, ids: Vec<i64>) {
         let element_ids = elements.into_iter().map(|node| node.id()).collect::<Vec<_>>();
@@ -895,8 +899,8 @@ mod tests {
     fn geotiff_ma_hd_to_pixel_coord_and_get_value_for_pixel_coord() {
         //Values and expected results picket from QGIS
         let mut geotiff = create_geotiff_ma_hd();
-        check_tiff_to_pixel_coord_and_get_value_for_pixel_coord(&mut geotiff, wgs84_coord_hd_mountain().as_tuple_lon_lat(), (425u32, 342u32), RasterValue::I16(573));
-        check_tiff_to_pixel_coord_and_get_value_for_pixel_coord(&mut geotiff, wgs84_coordinate_hd_river().as_tuple_lon_lat(), (372u32, 326u32), RasterValue::I16(107));
+        check_tiff_to_pixel_coord_and_get_value_for_pixel_coord(&mut geotiff, wgs84_coord_hd_mountain().get_tuple_lon_lat(), (425u32, 342u32), RasterValue::I16(573));
+        check_tiff_to_pixel_coord_and_get_value_for_pixel_coord(&mut geotiff, wgs84_coordinate_hd_river().get_tuple_lon_lat(), (372u32, 326u32), RasterValue::I16(107));
     }
     fn check_tiff_to_pixel_coord_and_get_value_for_pixel_coord(geotiff: &mut GeoTiff, tiff_coord: (f64, f64), expected_pixel_coord: (u32, u32), expected_value: RasterValue) {
         let pixel_coord = geotiff.tiff_to_pixel_coord(tiff_coord.0, tiff_coord.1);
