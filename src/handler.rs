@@ -36,6 +36,14 @@ pub trait Handler {
 
     fn name(&self) -> String;
 
+    fn handle_elements(&mut self, nodes: Vec<Node>, ways: Vec<Way>, relations: Vec<Relation>) -> (Vec<Node>, Vec<Way>, Vec<Relation>) {
+        (self.handle_nodes(nodes), self.handle_ways(ways), self.handle_relations(relations))
+    }
+
+    fn handle_and_flush_elements(&mut self, nodes: Vec<Node>, ways: Vec<Way>, relations: Vec<Relation>) -> (Vec<Node>, Vec<Way>, Vec<Relation>) {
+        (self.handle_and_flush_nodes(nodes), self.handle_and_flush_ways(ways), self.handle_and_flush_relations(relations))
+    }
+
     fn handle_nodes(&mut self, elements: Vec<Node>) -> Vec<Node> {
         elements
     }
@@ -146,12 +154,14 @@ impl HandlerChain {
         }
     }
 
-    fn process_nodes(&mut self, mut elements: Vec<Node>) {
+    fn process_nodes(&mut self, mut nodes: Vec<Node>) {
+        let mut ways = vec![];
+        let mut relations = vec![];
         for processor in &mut self.processors {
-            if elements.len() == 0 {
+            if nodes.len() == 0 {
                 break
             }
-            elements = processor.handle_nodes(elements);
+            (nodes, ways, relations) = processor.handle_elements(nodes, ways, relations);
         }
     }
 
@@ -166,12 +176,14 @@ impl HandlerChain {
         self.flushed_nodes = true;
     }
 
-    fn process_ways(&mut self, mut elements: Vec<Way>) {
+    fn process_ways(&mut self, mut ways: Vec<Way>) {
+        let mut nodes = vec![];
+        let mut relations = vec![];
         for processor in &mut self.processors {
-            if elements.len() == 0 {
+            if ways.len() == 0 {
                 break
             }
-            elements = processor.handle_ways(elements);
+            (nodes, ways, relations) = processor.handle_elements(nodes, ways, relations);
         }
     }
 
@@ -186,12 +198,14 @@ impl HandlerChain {
         self.flushed_ways = true;
     }
 
-    fn process_relations(&mut self, mut elements: Vec<Relation>) {
+    fn process_relations(&mut self, mut relations: Vec<Relation>) {
+        let mut nodes = vec![];
+        let mut ways = vec![];
         for processor in &mut self.processors {
-            if elements.len() == 0 {
+            if relations.len() == 0 {
                 break
             }
-            elements = processor.handle_relations(elements);
+            (nodes, ways, relations) = processor.handle_elements(nodes, ways, relations);
         }
     }
 

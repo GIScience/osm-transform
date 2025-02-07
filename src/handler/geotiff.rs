@@ -346,7 +346,13 @@ impl BufferingElevationEnricher {
             max_buffer_len,
             total_buffered_nodes_max,
             skip_ele: skip_ele,
+            next_node_id: 100_000_000_000,
         }
+    }
+    fn next_node_id(&mut self) -> i64 {
+        let id = self.next_node_id;
+        self.next_node_id = self.next_node_id + 1;
+        id
     }
 
     /// Only add node to (new) buffer, nothing else.

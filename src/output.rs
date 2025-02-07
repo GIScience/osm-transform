@@ -94,7 +94,7 @@ impl SplittingOutputHandler {
 
 impl Handler for SplittingOutputHandler {
     fn name(&self) -> String {
-        todo!()
+        "SplittingOutputHandler".to_string()
     }
 
 
