@@ -509,6 +509,65 @@ pub(crate) mod tests {
             result
         }
     }
+
+    pub(crate) struct ElementEvaluator {
+        id: String,
+        node_evaluator: Box<dyn Fn(&Node) -> bool>,
+        way_evaluator: Box<dyn Fn(&Way) -> bool>,
+        relation_evaluator: Box<dyn Fn(&Relation) -> bool>,
+        node_results: BTreeMap<i64, bool>,
+        way_results: BTreeMap<i64, bool>,
+        relation_results: BTreeMap<i64, bool>,
+    }
+    impl ElementEvaluator {
+        fn new(id: &str,
+               node_evaluator: Box<dyn Fn(&Node) -> bool>,
+               way_evaluator: Box<dyn Fn(&Way) -> bool>,
+               relation_evaluator: Box<dyn Fn(&Relation) -> bool>) -> Self {
+            ElementEvaluator {
+                id: id.to_string(),
+                node_evaluator,
+                way_evaluator,
+                relation_evaluator,
+                node_results: BTreeMap::new(),
+                way_results: BTreeMap::new(),
+                relation_results: BTreeMap::new(),
+            }
+        }
+
+    }
+    impl Handler for ElementEvaluator {
+        fn name(&self) -> String { format!("ElementEvaluator#{}", self.id.clone()) }
+
+        fn handle_nodes(&mut self, elements: Vec<Node>) -> Vec<Node> {
+            elements.iter().for_each(|node| {
+                self.node_results.insert(node.id(), (self.node_evaluator)(node));
+            });
+            elements
+        }
+
+        fn handle_ways(&mut self, elements: Vec<Way>) -> Vec<Way> {
+            elements.iter().for_each(|way| {
+                self.way_results.insert(way.id(), (self.way_evaluator)(way));
+            });
+            elements
+        }
+
+        fn handle_relations(&mut self, elements: Vec<Relation>) -> Vec<Relation> {
+            elements.iter().for_each(|relation| {
+                self.relation_results.insert(relation.id(), (self.relation_evaluator)(relation));
+            });
+            elements
+        }
+
+        fn add_result(&mut self, mut result: HandlerResult) -> HandlerResult {
+            result.other.insert(format!("{} node results", self.name()), self.node_results.iter().map(|(k, v)| format!("{}:{}", k, v)).collect::<Vec<String>>().join(", "));
+            result.other.insert(format!("{} way results", self.name()), self.node_results.iter().map(|(k, v)| format!("{}:{}", k, v)).collect::<Vec<String>>().join(", "));
+            result.other.insert(format!("{} relation results", self.name()), self.node_results.iter().map(|(k, v)| format!("{}:{}", k, v)).collect::<Vec<String>>().join(", "));
+            result
+        }
+    }
+
     #[test]
     /// Assert that it is possible to run a chain of processors.
     fn test_chain() {
@@ -788,7 +847,7 @@ pub(crate) mod tests {
     }
 
     #[test]
-    fn handler_chain_with_buffering_elevation_enricher_adds_new_nodes() {
+    fn handler_chain_with_buffering_elevation_enricher_adds_new_nodes_with_elevation() {
         let _ = SimpleLogger::new().init();
         let mut node_ids = BitVec::from_elem(10usize, false);
         node_ids.set(1usize, true);
@@ -807,13 +866,20 @@ pub(crate) mod tests {
             .add(handler)
             .add(TestOnlyOrderRecorder::new("final"))
             .add(ElementCounter::new("final"))
-            .add(ElevationChecker::new());
+            .add(ElevationChecker::new())
+            .add(ElementEvaluator::new("final",
+                                       Box::new(|node| node.tags().iter().any(|tag| tag.k() == "ele")),
+                                       Box::new(|_| true),
+                                       Box::new(|_| true)))
+            ;
 
         handler_chain.process(as_node_element(node_without_ele_from_location(101, location_with_elevation_hd_philosophers_way_start(), vec![])));
         handler_chain.process(as_node_element(node_without_ele_from_location(102, location_with_elevation_hd_philosophers_way_end(), vec![])));
         handler_chain.process(as_way_element(simple_way(201, vec![101, 102], vec![])));
         handler_chain.flush_handlers();
         let result = handler_chain.collect_result();
+
+        // dbg!(&result); // This causes the test to run eternally...?!
 
         assert_eq!(&result.counts.get("nodes count initial").unwrap().clone(), &2,);
         assert_eq!(&result.counts.get("ways count initial").unwrap().clone(), &1,);
@@ -823,5 +889,6 @@ pub(crate) mod tests {
         assert_eq!(&result.other.get("TestOnlyOrderRecorder final").unwrap().clone(), "node#101, node#102, node#0, way#201");
         assert_eq!(&result.other.get("TestOnlyOrderRecorder final").unwrap().clone(), "node#101, node#102, node#0, way#201");
         assert!(&result.other.get("all nodes have ele").unwrap().parse::<bool>().unwrap());
+        assert_eq!(&result.other.get("ElementEvaluator#final node results").unwrap().clone(), "0:true, 101:true, 102:true");
     }
 }
