@@ -1177,8 +1177,8 @@ mod tests {
         let _ = Logger::builder().build("rusty_routes_transformer", LevelFilter::Debug);
         let mut handler = BufferingElevationEnricher::new(GeoTiffManager::with_file_pattern("test/region*.tif"),5, 6, None, 0.01, 0.01);
 
-        handler.node_cache.insert(1, wgs84_coord_hd_philosophers_way_start());
-        handler.node_cache.insert(2, wgs84_coord_hd_philosophers_way_end());
+        handler.node_cache.insert(1000, wgs84_coord_hd_philosophers_way_start());
+        handler.node_cache.insert(1001, wgs84_coord_hd_philosophers_way_end());
 
         let way = simple_way_element(1, vec![1000, 1001], vec![]);
         let nodes = handler.handle_way(&way);
@@ -1191,8 +1191,8 @@ mod tests {
         let _ = Logger::builder().build("rusty_routes_transformer", LevelFilter::Debug);
         let mut handler = BufferingElevationEnricher::new(GeoTiffManager::with_file_pattern("test/region*.tif"),5, 6, None, 0.01, 0.01);
 
-        handler.node_cache.insert(1, wgs84_coord_hd_philosophers_way_start());
-        handler.node_cache.insert(2, wgs84_coord_hd_philosophers_way_end());
+        handler.node_cache.insert(1000, wgs84_coord_hd_philosophers_way_start());
+        handler.node_cache.insert(1001, wgs84_coord_hd_philosophers_way_end());
 
         let way = simple_way_element(1, vec![1000, 1001], vec![]);
         assert!(&way.refs().len() == &2);
@@ -1200,6 +1200,6 @@ mod tests {
         let nodes = handler.handle_way(&way);
 
         dbg!(&way);
-        assert!(&way.refs().len() == &3);
+        assert_eq!(&3, &way.refs().len());
     }
 }

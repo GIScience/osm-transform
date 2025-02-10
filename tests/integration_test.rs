@@ -19,6 +19,8 @@ fn base_config() -> Config {
         print_way_ids: HashSet::new(),
         print_relation_ids: HashSet::new(),
         debug: 0,
+        resolution_lon: 0.01,
+        resolution_lat: 0.01,
     }
 }
 
