@@ -6,7 +6,7 @@ use osm_io::osm::model::way::Way;
 use osm_io::osm::pbf;
 use osm_io::osm::pbf::compression_type::CompressionType;
 use osm_io::osm::pbf::file_info::FileInfo;
-use crate::handler::{Handler, HandlerResult, into_node_element, into_relation_element, into_way_element};
+use crate::handler::{Handler, HandlerResult, into_node_element, into_relation_element, into_way_element, format_element_id};
 
 pub struct SimpleOutputHandler {
     pub writer: pbf::writer::Writer,
@@ -118,17 +118,18 @@ impl Handler for SplittingOutputHandler {
         vec![]
     }
     fn add_result(&mut self, result: HandlerResult) -> HandlerResult {
-        self.way_relation_writer.close().expect("Failed to close writer");
+        self.way_relation_writer.close().expect("Failed to close way_relation_writer");
         let fresh_way_relation_reader = pbf::reader::Reader::new(&self.way_relation_writer.path());
         match fresh_way_relation_reader {
             Ok(reader) => {
                 for element in reader.elements().unwrap() {
+                    log::trace!("fresh_way_relation_reader copies element {} to node_writer", format_element_id(&element));
                     self.node_writer.write_element(element).expect("Failed to write element");
                 }
             }
             Err(_) => {}
         }
-        self.close();
+        self.node_writer.close().expect("Failed to close node writer");
         result
     }
 }

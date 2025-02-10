@@ -165,7 +165,7 @@ fn process(config: &Config, node_filter_result: Option<HandlerResult>) -> Handle
         Some(path_buf) => {
             log::info!("Initializing ouput handler");
             stopwatch.start();
-            if config.elevation_way_splitting {
+            if config.elevation_way_splitting == true {
                 let mut output_handler = SplittingOutputHandler::new(path_buf.clone());
                 output_handler.init();
                 handler_chain = handler_chain.add(output_handler);

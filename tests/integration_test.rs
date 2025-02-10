@@ -66,6 +66,7 @@ fn run_all() {
     config.elevation_total_buffer_size = 500000;
     config.with_node_filtering = true;
     config.remove_metadata = true;
+    config.elevation_way_splitting = true;
     rusty_routes_transformer::init(&config);
     let result = rusty_routes_transformer::run(&config);
     assert_eq!(result.counts.get("nodes count initial").unwrap(), &BAARLE_NODE_COUNT);
