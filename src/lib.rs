@@ -142,6 +142,7 @@ fn process(config: &Config, node_filter_result: Option<HandlerResult>) -> Handle
             config.elevation_batch_size,
             config.elevation_total_buffer_size,
             skip_ele,
+            config.elevation_way_splitting,
             config.resolution_lon,
             config.resolution_lat);
         handler_chain = handler_chain.add(elevation_enricher);

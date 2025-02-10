@@ -534,7 +534,6 @@ pub(crate) mod tests {
                 relation_results: BTreeMap::new(),
             }
         }
-
     }
     impl Handler for ElementEvaluator {
         fn name(&self) -> String { format!("ElementEvaluator#{}", self.id.clone()) }
@@ -786,12 +785,6 @@ pub(crate) mod tests {
         assert_eq!(&result.other.get("TestOnlyOrderRecorder final").unwrap().clone(), "node#2, node#6, node#8");
     }
 
-
-
-
-
-
-
     #[test]
     fn handler_chain() {
         let _ = SimpleLogger::new().init();
@@ -857,6 +850,7 @@ pub(crate) mod tests {
             5,
             6,
             None,
+            true,
             0.01,
             0.01);
 
