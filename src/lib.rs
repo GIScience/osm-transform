@@ -137,7 +137,13 @@ fn process(config: &Config, node_filter_result: Option<HandlerResult>) -> Handle
         let geotiff_manager: GeoTiffManager = GeoTiffManager::with_file_patterns(config.elevation_tiffs.clone());
         log::info!("Finished initializing geotiff_manager, time: {}", stopwatch);
         stopwatch.reset();
-        let elevation_enricher = BufferingElevationEnricher::new(geotiff_manager, config.elevation_batch_size, config.elevation_total_buffer_size, skip_ele);
+        let elevation_enricher = BufferingElevationEnricher::new(
+            geotiff_manager,
+            config.elevation_batch_size,
+            config.elevation_total_buffer_size,
+            skip_ele,
+            config.resolution_lon,
+            config.resolution_lat);
         handler_chain = handler_chain.add(elevation_enricher);
     }
 
@@ -198,4 +204,6 @@ pub struct Config {
     pub elevation_batch_size: usize,
     pub elevation_total_buffer_size: usize,
     pub elevation_way_splitting: bool,
+    pub resolution_lon: f64,
+    pub resolution_lat: f64,
 }

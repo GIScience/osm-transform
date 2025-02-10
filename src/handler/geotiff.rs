@@ -339,9 +339,11 @@ pub(crate) struct BufferingElevationEnricher {
     skip_ele: Option<BitVec>,
     node_cache: HashMap<i64, LocationWithElevation>,
     next_node_id: i64,
+    resolution_lon: f64,
+    resolution_lat: f64,
 }
 impl BufferingElevationEnricher {
-    pub fn new(geotiff_manager: GeoTiffManager, max_buffer_len: usize, total_buffered_nodes_max: usize, skip_ele: Option<BitVec>) -> Self {
+    pub fn new(geotiff_manager: GeoTiffManager, max_buffer_len: usize, total_buffered_nodes_max: usize, skip_ele: Option<BitVec>, resolution_lon: f64, resolution_lat: f64) -> Self {
         Self {
             geotiff_manager,
             nodes_for_geotiffs: HashMap::new(),
@@ -351,7 +353,15 @@ impl BufferingElevationEnricher {
             total_buffered_nodes_max,
             skip_ele: skip_ele,
             next_node_id: 0,
+            resolution_lon,
+            resolution_lat,
+
         }
+    }
+    pub fn with_resolution(mut self, resolution_lon: f64, resolution_lat: f64) -> Self {
+        self.resolution_lon = resolution_lon;
+        self.resolution_lat = resolution_lat;
+        self
     }
     fn next_node_id(&mut self) -> i64 {
         let id = self.next_node_id;
@@ -469,7 +479,7 @@ impl BufferingElevationEnricher {
             }
             let from_location = from_location.unwrap();
             let to_location = to_location.unwrap();
-            let intermediate_locations = WaySplitter::compute_intermediate_locations(from_location.lat, from_location.lon, to_location.lat, to_location.lon, (0.01f64, 0.01f64));
+            let intermediate_locations = WaySplitter::compute_intermediate_locations(from_location.lon, from_location.lat, to_location.lon, to_location.lat, (self.resolution_lon, self.resolution_lat));
             log::debug!("WaySplitter created {} intermediate locations", intermediate_nodes.len());
             intermediate_locations.iter().for_each(|location| {
                 let node = Node::new(self.next_node_id(), 0, location.get_coordinate(), 0, 0, 0, String::default(), true, vec![
@@ -1086,7 +1096,7 @@ mod tests {
     #[test]
     fn buffering_elevation_enricher_test() {
         let _ = SimpleLogger::new().init();
-        let mut handler = BufferingElevationEnricher::new(GeoTiffManager::with_file_pattern("test/region*.tif"), 4, 5, None);
+        let mut handler = BufferingElevationEnricher::new(GeoTiffManager::with_file_pattern("test/region*.tif"), 4, 5, None, 0.01, 0.01);
 
         // The first elements should be buffered in the buffer for their tiff
         assert_eq!(0usize, handler.handle_node(simple_node_element_limburg(1, vec![])).len());
@@ -1124,7 +1134,7 @@ mod tests {
     #[test]
     fn buffering_elevation_enricher_total_max_reached() {
         let _ = SimpleLogger::new().init();
-        let mut handler = BufferingElevationEnricher::new(GeoTiffManager::with_file_pattern("test/region*.tif"),5, 6, None);
+        let mut handler = BufferingElevationEnricher::new(GeoTiffManager::with_file_pattern("test/region*.tif"),5, 6, None, 0.01, 0.01);
 
         // The first elements should be buffered in the buffers for their tiffs
         assert_eq!(0usize, handler.handle_node(simple_node_element_limburg(1, vec![])).len());
@@ -1150,7 +1160,7 @@ mod tests {
 
     #[test]
     fn node_cache_is_filled() {
-        let mut handler = BufferingElevationEnricher::new(GeoTiffManager::with_file_pattern("test/region*.tif"),5, 6, None);
+        let mut handler = BufferingElevationEnricher::new(GeoTiffManager::with_file_pattern("test/region*.tif"),5, 6, None, 0.01, 0.01);
 
         // The first elements should be buffered in the buffers for their tiffs
         assert_eq!(0usize, handler.handle_node(simple_node_element_limburg(1, vec![])).len());
@@ -1167,7 +1177,7 @@ mod tests {
     #[test]
     fn handle_way_split_nodes_returned() {
         let _ = Logger::builder().build("rusty_routes_transformer", LevelFilter::Debug);
-        let mut handler = BufferingElevationEnricher::new(GeoTiffManager::with_file_pattern("test/region*.tif"),5, 6, None);
+        let mut handler = BufferingElevationEnricher::new(GeoTiffManager::with_file_pattern("test/region*.tif"),5, 6, None, 0.01, 0.01);
 
         handler.node_cache.insert(1, wgs84_coord_hd_philosophers_way_start());
         handler.node_cache.insert(2, wgs84_coord_hd_philosophers_way_end());

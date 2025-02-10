@@ -68,6 +68,14 @@ pub struct Args {
     /// Do NOT remove metadata 'version', 'timestamp', 'changeset', 'uid', 'user'
     #[arg(long)]
     pub keep_metadata: bool,
+
+    /// Resolution for way splitting in direction longitude
+    #[arg(long, default_value = "0.001")]
+    pub resolution_lon: f64,
+
+    /// Resolution for way splitting in direction latitude
+    #[arg(long, default_value = "0.001")]
+    pub resolution_lat: f64,
 }
 impl Args {
     pub fn to_config(self) -> Config {
@@ -84,7 +92,10 @@ impl Args {
             print_node_ids: HashSet::from_iter(self.print_node_ids),
             print_way_ids: HashSet::from_iter(self.print_way_ids),
             print_relation_ids: HashSet::from_iter(self.print_relation_ids),
-            remove_metadata: ! self.keep_metadata
+            remove_metadata: ! self.keep_metadata,
+            resolution_lon: self.resolution_lon,
+            resolution_lat: self.resolution_lat,
+
         }
     }
 }

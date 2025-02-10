@@ -33,23 +33,23 @@ impl WaySplitter {
         let to_lat = to.lat();
         let to_lon = to.lon();
 
-        Self::compute_intermediate_locations(from_lat, from_lon, to_lat, to_lon, resolution)
+        Self::compute_intermediate_locations(from_lon, from_lat, to_lon, to_lat, resolution)
     }
 
-    pub fn compute_intermediate_locations(mut from_lat: f64, mut from_lon: f64, to_lat: f64, to_lon: f64, resolution: (f64, f64)) -> Vec<LocationWithElevation> {
-        let dx = to_lat - from_lat;
-        let dy = to_lon - from_lon;
-        let n = f64::max(dx.abs() / resolution.0, dy.abs() / resolution.1).max(1.0).ceil();
+    pub fn compute_intermediate_locations(mut from_lon: f64, mut from_lat: f64, to_lon: f64, to_lat: f64, resolution: (f64, f64)) -> Vec<LocationWithElevation> {
+        let d_lon = to_lon - from_lon;
+        let d_lat = to_lat - from_lat;
+        let n = f64::max(d_lat.abs() / resolution.1, d_lon.abs() / resolution.0).max(1.0).ceil();
 
-        let sx = dx / n;
-        let sy = dy / n;
+        let s_lon = d_lon / n;
+        let s_lat = d_lat / n;
 
-        let n = (n - 1.0) as usize;
-        let mut v = Vec::with_capacity(n);
+        let number_of_nodes = (n - 1.0) as usize;
+        let mut v = Vec::with_capacity(number_of_nodes);
 
-        for _i in 0..n {
-            from_lat += sx;
-            from_lon += sy;
+        for _i in 0..number_of_nodes {
+            from_lat += s_lat;
+            from_lon += s_lon;
             v.push(LocationWithElevation::from_lon_lat(from_lon, from_lat));
         }
 
@@ -89,7 +89,7 @@ fn test_intermediate_points() {
     assert_eq!(points[0].get_coordinate(), Coordinate::new(-0.5, 0.5));
 
     // test multiple intermediate points necessary
-    let points = way_splitter.compute_intermediate_points(point_a.clone(), point_b.clone(), (0.3, 0.5));
+    let points = way_splitter.compute_intermediate_points(point_a.clone(), point_b.clone(), (0.5, 0.3 ));
     assert_eq!(points.len(), 3);
     assert_eq!(points[0].get_coordinate(), Coordinate::new(-0.75, 0.25));
     assert_eq!(points[1].get_coordinate(), Coordinate::new(-0.50, 0.50));
@@ -100,7 +100,7 @@ fn test_intermediate_points() {
     assert_eq!(points[0].get_coordinate(), Coordinate::new(0.0, 0.0));
 
     // test latitude lines parallel to the Equator
-    let points = way_splitter.compute_intermediate_points(point_b.clone(), point_d.clone(), (2.0, 1.0));
+    let points = way_splitter.compute_intermediate_points(point_b.clone(), point_d.clone(), (1.0, 2.0));
     assert_eq!(points[0].get_coordinate(), Coordinate::new(0.0, 0.0));
 
     // test attempt to split zero length way
