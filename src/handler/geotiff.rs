@@ -453,12 +453,12 @@ impl BufferingElevationEnricher {
     }
 
     pub(crate) fn handle_way(&mut self, way: &Way) -> Vec<Node> {
-        log::trace!("handle_way with WaySplitter called");
+        log::debug!("handle_way with WaySplitter called");
         if way.refs().len() < 2 {
             return vec![];
         }
         let mut intermediate_nodes = vec![];
-        for from_idx in 0..way.refs().len()-2 {
+        for from_idx in 0..way.refs().len()-1 {
             let from_node_id = way.refs()[from_idx];
             let to_node_id = way.refs()[from_idx+1];
             let mut from_location = self.node_cache.get(&from_node_id);
@@ -469,7 +469,7 @@ impl BufferingElevationEnricher {
             }
             let from_location = from_location.unwrap();
             let to_location = to_location.unwrap();
-            let intermediate_locations = WaySplitter::compute_intermediate_locations(from_location.lat, from_location.lon, to_location.lat, to_location.lon, (3f64, 3f64));
+            let intermediate_locations = WaySplitter::compute_intermediate_locations(from_location.lat, from_location.lon, to_location.lat, to_location.lon, (0.01f64, 0.01f64));
             log::debug!("WaySplitter created {} intermediate locations", intermediate_nodes.len());
             intermediate_locations.iter().for_each(|location| {
                 let node = Node::new(self.next_node_id(), 0, location.get_coordinate(), 0, 0, 0, String::default(), true, vec![
@@ -613,7 +613,14 @@ pub(crate) struct LocationWithElevation {
 }
 #[allow(dead_code)]
 impl LocationWithElevation {
-    pub(crate) fn from_lon_lat(lon: f64, lat: f64) -> Self {
+    pub(crate) fn new(lon: f64, lat: f64, ele: f64) -> Self {
+        Self {
+            lon,
+            lat,
+            ele
+        }
+    }
+   pub(crate) fn from_lon_lat(lon: f64, lat: f64) -> Self {
         Self {
             lon,
             lat,
@@ -645,8 +652,11 @@ mod tests {
 
     use epsg::CRS;
     use georaster::geotiff::{GeoTiffReader, RasterValue};
+    use log4rs::config::Logger;
+    use log::LevelFilter;
     use osm_io::osm::model::node::Node;
     use osm_io::osm::model::tag::Tag;
+    use osm_io::osm::model::way::Way;
     use proj4rs::Proj;
     use simple_logger::SimpleLogger;
 
@@ -700,6 +710,9 @@ mod tests {
         assert_eq!(geotiffs[0], "test/srtm_38_02.tif");
         assert_eq!(geotiffs[1], "test/50N000E_20101117_gmted_mea075.tif");
     }
+
+    fn wgs84_coord_hd_philosophers_way_start() -> LocationWithElevation  { LocationWithElevation::new(8.693313002586367, 49.41470412961422, 125.0)}
+    fn wgs84_coord_hd_philosophers_way_end() -> LocationWithElevation  { LocationWithElevation::new(8.707872033119203, 49.41732503427102, 200.0)}
     fn wgs84_coord_hd_mountain() -> LocationWithElevation { LocationWithElevation::from_lon_lat(8.726878, 49.397500)}
     fn wgs84_coordinate_hd_river() -> LocationWithElevation { LocationWithElevation::from_lon_lat(8.682461, 49.411029)}
     fn wgs84_coordinate_limburg_vienna_house() -> LocationWithElevation { LocationWithElevation::from_lon_lat(8.06, 50.39)}
@@ -742,6 +755,15 @@ mod tests {
     pub fn simple_node_element_limburg(id: i64, tags: Vec<(&str, &str)>) -> Node {
         let tags_obj = tags.iter().map(|(k, v)| Tag::new(k.to_string(), v.to_string())).collect();
         Node::new(id, 1, wgs84_coordinate_limburg_vienna_house().get_coordinate(), 1, 1, 1, "a".to_string(), true, tags_obj)
+    }
+    pub fn simple_node_element(id: i64, location: LocationWithElevation, tags: Vec<(&str, &str)>) -> Node {
+        let mut tags_obj: Vec<Tag> = tags.iter().map(|(k, v)| Tag::new(k.to_string(), v.to_string())).collect();
+        tags_obj.push(Tag::new("ele".to_string(), location.ele().to_string()));
+        Node::new(id, 1, location.get_coordinate(), 1, 1, 1, "a".to_string(), true, tags_obj)
+    }
+    pub fn simple_way_element(id: i64, node_refs: Vec<i64>, tags: Vec<(&str, &str)>) -> Way {
+        let mut tags_obj = tags.iter().map(|(k, v)| Tag::new(k.to_string(), v.to_string())).collect();
+        Way::new(id, 1, 1, 1, 1, "a".to_string(), true, node_refs, tags_obj)
     }
     pub fn simple_node_element_hd_ma(id: i64, tags: Vec<(&str, &str)>) -> Node {
         let tags_obj = tags.iter().map(|(k, v)| Tag::new(k.to_string(), v.to_string())).collect();
@@ -1140,5 +1162,24 @@ mod tests {
 
         // Now let's check the buffer sizes
         assert_eq!(6usize, handler.node_cache.len());
+    }
+
+    #[test]
+    fn handle_way_split_nodes_returned() {
+        let _ = Logger::builder().build("rusty_routes_transformer", LevelFilter::Debug);
+        let mut handler = BufferingElevationEnricher::new(GeoTiffManager::with_file_pattern("test/region*.tif"),5, 6, None);
+
+        handler.node_cache.insert(1, wgs84_coord_hd_philosophers_way_start());
+        handler.node_cache.insert(2, wgs84_coord_hd_philosophers_way_end());
+
+        let way = simple_way_element(1, vec![1, 2], vec![]);
+        let nodes = handler.handle_way(&way);
+        dbg!(nodes);
+        // assert!(nodes.len() < 0);
+    }
+
+    #[test]
+    fn handle_way_split_nodes_added_as_refs() {
+
     }
 }
