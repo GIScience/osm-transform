@@ -36,7 +36,8 @@ pub trait Handler {
 
     fn name(&self) -> String;
 
-    fn handle_elements(&mut self, nodes: Vec<Node>, ways: Vec<Way>, relations: Vec<Relation>) -> (Vec<Node>, Vec<Way>, Vec<Relation>) {
+    fn handle_elements(&mut self, nodes: Vec<Node>, ways: Vec<Way>, relations: Vec<Relation>) -> (Vec<Node>, Vec<Way>, Vec<Relation>){
+        log::trace!("{} called with {} nodes, {} ways, {} relations", self.name(), nodes.len(), ways.len(), relations.len());
         (self.handle_nodes(nodes), self.handle_ways(ways), self.handle_relations(relations))
     }
 
@@ -136,92 +137,50 @@ impl HandlerChain {
         log::trace!("######");
         match element {
             Element::Node { node } => {
-                self.process_nodes(vec![node])
+                self.handle_element(vec![node], vec![], vec![]);
             },
             Element::Way { way } => {
                 if !self.flushed_nodes {
-                    self.flush_nodes();
+                    self.flush_handlers();
+                    self.flushed_nodes = true;
                 }
-                self.process_ways(vec![way])
+                self.handle_element(vec![], vec![way], vec![])
             },
             Element::Relation { relation } => {
                 if !self.flushed_ways {
-                    self.flush_ways();
+                    self.flush_handlers();
+                    self.flushed_ways = true;
                 }
-                self.process_relations(vec![relation])
+                self.handle_element(vec![], vec![], vec![relation])
             },
             _ => (),
         }
     }
 
-    fn process_nodes(&mut self, mut nodes: Vec<Node>) {
+    fn handle_element(&mut self, mut nodes: Vec<Node>, mut ways: Vec<Way>, mut relations: Vec<Relation>) {
+        log::trace!("HandlerChain.handle_elements called with {} nodes {} ways {} relations", nodes.len(), ways.len(), relations.len());
+        for processor in &mut self.processors {
+            if nodes.len() == 0 && ways.len() == 0 && relations.len() == 0 {
+                break
+            }
+            log::trace!("HandlerChain calling {}", processor.name());
+            (nodes, ways, relations) = processor.handle_elements(nodes, ways, relations);
+        }
+    }
+
+    pub(crate) fn flush_handlers(&mut self) {
+        log::trace!("HandlerChain.flush_handlers called");
+        let mut nodes = vec![];
         let mut ways = vec![];
         let mut relations = vec![];
         for processor in &mut self.processors {
-            if nodes.len() == 0 {
-                break
-            }
-            (nodes, ways, relations) = processor.handle_elements(nodes, ways, relations);
+            log::trace!("######");
+            log::trace!("###### Flushing {} with {} nodes {} ways {} relations flushed by upstream processors", processor.name(), nodes.len(), ways.len(), relations.len());
+            log::trace!("######");
+            (nodes, ways, relations) = processor.handle_and_flush_elements(nodes, ways, relations);
         }
     }
 
-    fn flush_nodes(&mut self) {
-        let mut elements = vec![];
-        for processor in &mut self.processors {
-            log::trace!("######");
-            log::trace!("###### Flushing {} with {} nodes flushed by upstream processors", processor.name(), elements.len());
-            log::trace!("######");
-            elements = processor.handle_and_flush_nodes(elements);
-        }
-        self.flushed_nodes = true;
-    }
-
-    fn process_ways(&mut self, mut ways: Vec<Way>) {
-        let mut nodes = vec![];
-        let mut relations = vec![];
-        for processor in &mut self.processors {
-            if ways.len() == 0 {
-                break
-            }
-            (nodes, ways, relations) = processor.handle_elements(nodes, ways, relations);
-        }
-    }
-
-    fn flush_ways(&mut self) {
-        let mut elements = vec![];
-        for processor in &mut self.processors {
-            log::trace!("######");
-            log::trace!("###### Flushing {} with {} ways flushed by upstream processors", processor.name(), elements.len());
-            log::trace!("######");
-            elements = processor.handle_and_flush_ways(elements);
-        }
-        self.flushed_ways = true;
-    }
-
-    fn process_relations(&mut self, mut relations: Vec<Relation>) {
-        let mut nodes = vec![];
-        let mut ways = vec![];
-        for processor in &mut self.processors {
-            if relations.len() == 0 {
-                break
-            }
-            (nodes, ways, relations) = processor.handle_elements(nodes, ways, relations);
-        }
-    }
-
-    fn flush_relations(&mut self) {
-        let mut elements = vec![];
-        for processor in &mut self.processors {
-            log::trace!("######");
-            log::trace!("###### Flushing {} with {} relations flushed by upstream processors", processor.name(), elements.len());
-            log::trace!("######");
-            elements = processor.handle_and_flush_relations(elements);
-        }
-    }
-    pub(crate) fn flush(&mut self) {
-        // only relations, as all other elements have been processed and flushed before relations
-        self.flush_relations();
-    }
     pub(crate) fn collect_result(&mut self) -> HandlerResult {
         let mut result = HandlerResult::default();
         for processor in &mut self.processors {
@@ -524,7 +483,7 @@ pub(crate) mod tests {
         processor_chain.process(simple_node_element(2, vec![("who", "seppl")]));
         processor_chain.process(simple_node_element(6, vec![("who", "hotzenplotz")]));
         processor_chain.process(simple_node_element(8, vec![("who", "großmutter")]));
-        processor_chain.flush();
+        processor_chain.flush_handlers();
         let result = processor_chain.collect_result();
 
         assert_eq!(&result.counts.get("nodes count initial").unwrap().clone(), &4,);
@@ -569,7 +528,7 @@ pub(crate) mod tests {
         processor_chain.process(simple_node_element(8, vec![("who", "großmutter")]));
         processor_chain.process(simple_way_element(23, vec![1, 2, 8, 6], vec![("who", "kasper")]));
         processor_chain.process(simple_relation_element(66, vec![(MemberType::Way, 23, "kasper&seppl brign großmutter to hotzenplotz")], vec![("who", "großmutter")]));
-        processor_chain.flush();
+        processor_chain.flush_handlers();
         let result = processor_chain.collect_result();
 
         assert_eq!(&result.counts.get("nodes count initial").unwrap().clone(), &4,);
@@ -605,7 +564,7 @@ pub(crate) mod tests {
         processor_chain.process(simple_node_element(2, vec![("who", "seppl")]));
         processor_chain.process(simple_node_element(6, vec![("who", "hotzenplotz")]));
         processor_chain.process(simple_node_element(8, vec![("who", "großmutter")]));
-        processor_chain.flush();
+        processor_chain.flush_handlers();
         let result = processor_chain.collect_result();
 
         assert_eq!(&result.counts.get("nodes count initial").unwrap().clone(), &4,);
@@ -638,7 +597,7 @@ pub(crate) mod tests {
         processor_chain.process(simple_node_element(2, vec![("who", "seppl")]));
         processor_chain.process(simple_node_element(6, vec![("who", "hotzenplotz")]));
         processor_chain.process(simple_node_element(8, vec![("who", "großmutter")]));
-        processor_chain.flush();
+        processor_chain.flush_handlers();
         let result = processor_chain.collect_result();
 
         assert_eq!(&result.counts.get("nodes count initial").unwrap().clone(), &4,);
@@ -672,7 +631,7 @@ pub(crate) mod tests {
         processor_chain.process(simple_node_element(2, vec![("who", "seppl")]));
         processor_chain.process(simple_node_element(6, vec![("who", "hotzenplotz")]));
         processor_chain.process(simple_node_element(8, vec![("who", "großmutter")]));
-        processor_chain.flush();
+        processor_chain.flush_handlers();
         let result = processor_chain.collect_result();
 
         assert_eq!(&result.counts.get("nodes count initial").unwrap().clone(), &4,);
@@ -711,7 +670,7 @@ pub(crate) mod tests {
         processor_chain.process(simple_node_element(2, vec![("who", "seppl")]));
         processor_chain.process(simple_node_element(6, vec![("who", "hotzenplotz")]));
         processor_chain.process(simple_node_element(8, vec![("who", "großmutter")]));
-        processor_chain.flush();
+        processor_chain.flush_handlers();
         let result = processor_chain.collect_result();
 
         assert_eq!(&result.counts.get("nodes count initial").unwrap().clone(), &4,);
@@ -773,7 +732,7 @@ pub(crate) mod tests {
         handler_chain.process(simple_node_element(3, vec![(existing_tag().as_str(), "hotzenplotz")]));
         handler_chain.process(simple_node_element(4, vec![(existing_tag().as_str(), "großmutter")]));
 
-        handler_chain.flush();
+        handler_chain.flush_handlers();
         let result = handler_chain.collect_result();
 
         assert_eq!(&result.counts.get("nodes count initial").unwrap().clone(), &4,);

@@ -14,7 +14,7 @@ pub(crate) fn process_with_handler(config: &Config, handler_chain: &mut HandlerC
     for element in reader.elements()? {
         handler_chain.process(element);
     }
-    handler_chain.flush();
+    handler_chain.flush_handlers();
     log::info!("Finished pbf io pipeline, time: {}", stopwatch);
     Ok(())
 }

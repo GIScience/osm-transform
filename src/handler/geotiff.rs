@@ -15,7 +15,7 @@ use osm_io::osm::model::tag::Tag;
 use osm_io::osm::model::way::Way;
 use proj4rs::Proj;
 use rstar::{AABB, Envelope, Point, PointDistance, RTree, RTreeObject};
-use crate::handler::Handler;
+use crate::handler::{Handler, HandlerResult};
 use crate::handler::interpolate::WaySplitter;
 use crate::srs::DynamicSrsResolver;
 
@@ -350,7 +350,7 @@ impl BufferingElevationEnricher {
             max_buffer_len,
             total_buffered_nodes_max,
             skip_ele: skip_ele,
-            next_node_id: 100_000_000_000,
+            next_node_id: 0,
         }
     }
     fn next_node_id(&mut self) -> i64 {
@@ -453,6 +453,7 @@ impl BufferingElevationEnricher {
     }
 
     pub(crate) fn handle_way(&mut self, way: &Way) -> Vec<Node> {
+        log::trace!("handle_way with WaySplitter called");
         if way.refs().len() < 2 {
             return vec![];
         }
@@ -460,14 +461,22 @@ impl BufferingElevationEnricher {
         for from_idx in 0..way.refs().len()-2 {
             let from_node_id = way.refs()[from_idx];
             let to_node_id = way.refs()[from_idx+1];
-            let from_location = self.node_cache.get(&from_node_id).unwrap();
-            let to_location = self.node_cache.get(&to_node_id).unwrap();
-
-            let intermediate_locations = WaySplitter::compute_intermediate_locations(from_location.lat, from_location.lon, to_location.lat, to_location.lon, (10f64, 10f64));
+            let mut from_location = self.node_cache.get(&from_node_id);
+            let mut to_location = self.node_cache.get(&to_node_id);
+            if from_location.is_none() || to_location.is_none() {
+                log::debug!("Cannot split way segment: node_cache does not contain nodes {} and {}", from_node_id, to_node_id);
+                continue;
+            }
+            let from_location = from_location.unwrap();
+            let to_location = to_location.unwrap();
+            let intermediate_locations = WaySplitter::compute_intermediate_locations(from_location.lat, from_location.lon, to_location.lat, to_location.lon, (3f64, 3f64));
+            log::debug!("WaySplitter created {} intermediate locations", intermediate_nodes.len());
             intermediate_locations.iter().for_each(|location| {
-                let node = Node::new(self.next_node_id(), 0, Coordinate::new(location.lat(), location.lon()), 0, 0, 0, String::default(), true, vec![
+                let node = Node::new(self.next_node_id(), 0, location.get_coordinate(), 0, 0, 0, String::default(), true, vec![
                     Tag::new("ele".to_string(), location.ele().to_string())
                 ]);
+                log::debug!("created intermediate node {}", node.id());
+
                 intermediate_nodes.push(node);
             });
         }
@@ -529,14 +538,37 @@ impl BufferingElevationEnricher {
 impl Handler for BufferingElevationEnricher {
     fn name(&self) -> String { "BufferingElevationEnricher".to_string() }
 
-    fn handle_elements(&mut self, mut nodes: Vec<Node>, mut ways: Vec<Way>, mut relations: Vec<Relation>) -> (Vec<Node>, Vec<Way>, Vec<Relation>) {
-        if nodes.len()>0 { nodes = self.handle_nodes(nodes); }
+    fn handle_elements(&mut self, mut nodes: Vec<Node>, ways: Vec<Way>, mut relations: Vec<Relation>) -> (Vec<Node>, Vec<Way>, Vec<Relation>) {
+        log::trace!("{}.handle_elements() called with {} nodes, {} ways, {} relations", self.name(), nodes.len(), ways.len(), relations.len());
+
+        if nodes.len()>0 {
+            nodes = self.handle_nodes(nodes);
+        }
         if ways.len()>0 {
             for way in ways.iter() {
                 nodes.extend(self.handle_way(way));
             }
         }
-        if relations.len()>0 { relations = self.handle_relations(relations); }
+        if relations.len()>0 {
+            relations = self.handle_relations(relations);
+        }
+        (nodes, ways, relations)
+    }
+
+    fn handle_and_flush_elements(&mut self, mut nodes: Vec<Node>, mut ways: Vec<Way>, mut relations: Vec<Relation>) -> (Vec<Node>, Vec<Way>, Vec<Relation>) {
+        log::trace!("{}.handle_and_flush_elements() called with {} nodes, {} ways, {} relations", self.name(), nodes.len(), ways.len(), relations.len());
+
+        if nodes.len()>0 {
+            nodes = self.handle_and_flush_nodes(nodes);
+        }
+        if ways.len()>0 {
+            for way in ways.iter() {
+                nodes.extend(self.handle_way(way));
+            }
+        }
+        if relations.len()>0 {
+            relations = self.handle_relations(relations);
+        }
         (nodes, ways, relations)
     }
 
@@ -566,9 +598,14 @@ impl Handler for BufferingElevationEnricher {
         }
         result
     }
+
+    fn add_result(&mut self, mut result: HandlerResult) -> HandlerResult {
+        result.other.insert("node_cache size".to_string(), format!("{}", self.node_cache.len()));
+        result
+    }
 }
 
-
+#[derive(Debug)]
 pub(crate) struct LocationWithElevation {
     lon: f64,
     lat: f64,

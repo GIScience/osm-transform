@@ -96,8 +96,6 @@ impl Handler for SplittingOutputHandler {
     fn name(&self) -> String {
         "SplittingOutputHandler".to_string()
     }
-
-
     fn handle_nodes(&mut self, nodes: Vec<Node>) -> Vec<Node> {
         for node in nodes {
             self.node_writer.write_element( Element::Node { node } ).expect("Failed to write node");
