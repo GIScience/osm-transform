@@ -488,42 +488,20 @@ pub(crate) mod tests {
         }
     }
 
-    pub(crate) struct ElevationChecker {
-        all_nodes_have_ele: bool,
-    }
-    impl ElevationChecker {
-        pub fn new() -> Self {
-            Self { all_nodes_have_ele: true }
-        }
-    }
-    impl Handler for ElevationChecker {
-        fn name(&self) -> String { "ElevationChecker".to_string() }
-
-        fn handle_nodes(&mut self, elements: Vec<Node>) -> Vec<Node> {
-            self.all_nodes_have_ele = self.all_nodes_have_ele && elements.iter().all(|node| node.tags().iter().any(|tag| tag.k() == "ele"));
-            elements
-        }
-
-        fn add_result(&mut self, mut result: HandlerResult) -> HandlerResult {
-            result.other.insert("all nodes have ele".to_string(), self.all_nodes_have_ele.to_string());
-            result
-        }
-    }
-
     pub(crate) struct ElementEvaluator {
         id: String,
-        node_evaluator: Box<dyn Fn(&Node) -> bool>,
-        way_evaluator: Box<dyn Fn(&Way) -> bool>,
-        relation_evaluator: Box<dyn Fn(&Relation) -> bool>,
-        node_results: BTreeMap<i64, bool>,
-        way_results: BTreeMap<i64, bool>,
-        relation_results: BTreeMap<i64, bool>,
+        node_evaluator: Box<dyn Fn(&Node) -> String>,
+        way_evaluator: Box<dyn Fn(&Way) -> String>,
+        relation_evaluator: Box<dyn Fn(&Relation) -> String>,
+        node_results: BTreeMap<i64, String>,
+        way_results: BTreeMap<i64, String>,
+        relation_results: BTreeMap<i64, String>,
     }
     impl ElementEvaluator {
         fn new(id: &str,
-               node_evaluator: Box<dyn Fn(&Node) -> bool>,
-               way_evaluator: Box<dyn Fn(&Way) -> bool>,
-               relation_evaluator: Box<dyn Fn(&Relation) -> bool>) -> Self {
+               node_evaluator: Box<dyn Fn(&Node) -> String>,
+               way_evaluator: Box<dyn Fn(&Way) -> String>,
+               relation_evaluator: Box<dyn Fn(&Relation) -> String>) -> Self {
             ElementEvaluator {
                 id: id.to_string(),
                 node_evaluator,
@@ -561,8 +539,18 @@ pub(crate) mod tests {
 
         fn add_result(&mut self, mut result: HandlerResult) -> HandlerResult {
             result.other.insert(format!("{} node results", self.name()), self.node_results.iter().map(|(k, v)| format!("{}:{}", k, v)).collect::<Vec<String>>().join(", "));
-            result.other.insert(format!("{} way results", self.name()), self.node_results.iter().map(|(k, v)| format!("{}:{}", k, v)).collect::<Vec<String>>().join(", "));
-            result.other.insert(format!("{} relation results", self.name()), self.node_results.iter().map(|(k, v)| format!("{}:{}", k, v)).collect::<Vec<String>>().join(", "));
+            result.other.insert(format!("{} way results", self.name()), self.way_results.iter().map(|(k, v)| format!("{}:{}", k, v)).collect::<Vec<String>>().join(", "));
+            result.other.insert(format!("{} relation results", self.name()), self.relation_results.iter().map(|(k, v)| format!("{}:{}", k, v)).collect::<Vec<String>>().join(", "));
+
+            self.node_results.iter().for_each(|(k, v)| {
+                result.other.insert(format!("{}:node#{}", self.name(), k), v.clone());
+            });
+            self.way_results.iter().for_each(|(k, v)| {
+                result.other.insert(format!("{}:way#{}", self.name(), k), v.clone());
+            });
+            self.relation_results.iter().for_each(|(k, v)| {
+                result.other.insert(format!("{}:relation#{}", self.name(), k), v.clone());
+            });
             result
         }
     }
@@ -860,11 +848,14 @@ pub(crate) mod tests {
             .add(handler)
             .add(TestOnlyOrderRecorder::new("final"))
             .add(ElementCounter::new("final"))
-            .add(ElevationChecker::new())
-            .add(ElementEvaluator::new("final",
-                                       Box::new(|node| node.tags().iter().any(|tag| tag.k() == "ele")),
-                                       Box::new(|_| true),
-                                       Box::new(|_| true)))
+            .add(ElementEvaluator::new("elevation",
+                                       Box::new(|node| node.tags().iter().any(|tag| tag.k() == "ele").to_string()),
+                                       Box::new(|_| "".to_string()),
+                                       Box::new(|_| "".to_string())))
+            .add(ElementEvaluator::new("way_refs",
+                                       Box::new(|_| "".to_string()),
+                                       Box::new(|way| way.refs().iter().map(|id| id.to_string()).collect::<Vec<String>>().join(",")),
+                                       Box::new(|_| "".to_string())))
             ;
 
         handler_chain.process(as_node_element(node_without_ele_from_location(101, location_with_elevation_hd_philosophers_way_start(), vec![])));
@@ -881,8 +872,7 @@ pub(crate) mod tests {
         assert_eq!(&result.counts.get("ways count final").unwrap().clone(), &1,);
         assert_eq!(&result.other.get("TestOnlyOrderRecorder initial").unwrap().clone(), "node#101, node#102, way#201");
         assert_eq!(&result.other.get("TestOnlyOrderRecorder final").unwrap().clone(), "node#101, node#102, node#0, way#201");
-        assert_eq!(&result.other.get("TestOnlyOrderRecorder final").unwrap().clone(), "node#101, node#102, node#0, way#201");
-        assert!(&result.other.get("all nodes have ele").unwrap().parse::<bool>().unwrap());
-        assert_eq!(&result.other.get("ElementEvaluator#final node results").unwrap().clone(), "0:true, 101:true, 102:true");
+        assert_eq!(&result.other.get("ElementEvaluator#elevation node results").unwrap().clone(), "0:true, 101:true, 102:true");
+        assert_eq!(&result.other.get("ElementEvaluator#way_refs:way#201").unwrap().clone(), "101,0,102");
     }
 }
