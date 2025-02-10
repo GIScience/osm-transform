@@ -465,7 +465,10 @@ impl BufferingElevationEnricher {
     }
 
     pub(crate) fn handle_way(&mut self, mut way: &mut Way) -> Vec<Node> {
-        log::debug!("handle_way with WaySplitter called");
+        log::trace!("handle_way with WaySplitter called");
+        if ! self.elevation_way_splitting {
+            return vec![];
+        }
         if way.refs().len() < 2 {
             return vec![];
         }

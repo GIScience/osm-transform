@@ -18,7 +18,7 @@ fn base_config() -> Config {
         print_node_ids: HashSet::new(),
         print_way_ids: HashSet::new(),
         print_relation_ids: HashSet::new(),
-        debug: 0,
+        debug: 4,
         resolution_lon: 0.01,
         resolution_lat: 0.01,
     }
@@ -130,6 +130,41 @@ fn run_elevation() {
     assert_eq!(result.counts.get("relations count final").unwrap(), &FILTERED_RELATION_COUNT);
     assert_eq!(result.counts.get("ways count initial").unwrap(), &BAARLE_WAY_COUNT);
     assert_eq!(result.counts.get("ways count final").unwrap(), &FILTERED_WAY_COUNT);
+}
+#[test]
+fn run_elevation_way_splitting() {
+    let mut config = base_config();
+    config.elevation_tiffs = vec!["test/*.tif".to_string()];
+    config.elevation_way_splitting = true;
+    config.resolution_lon= 0.0001;
+    config.resolution_lat= 0.0001;
+    rusty_routes_transformer::init(&config);
+    let result = rusty_routes_transformer::run(&config);
+    assert_eq!(result.counts.get("nodes count initial").unwrap(), &BAARLE_NODE_COUNT);
+    assert!(result.counts.get("nodes count final").unwrap() > &BAARLE_NODE_COUNT);
+    assert_eq!(result.counts.get("relations count initial").unwrap(), &BAARLE_RELATION_COUNT);
+    assert_eq!(result.counts.get("relations count final").unwrap(), &FILTERED_RELATION_COUNT);
+    assert_eq!(result.counts.get("ways count initial").unwrap(), &BAARLE_WAY_COUNT);
+    assert_eq!(result.counts.get("ways count final").unwrap(), &FILTERED_WAY_COUNT);
+}
+#[test]
+fn run_elevation_way_splitting_write() {
+    let mut config = base_config();
+    config.elevation_tiffs = vec!["test/*.tif".to_string()];
+    config.elevation_way_splitting = true;
+    config.resolution_lon= 0.0001;
+    config.resolution_lat= 0.0001;
+    config.output_pbf = Some(PathBuf::from("target/tmp/output-integration-test-run_elevation_way_splitting_write.pbf"));
+    rusty_routes_transformer::init(&config);
+    let result = rusty_routes_transformer::run(&config);
+    assert_eq!(result.counts.get("nodes count initial").unwrap(), &BAARLE_NODE_COUNT);
+    assert!(result.counts.get("nodes count final").unwrap() > &BAARLE_NODE_COUNT);
+    assert_eq!(result.counts.get("relations count initial").unwrap(), &BAARLE_RELATION_COUNT);
+    assert_eq!(result.counts.get("relations count final").unwrap(), &FILTERED_RELATION_COUNT);
+    assert_eq!(result.counts.get("ways count initial").unwrap(), &BAARLE_WAY_COUNT);
+    assert_eq!(result.counts.get("ways count final").unwrap(), &FILTERED_WAY_COUNT);
+    check_pbf("target/tmp/output-integration-test-run_elevation_way_splitting_write.pbf", Some(42645645));
+    check_pbf("target/tmp/output-integration-test-run_elevation_way_splitting_write.pbf", Some(1));
 }
 
 fn check_pbf(path: &str, expected_node: Option<i64>) {
