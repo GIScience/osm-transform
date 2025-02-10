@@ -462,15 +462,19 @@ impl BufferingElevationEnricher {
         }
     }
 
-    pub(crate) fn handle_way(&mut self, way: &Way) -> Vec<Node> {
+    pub(crate) fn handle_way(&mut self, mut way: &mut Way) -> Vec<Node> {
         log::debug!("handle_way with WaySplitter called");
         if way.refs().len() < 2 {
             return vec![];
         }
         let mut intermediate_nodes = vec![];
+        let mut references = vec![];
+        let mut to_node_id: i64 = way.refs().last().unwrap().clone();
+
         for from_idx in 0..way.refs().len()-1 {
             let from_node_id = way.refs()[from_idx];
-            let to_node_id = way.refs()[from_idx+1];
+            references.push(from_node_id);
+            to_node_id = way.refs()[from_idx+1];
             let mut from_location = self.node_cache.get(&from_node_id);
             let mut to_location = self.node_cache.get(&to_node_id);
             if from_location.is_none() || to_location.is_none() {
@@ -482,14 +486,20 @@ impl BufferingElevationEnricher {
             let intermediate_locations = WaySplitter::compute_intermediate_locations(from_location.lon, from_location.lat, to_location.lon, to_location.lat, (self.resolution_lon, self.resolution_lat));
             log::debug!("WaySplitter created {} intermediate locations", intermediate_nodes.len());
             intermediate_locations.iter().for_each(|location| {
+                //TODO only add node if elevation difference exceeds a certain threshold
                 let node = Node::new(self.next_node_id(), 0, location.get_coordinate(), 0, 0, 0, String::default(), true, vec![
                     Tag::new("ele".to_string(), location.ele().to_string())
                 ]);
-                log::debug!("created intermediate node {}", node.id());
 
+                log::debug!("created intermediate node {}", node.id());
+                references.push(node.id().clone());
                 intermediate_nodes.push(node);
             });
         }
+
+        references.push(to_node_id.clone());
+        way.refs_mut().clear();
+        way.refs_mut().extend(references);
         intermediate_nodes
     }
 
@@ -548,18 +558,18 @@ impl BufferingElevationEnricher {
 impl Handler for BufferingElevationEnricher {
     fn name(&self) -> String { "BufferingElevationEnricher".to_string() }
 
-    fn handle_elements(&mut self, mut nodes: Vec<Node>, ways: Vec<Way>, mut relations: Vec<Relation>) -> (Vec<Node>, Vec<Way>, Vec<Relation>) {
+    fn handle_elements(&mut self, mut nodes: Vec<Node>, mut ways: Vec<Way>, mut relations: Vec<Relation>) -> (Vec<Node>, Vec<Way>, Vec<Relation>) {
         log::trace!("{}.handle_elements() called with {} nodes, {} ways, {} relations", self.name(), nodes.len(), ways.len(), relations.len());
 
-        if nodes.len()>0 {
+        if nodes.len() > 0 {
             nodes = self.handle_nodes(nodes);
         }
-        if ways.len()>0 {
-            for way in ways.iter() {
+        if ways.len() > 0 {
+            for way in ways.iter_mut() {
                 nodes.extend(self.handle_way(way));
             }
         }
-        if relations.len()>0 {
+        if relations.len() > 0 {
             relations = self.handle_relations(relations);
         }
         (nodes, ways, relations)
@@ -570,7 +580,7 @@ impl Handler for BufferingElevationEnricher {
 
         nodes = self.handle_and_flush_nodes(nodes);
         if ways.len()>0 {
-            for way in ways.iter() {
+            for way in ways.iter_mut() {
                 nodes.extend(self.handle_way(way));
             }
         }
@@ -588,8 +598,8 @@ impl Handler for BufferingElevationEnricher {
         result
     }
 
-    fn handle_ways(&mut self, ways: Vec<Way>) -> Vec<Way> {
-        for way in ways.iter() {
+    fn handle_ways(&mut self, mut ways: Vec<Way>) -> Vec<Way> {
+        for way in ways.iter_mut() {
             self.handle_way(way);
         }
         ways
@@ -1180,8 +1190,8 @@ mod tests {
         handler.node_cache.insert(1000, wgs84_coord_hd_philosophers_way_start());
         handler.node_cache.insert(1001, wgs84_coord_hd_philosophers_way_end());
 
-        let way = simple_way_element(1, vec![1000, 1001], vec![]);
-        let nodes = handler.handle_way(&way);
+        let mut way = simple_way_element(1, vec![1000, 1001], vec![]);
+        let nodes = handler.handle_way(&mut way);
         dbg!(&nodes);
         assert!(nodes.len() > 0);
     }
@@ -1189,17 +1199,21 @@ mod tests {
     #[test]
     fn handle_way_split_nodes_added_as_refs() {
         let _ = Logger::builder().build("rusty_routes_transformer", LevelFilter::Debug);
-        let mut handler = BufferingElevationEnricher::new(GeoTiffManager::with_file_pattern("test/region*.tif"),5, 6, None, 0.01, 0.01);
+        let mut handler = BufferingElevationEnricher::new(GeoTiffManager::with_file_pattern("test/region*.tif"),5, 6, None, 0.005, 0.005);
 
         handler.node_cache.insert(1000, wgs84_coord_hd_philosophers_way_start());
         handler.node_cache.insert(1001, wgs84_coord_hd_philosophers_way_end());
 
-        let way = simple_way_element(1, vec![1000, 1001], vec![]);
+        let mut way = simple_way_element(1, vec![1000, 1001], vec![]);
         assert!(&way.refs().len() == &2);
 
-        let nodes = handler.handle_way(&way);
+        let nodes = handler.handle_way(&mut way);
 
         dbg!(&way);
-        assert_eq!(&3, &way.refs().len());
+        assert_eq!(&4, &way.refs().len());
+        assert_eq!(1000_i64, way.refs()[0]);
+        assert_eq!(0_i64, way.refs()[1]);
+        assert_eq!(1_i64, way.refs()[2]);
+        assert_eq!(1001_i64, way.refs()[3]);
     }
 }
