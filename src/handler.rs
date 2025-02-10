@@ -213,6 +213,7 @@ pub(crate) mod tests {
     use simple_logger::SimpleLogger;
     use crate::handler::*;
     use crate::handler::filter::*;
+    use crate::handler::geotiff::{BufferingElevationEnricher, GeoTiffManager, LocationWithElevation};
     use crate::handler::info::*;
 
     fn existing_tag() -> String { "EXISTING_TAG".to_string() }
@@ -259,6 +260,28 @@ pub(crate) mod tests {
     pub fn copy_node_with_new_id(node: &Node, new_id: i64) -> Node {
         Node::new(new_id, node.version(), node.coordinate().clone(), node.timestamp(), node.changeset(), node.uid(), node.user().clone(), node.visible(), node.tags().clone())
     }
+    pub fn as_node_element(node: Node) -> Element {
+        Element::Node { node: node }
+    }
+    pub fn as_way_element(way: Way) -> Element {
+        Element::Way { way: way }
+    }
+    pub fn as_relation_element(relation: Relation) -> Element {
+        Element::Relation { relation: relation }
+    }
+
+    pub fn node_with_ele_from_location(id: i64, location: LocationWithElevation, tags: Vec<(&str, &str)>) -> Node {
+        let mut tags_obj: Vec<Tag> = tags.iter().map(|(k, v)| Tag::new(k.to_string(), v.to_string())).collect();
+        if &location.ele() != &0.0 { tags_obj.push(Tag::new("ele".to_string(), location.ele().to_string())); }
+        Node::new(id, 1, location.get_coordinate(), 1, 1, 1, "a".to_string(), true, tags_obj)
+    }
+    pub fn node_without_ele_from_location(id: i64, location: LocationWithElevation, tags: Vec<(&str, &str)>) -> Node {
+        let tags_obj: Vec<Tag> = tags.iter().map(|(k, v)| Tag::new(k.to_string(), v.to_string())).collect();
+        Node::new(id, 1, location.get_coordinate(), 1, 1, 1, "a".to_string(), true, tags_obj)
+    }
+
+    fn location_with_elevation_hd_philosophers_way_start() -> LocationWithElevation  { LocationWithElevation::new(8.693313002586367, 49.41470412961422, 125.0)}
+    fn location_with_elevation_hd_philosophers_way_end() -> LocationWithElevation  { LocationWithElevation::new(8.707872033119203, 49.41732503427102, 200.0)}
 
     ///Modify element and return same instance.
     #[derive(Debug, Default)]
@@ -465,7 +488,27 @@ pub(crate) mod tests {
         }
     }
 
+    pub(crate) struct ElevationChecker {
+        all_nodes_have_ele: bool,
+    }
+    impl ElevationChecker {
+        pub fn new() -> Self {
+            Self { all_nodes_have_ele: true }
+        }
+    }
+    impl Handler for ElevationChecker {
+        fn name(&self) -> String { "ElevationChecker".to_string() }
 
+        fn handle_nodes(&mut self, elements: Vec<Node>) -> Vec<Node> {
+            self.all_nodes_have_ele = self.all_nodes_have_ele && elements.iter().all(|node| node.tags().iter().any(|tag| tag.k() == "ele"));
+            elements
+        }
+
+        fn add_result(&mut self, mut result: HandlerResult) -> HandlerResult {
+            result.other.insert("all nodes have ele".to_string(), self.all_nodes_have_ele.to_string());
+            result
+        }
+    }
     #[test]
     /// Assert that it is possible to run a chain of processors.
     fn test_chain() {
@@ -742,5 +785,43 @@ pub(crate) mod tests {
         assert_eq!(result.node_ids[2], true);
         assert_eq!(result.node_ids[3], false);
         assert_eq!(result.node_ids[4], false);
+    }
+
+    #[test]
+    fn handler_chain_with_buffering_elevation_enricher_adds_new_nodes() {
+        let _ = SimpleLogger::new().init();
+        let mut node_ids = BitVec::from_elem(10usize, false);
+        node_ids.set(1usize, true);
+        node_ids.set(2usize, true);
+        let mut handler = BufferingElevationEnricher::new(
+            GeoTiffManager::with_file_pattern("test/region*.tif"),
+            5,
+            6,
+            None,
+            0.01,
+            0.01);
+
+        let mut handler_chain = HandlerChain::default()
+            .add(ElementCounter::new("initial"))
+            .add(TestOnlyOrderRecorder::new("initial"))
+            .add(handler)
+            .add(TestOnlyOrderRecorder::new("final"))
+            .add(ElementCounter::new("final"))
+            .add(ElevationChecker::new());
+
+        handler_chain.process(as_node_element(node_without_ele_from_location(101, location_with_elevation_hd_philosophers_way_start(), vec![])));
+        handler_chain.process(as_node_element(node_without_ele_from_location(102, location_with_elevation_hd_philosophers_way_end(), vec![])));
+        handler_chain.process(as_way_element(simple_way(201, vec![101, 102], vec![])));
+        handler_chain.flush_handlers();
+        let result = handler_chain.collect_result();
+
+        assert_eq!(&result.counts.get("nodes count initial").unwrap().clone(), &2,);
+        assert_eq!(&result.counts.get("ways count initial").unwrap().clone(), &1,);
+        assert_eq!(&result.counts.get("nodes count final").unwrap().clone(), &3);
+        assert_eq!(&result.counts.get("ways count final").unwrap().clone(), &1,);
+        assert_eq!(&result.other.get("TestOnlyOrderRecorder initial").unwrap().clone(), "node#101, node#102, way#201");
+        assert_eq!(&result.other.get("TestOnlyOrderRecorder final").unwrap().clone(), "node#101, node#102, node#0, way#201");
+        assert_eq!(&result.other.get("TestOnlyOrderRecorder final").unwrap().clone(), "node#101, node#102, node#0, way#201");
+        assert!(&result.other.get("all nodes have ele").unwrap().parse::<bool>().unwrap());
     }
 }

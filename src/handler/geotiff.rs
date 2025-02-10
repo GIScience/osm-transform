@@ -568,9 +568,7 @@ impl Handler for BufferingElevationEnricher {
     fn handle_and_flush_elements(&mut self, mut nodes: Vec<Node>, mut ways: Vec<Way>, mut relations: Vec<Relation>) -> (Vec<Node>, Vec<Way>, Vec<Relation>) {
         log::trace!("{}.handle_and_flush_elements() called with {} nodes, {} ways, {} relations", self.name(), nodes.len(), ways.len(), relations.len());
 
-        if nodes.len()>0 {
-            nodes = self.handle_and_flush_nodes(nodes);
-        }
+        nodes = self.handle_and_flush_nodes(nodes);
         if ways.len()>0 {
             for way in ways.iter() {
                 nodes.extend(self.handle_way(way));
@@ -579,7 +577,7 @@ impl Handler for BufferingElevationEnricher {
         if relations.len()>0 {
             relations = self.handle_relations(relations);
         }
-        (nodes, ways, relations)
+        (self.handle_and_flush_nodes(nodes), self.handle_and_flush_ways(ways), self.handle_and_flush_relations(relations))
     }
 
     fn handle_nodes(&mut self, nodes: Vec<Node>) -> Vec<Node> {
@@ -766,9 +764,9 @@ mod tests {
         let tags_obj = tags.iter().map(|(k, v)| Tag::new(k.to_string(), v.to_string())).collect();
         Node::new(id, 1, wgs84_coordinate_limburg_vienna_house().get_coordinate(), 1, 1, 1, "a".to_string(), true, tags_obj)
     }
-    pub fn simple_node_element(id: i64, location: LocationWithElevation, tags: Vec<(&str, &str)>) -> Node {
+    pub fn node_with_ele_from_location(id: i64, location: LocationWithElevation, tags: Vec<(&str, &str)>) -> Node {
         let mut tags_obj: Vec<Tag> = tags.iter().map(|(k, v)| Tag::new(k.to_string(), v.to_string())).collect();
-        tags_obj.push(Tag::new("ele".to_string(), location.ele().to_string()));
+        if &location.ele() != &0.0 { tags_obj.push(Tag::new("ele".to_string(), location.ele().to_string())); }
         Node::new(id, 1, location.get_coordinate(), 1, 1, 1, "a".to_string(), true, tags_obj)
     }
     pub fn simple_way_element(id: i64, node_refs: Vec<i64>, tags: Vec<(&str, &str)>) -> Way {
@@ -1182,14 +1180,26 @@ mod tests {
         handler.node_cache.insert(1, wgs84_coord_hd_philosophers_way_start());
         handler.node_cache.insert(2, wgs84_coord_hd_philosophers_way_end());
 
-        let way = simple_way_element(1, vec![1, 2], vec![]);
+        let way = simple_way_element(1, vec![1000, 1001], vec![]);
         let nodes = handler.handle_way(&way);
-        dbg!(nodes);
-        // assert!(nodes.len() < 0);
+        dbg!(&nodes);
+        assert!(nodes.len() > 0);
     }
 
     #[test]
     fn handle_way_split_nodes_added_as_refs() {
+        let _ = Logger::builder().build("rusty_routes_transformer", LevelFilter::Debug);
+        let mut handler = BufferingElevationEnricher::new(GeoTiffManager::with_file_pattern("test/region*.tif"),5, 6, None, 0.01, 0.01);
 
+        handler.node_cache.insert(1, wgs84_coord_hd_philosophers_way_start());
+        handler.node_cache.insert(2, wgs84_coord_hd_philosophers_way_end());
+
+        let way = simple_way_element(1, vec![1000, 1001], vec![]);
+        assert!(&way.refs().len() == &2);
+
+        let nodes = handler.handle_way(&way);
+
+        dbg!(&way);
+        assert!(&way.refs().len() == &3);
     }
 }
