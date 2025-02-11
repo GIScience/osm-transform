@@ -5,9 +5,9 @@ use osm_io::osm::pbf::reader::Reader;
 use rusty_routes_transformer::Config;
 
 fn base_config() -> Config {
-    Config {
+    let mut config = Config {
         input_pbf: PathBuf::from("test/baarle_small.pbf"),
-        output_pbf:  None,
+        output_pbf: None,
         country_csv: None,
         elevation_tiffs: vec![],
         elevation_batch_size: 10000,
@@ -21,7 +21,11 @@ fn base_config() -> Config {
         debug: 0,
         resolution_lon: 0.01,
         resolution_lat: 0.01,
-    }
+
+    };
+    config.print_way_ids.insert(7216689i64);
+    config.print_node_ids.insert(1);
+    config
 }
 
 const BAARLE_NODE_COUNT: u64 = 3964u64;
@@ -61,12 +65,14 @@ fn run_all() {
     let mut config = base_config();
     config.output_pbf = Some(PathBuf::from("target/tmp/output-integration-test-run_all.pbf"));
     config.country_csv = Some(PathBuf::from("test/mapping_test.csv"));
-    config.elevation_tiffs = vec!["test/srtm*.tif".to_string(), "test/region*.tif".to_string()];
+    config.elevation_tiffs = vec!["test/*.tif".to_string()];
     config.elevation_batch_size = 100000;
     config.elevation_total_buffer_size = 500000;
     config.with_node_filtering = true;
     config.remove_metadata = true;
     config.elevation_way_splitting = true;
+    config.resolution_lon= 0.0001;
+    config.resolution_lat= 0.0001;
     rusty_routes_transformer::init(&config);
     let result = rusty_routes_transformer::run(&config);
     assert_eq!(result.counts.get("nodes count initial").unwrap(), &BAARLE_NODE_COUNT);

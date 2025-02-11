@@ -88,6 +88,7 @@ fn extract_referenced_nodes(config: &Config) -> HandlerResult {
 fn process(config: &Config, node_filter_result: Option<HandlerResult>) -> HandlerResult {
     let mut node_ids = None;
     let mut skip_ele = None;
+    let mut counter_id = 0;
 
     match node_filter_result {
         None => {}
@@ -102,8 +103,7 @@ fn process(config: &Config, node_filter_result: Option<HandlerResult>) -> Handle
             .with_node_ids(config.print_node_ids.clone())
             .with_way_ids(config.print_way_ids.clone())
             .with_relation_ids(config.print_relation_ids.clone()))
-        .add(ElementCounter::new("initial"));
-
+        .add(ElementCounter::with_index({counter_id+=1; counter_id}, "initial"));
     if config.remove_metadata {
         handler_chain = handler_chain.add(MetadataRemover::default())
     }
@@ -114,6 +114,7 @@ fn process(config: &Config, node_filter_result: Option<HandlerResult>) -> Handle
         let node_id_filter = NodeIdFilter { node_ids: node_ids.unwrap() };
         log::debug!("node_id_filter has node_ids with len={}", node_id_filter.node_ids.len());
         handler_chain = handler_chain.add(node_id_filter);
+        handler_chain = handler_chain.add(ElementCounter::with_index({counter_id+=1; counter_id}, "after_node_filter"));
     }
 
     let mut stopwatch = StopWatch::new();
@@ -145,7 +146,16 @@ fn process(config: &Config, node_filter_result: Option<HandlerResult>) -> Handle
             config.elevation_way_splitting,
             config.resolution_lon,
             config.resolution_lat);
+        handler_chain = handler_chain.add(ElementPrinter::with_prefix(" before elevation_enricher:----------------\n".to_string())
+            .with_node_ids(config.print_node_ids.clone())
+            .with_way_ids(config.print_way_ids.clone())
+            .with_relation_ids(config.print_relation_ids.clone()));
         handler_chain = handler_chain.add(elevation_enricher);
+        handler_chain = handler_chain.add(ElementCounter::with_index({counter_id += 1; counter_id}, "after elevation_enricher"));
+        handler_chain = handler_chain.add(ElementPrinter::with_prefix(" after elevation_enricher:----------------\n".to_string())
+            .with_node_ids(config.print_node_ids.clone())
+            .with_way_ids(config.print_way_ids.clone())
+            .with_relation_ids(config.print_relation_ids.clone()));
     }
 
     handler_chain = handler_chain.add(TagFilterByKey::new(
@@ -153,7 +163,7 @@ fn process(config: &Config, node_filter_result: Option<HandlerResult>) -> Handle
         Regex::new("(.*:)?source(:.*)?|(.*:)?note(:.*)?|url|created_by|fixme|wikipedia").unwrap(),
         FilterType::RemoveMatching));
 
-    handler_chain = handler_chain.add(ElementCounter::new("final"));
+    handler_chain = handler_chain.add(ElementCounter::with_index({counter_id += 1; counter_id}, "final"));
 
     handler_chain = handler_chain.add(ElementPrinter::with_prefix("\noutput:----------------\n".to_string())
         .with_node_ids(config.print_node_ids.clone())
@@ -163,7 +173,7 @@ fn process(config: &Config, node_filter_result: Option<HandlerResult>) -> Handle
 
     match &config.output_pbf {
         Some(path_buf) => {
-            log::info!("Initializing ouput handler");
+            log::info!("Initializing output handler");
             stopwatch.start();
             if config.elevation_way_splitting == true {
                 let mut output_handler = SplittingOutputHandler::new(path_buf.clone());

@@ -21,6 +21,14 @@ impl ElementCounter {
             result_key: result_key.to_string(),
         }
     }
+    pub fn with_index(index: i32, result_key: &str) -> Self {
+        Self {
+            nodes_count: 0,
+            ways_count: 0,
+            relations_count: 0,
+            result_key: format!("{:0>2} {}", index, result_key),
+        }
+    }
 }
 impl Handler for ElementCounter {
     fn name(&self) -> String { format!("ElementCounter {}", self.result_key) }

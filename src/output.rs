@@ -1,4 +1,7 @@
 use std::path::{Path, PathBuf};
+use std::thread::sleep;
+use log::log;
+use osm_io::osm::model::coordinate::Coordinate;
 use osm_io::osm::model::element::Element;
 use osm_io::osm::model::node::Node;
 use osm_io::osm::model::relation::Relation;
@@ -87,6 +90,7 @@ impl SplittingOutputHandler {
     }
 
     pub fn close(&mut self) {
+        log::info!("Closing both writers");
         self.node_writer.close().expect("Failed to close writer");
         self.way_relation_writer.close().expect("Failed to close writer");
     }
@@ -119,7 +123,9 @@ impl Handler for SplittingOutputHandler {
     }
     fn add_result(&mut self, result: HandlerResult) -> HandlerResult {
         self.way_relation_writer.close().expect("Failed to close way_relation_writer");
-        log::info!("Reading the newly generated file {:?} again and appending all elements to {:?}...", &self.way_relation_writer.path(), &self.node_writer.path());
+        self.node_writer.close().expect("Failed to close node writer");
+        log::info!("Reading the newly generated file {:?} and appending all elements to {:?}...", &self.way_relation_writer.path(), &self.node_writer.path());
+        // let fresh_way_relation_reader = pbf::reader::Reader::new(&PathBuf::from("test/baarle_small.pbf"));
         let fresh_way_relation_reader = pbf::reader::Reader::new(&self.way_relation_writer.path());
         match fresh_way_relation_reader {
             Ok(reader) => {

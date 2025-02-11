@@ -2,6 +2,7 @@ use std::collections::HashMap;
 use std::error::Error;
 use std::fs::File;
 use std::io::BufReader;
+use std::panic;
 use std::path::PathBuf;
 use itertools::Itertools;
 use bit_vec::BitVec;
@@ -166,6 +167,7 @@ impl GeoTiffManager {
     }
 
     fn index_geotiffs(&mut self, files_pattern: &str) {
+        let mut counter = 0;
         match glob(files_pattern) {
             Ok(paths) => {
                 for entry in paths {
@@ -176,6 +178,7 @@ impl GeoTiffManager {
                                 match geotiff {
                                     Ok(geotiff) => {
                                         self.index_geotiff(path, geotiff);
+                                        counter += 1;
                                     }
                                     Err(error) => {
                                         log::error!("{:?}", error);
@@ -189,6 +192,10 @@ impl GeoTiffManager {
             }
             Err(e) => error!("Failed to read glob pattern: {:?}", e),
         }
+        if counter == 0 {
+            panic!("No geotiff files found for glob pattern {}", files_pattern);
+        }
+        log::info!("Indexed {} geotiff files for pattern {}", counter, files_pattern);
     }
 
     fn index_geotiff(&mut self, path: PathBuf, geotiff: GeoTiff) {
@@ -200,16 +207,16 @@ impl GeoTiffManager {
 
     pub fn load_geotiff(&mut self, file_path: &str) -> Result<GeoTiff, Box<dyn Error>> {
         log::debug!("Loading geotiff {}", file_path);
-        let img_file = BufReader::new(File::open(file_path).expect("Could not open input file"));
-        let geotiffreader = GeoTiffReader::open(img_file).expect("Could not read input file as tiff");
+        let img_file = BufReader::new(File::open(file_path).expect(format!("Could not open input file {}", file_path).as_str()));
+        let geotiffreader = GeoTiffReader::open(img_file).expect(format!("Could not read input file {} as tiff", file_path).as_str());
 
         let origin = geotiffreader.origin().unwrap();
         let pixel_size = geotiffreader.pixel_size().unwrap();
         let geo_params = geotiffreader.geo_params.clone().unwrap();
-        let dimensions = geotiffreader.images().get(0).expect("no image in tiff").dimensions.unwrap();
+        let dimensions = geotiffreader.images().get(0).expect(format!("no image in tiff {}", file_path).as_str()).dimensions.unwrap();
 
         let geo_params: Vec<&str> = geo_params.split("|").collect();
-        let proj_tiff = self.srs_resolver.get_epsg(geo_params[0].to_string()).expect("not found");
+        let proj_tiff = self.srs_resolver.get_epsg(geo_params[0].to_string()).expect(format!("Elevation tif {} contains unknown SRS '{}'", file_path, geo_params[0].to_string()).as_str());
 
         let proj_wgs84 = Proj::from_epsg_code(4326).unwrap();
         let proj_tiff = Proj::from_epsg_code(proj_tiff as u16).unwrap(); //as u16 should not be necessary, SrsResolver should return u16
@@ -353,7 +360,7 @@ impl BufferingElevationEnricher {
             max_buffer_len,
             total_buffered_nodes_max,
             skip_ele,
-            next_node_id: 0,
+            next_node_id: 1,//todo make configurable with default in cli or evaluate highest node id in input (new simple handler)
             resolution_lon,
             resolution_lat,
             elevation_way_splitting
@@ -483,13 +490,13 @@ impl BufferingElevationEnricher {
             let mut from_location = self.node_cache.get(&from_node_id);
             let mut to_location = self.node_cache.get(&to_node_id);
             if from_location.is_none() || to_location.is_none() {
-                log::debug!("Cannot split way segment: node_cache does not contain nodes {} and {}", from_node_id, to_node_id);
+                log::trace!("{}.handle_way#{}: Cannot split way segment: node_cache does not contain nodes {} and {}", self.name(), way.id(), from_node_id, to_node_id);
                 continue;
             }
             let from_location = from_location.unwrap();
             let to_location = to_location.unwrap();
             let intermediate_locations = WaySplitter::compute_intermediate_locations(from_location.lon, from_location.lat, to_location.lon, to_location.lat, (self.resolution_lon, self.resolution_lat));
-            log::debug!("WaySplitter created {} intermediate locations", intermediate_nodes.len());
+            log::debug!("{}.handle_way#{}: Created {} intermediate locations", self.name(), way.id(), intermediate_nodes.len());
             intermediate_locations.iter().for_each(|location| {
                 //TODO only add node if elevation difference exceeds a certain threshold
                 let node = Node::new(self.next_node_id(), 0, location.get_coordinate(), 0, 0, 0, String::default(), true, vec![
@@ -581,7 +588,7 @@ impl Handler for BufferingElevationEnricher {
     }
 
     fn handle_and_flush_elements(&mut self, mut nodes: Vec<Node>, mut ways: Vec<Way>, mut relations: Vec<Relation>) -> (Vec<Node>, Vec<Way>, Vec<Relation>) {
-        log::trace!("{}.handle_and_flush_elements() called with {} nodes, {} ways, {} relations", self.name(), nodes.len(), ways.len(), relations.len());
+        log::debug!("{}.handle_and_flush_elements() called with {} nodes, {} ways, {} relations", self.name(), nodes.len(), ways.len(), relations.len());
 
         nodes = self.handle_and_flush_nodes(nodes);
         if ways.len()>0 {
@@ -610,7 +617,7 @@ impl Handler for BufferingElevationEnricher {
         ways
     }
     fn handle_and_flush_nodes(&mut self, elements: Vec<Node> ) -> Vec<Node> {
-        log::debug!("{}: handle_and_flush_nodes called", self.name());
+        log::debug!("{}: handle_and_flush_nodes called", self.name());//found
         let mut result = self.handle_nodes(elements);
 
         let buffers: Vec<String> = self.nodes_for_geotiffs.iter()
