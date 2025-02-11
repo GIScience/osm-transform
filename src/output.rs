@@ -1,4 +1,4 @@
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use osm_io::osm::model::element::Element;
 use osm_io::osm::model::node::Node;
 use osm_io::osm::model::relation::Relation;
@@ -16,9 +16,9 @@ pub struct SimpleOutputHandler {
 impl SimpleOutputHandler {
     pub fn new(output_path: PathBuf) -> Self {
         let mut file_info = FileInfo::default();
-        file_info.with_writingprogram_str("rusty-routes");
+        file_info.with_writingprogram_str("rusty-routes-transformer");
         Self {
-            writer: pbf::writer::Writer::from_file_info(output_path, file_info, CompressionType::Zlib).expect("Failed to create output writer"),
+            writer: pbf::writer::Writer::from_file_info(output_path, file_info, CompressionType::Uncompressed).expect("Failed to create output writer"),
         }
     }
 
@@ -70,14 +70,14 @@ pub struct SplittingOutputHandler {
 impl SplittingOutputHandler {
     pub fn new(output_path: PathBuf) -> Self {
         let mut file_info = FileInfo::default();
-        file_info.with_writingprogram_str("rusty-routes");
+        file_info.with_writingprogram_str("rusty-routes-transformer");
 
         let base_name = output_path.file_stem().expect("Failed to get file stem").to_str().expect("Failed to convert file stem to string");
         let ways_relations_path = PathBuf::from(format!("{}_ways_relations.pbf", base_name));
 
         Self {
-            node_writer: pbf::writer::Writer::from_file_info(output_path, file_info.clone(), CompressionType::Zlib).expect("Failed to create node output writer"),
-            way_relation_writer: pbf::writer::Writer::from_file_info(ways_relations_path, file_info.clone(), CompressionType::Zlib).expect("Failed to create way_relation output writer"),
+            node_writer: pbf::writer::Writer::from_file_info(output_path, file_info.clone(), CompressionType::Uncompressed).expect("Failed to create node output writer"),
+            way_relation_writer: pbf::writer::Writer::from_file_info(ways_relations_path, file_info.clone(), CompressionType::Uncompressed).expect("Failed to create way_relation output writer"),
         }
     }
 
@@ -119,6 +119,7 @@ impl Handler for SplittingOutputHandler {
     }
     fn add_result(&mut self, result: HandlerResult) -> HandlerResult {
         self.way_relation_writer.close().expect("Failed to close way_relation_writer");
+        log::info!("Reading the newly generated file {:?} again and appending all elements to {:?}...", &self.way_relation_writer.path(), &self.node_writer.path());
         let fresh_way_relation_reader = pbf::reader::Reader::new(&self.way_relation_writer.path());
         match fresh_way_relation_reader {
             Ok(reader) => {
