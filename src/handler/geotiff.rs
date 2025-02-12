@@ -16,7 +16,7 @@ use osm_io::osm::model::tag::Tag;
 use osm_io::osm::model::way::Way;
 use proj4rs::Proj;
 use rstar::{AABB, Envelope, Point, PointDistance, RTree, RTreeObject};
-use crate::handler::{Handler, HandlerResult};
+use crate::handler::{Handler, HandlerResult, HIGHEST_NODE_ID};
 use crate::handler::interpolate::WaySplitter;
 use crate::srs::DynamicSrsResolver;
 
@@ -360,7 +360,7 @@ impl BufferingElevationEnricher {
             max_buffer_len,
             total_buffered_nodes_max,
             skip_ele,
-            next_node_id: 1,//todo make configurable with default in cli or evaluate highest node id in input (new simple handler)
+            next_node_id: HIGHEST_NODE_ID + 1,
             resolution_lon,
             resolution_lat,
             elevation_way_splitting
@@ -691,7 +691,7 @@ mod tests {
     use simple_logger::SimpleLogger;
 
     use crate::handler::geotiff::{BufferingElevationEnricher, format_as_elevation_string, GeoTiff, GeoTiffManager, round_f32, round_f64, transform, LocationWithElevation};
-    use crate::handler::Handler;
+    use crate::handler::{Handler, HIGHEST_NODE_ID};
     use crate::srs::DynamicSrsResolver;
 
     #[test]
@@ -1224,8 +1224,8 @@ mod tests {
         dbg!(&way);
         assert_eq!(&4, &way.refs().len());
         assert_eq!(1000_i64, way.refs()[0]);
-        assert_eq!(0_i64, way.refs()[1]);
-        assert_eq!(1_i64, way.refs()[2]);
+        assert_eq!(HIGHEST_NODE_ID + 1, way.refs()[1]);
+        assert_eq!(HIGHEST_NODE_ID + 2, way.refs()[2]);
         assert_eq!(1001_i64, way.refs()[3]);
     }
 }

@@ -875,8 +875,8 @@ pub(crate) mod tests {
         assert_eq!(&result.counts.get("nodes count final").unwrap().clone(), &3);
         assert_eq!(&result.counts.get("ways count final").unwrap().clone(), &1,);
         assert_eq!(&result.other.get("TestOnlyOrderRecorder initial").unwrap().clone(), "node#101, node#102, way#201");
-        assert_eq!(&result.other.get("TestOnlyOrderRecorder final").unwrap().clone(), "node#101, node#102, node#0, way#201");
-        assert_eq!(&result.other.get("ElementEvaluator#elevation node results").unwrap().clone(), "0:true, 101:true, 102:true");
-        assert_eq!(&result.other.get("ElementEvaluator#way_refs:way#201").unwrap().clone(), "101,0,102");
+        assert_eq!(&result.other.get("TestOnlyOrderRecorder final").unwrap().clone(), format!("node#101, node#102, node#{}, way#201", HIGHEST_NODE_ID+1).as_str());
+        assert_eq!(&result.other.get("ElementEvaluator#elevation node results").unwrap().clone(), format!("101:true, 102:true, {}:true", HIGHEST_NODE_ID+1).as_str() );
+        assert_eq!(&result.other.get("ElementEvaluator#way_refs:way#201").unwrap().clone(), format!("101,{},102",HIGHEST_NODE_ID+1).as_str());
     }
 }

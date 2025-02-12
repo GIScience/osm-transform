@@ -231,8 +231,8 @@ impl NodeIdFilter {
             }
         }
     }
-
 }
+
 impl Handler for NodeIdFilter {
     fn name(&self) -> String {
         "NodeIdFilter".to_string()
