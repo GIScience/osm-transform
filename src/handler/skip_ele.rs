@@ -4,7 +4,7 @@ use osm_io::osm::model::way::Way;
 use crate::handler::{HandlerResult, HIGHEST_NODE_ID, Handler};
 
 pub(crate) struct SkipElevationNodeCollector {
-    referenced_node_ids: BitVec,
+    skip_elevation_node_ids: BitVec,
     no_elevation_keys: Vec<String>,
 }
 impl SkipElevationNodeCollector {
@@ -12,7 +12,7 @@ impl SkipElevationNodeCollector {
 
     pub(crate) fn new(nbits: usize, no_elevation_keys: Vec<&str>) -> Self {
         Self {
-            referenced_node_ids: BitVec::from_elem(nbits, false),
+            skip_elevation_node_ids: BitVec::from_elem(nbits, false),
             no_elevation_keys: no_elevation_keys.iter().map(|&str| String::from(str)).collect()
         }
     }
@@ -30,7 +30,7 @@ impl SkipElevationNodeCollector {
             log::trace!("skipping elevation for way {}", way.id());
             for &id in way.refs() {
                 log::trace!("skipping elevation for node {}", id);
-                self.referenced_node_ids.set(id as usize, true);
+                self.skip_elevation_node_ids.set(id as usize, true);
             }
         }
     }
@@ -46,8 +46,7 @@ impl Handler for SkipElevationNodeCollector {
     }
 
     fn add_result(&mut self, mut result: HandlerResult) -> HandlerResult {
-        log::debug!("cloning node_ids of NoElevationNodeIdCollector with len={} into HandlerResult ", self.referenced_node_ids.len());
-        result.skip_ele = self.referenced_node_ids.clone();
+        result.skip_ele = self.skip_elevation_node_ids.clone();
         result
     }
 }
@@ -90,16 +89,16 @@ mod test {
             collector.handle_way(&way);
         }
 
-        assert!(!collector.referenced_node_ids.get(0).unwrap_or(false) );
-        assert!(!collector.referenced_node_ids.get(1).unwrap_or(false) );
-        assert!(!collector.referenced_node_ids.get(2).unwrap_or(false) );
-        assert!( collector.referenced_node_ids.get(3).unwrap_or(false) );
-        assert!( collector.referenced_node_ids.get(4).unwrap_or(false) );
-        assert!(!collector.referenced_node_ids.get(5).unwrap_or(false) );
-        assert!( collector.referenced_node_ids.get(6).unwrap_or(false) );
-        assert!( collector.referenced_node_ids.get(7).unwrap_or(false) );
-        assert!( collector.referenced_node_ids.get(8).unwrap_or(false) );
-        assert!( collector.referenced_node_ids.get(9).unwrap_or(false) );
+        assert!(!collector.skip_elevation_node_ids.get(0).unwrap_or(false) );
+        assert!(!collector.skip_elevation_node_ids.get(1).unwrap_or(false) );
+        assert!(!collector.skip_elevation_node_ids.get(2).unwrap_or(false) );
+        assert!( collector.skip_elevation_node_ids.get(3).unwrap_or(false) );
+        assert!( collector.skip_elevation_node_ids.get(4).unwrap_or(false) );
+        assert!(!collector.skip_elevation_node_ids.get(5).unwrap_or(false) );
+        assert!( collector.skip_elevation_node_ids.get(6).unwrap_or(false) );
+        assert!( collector.skip_elevation_node_ids.get(7).unwrap_or(false) );
+        assert!( collector.skip_elevation_node_ids.get(8).unwrap_or(false) );
+        assert!( collector.skip_elevation_node_ids.get(9).unwrap_or(false) );
     }
 
     #[test]

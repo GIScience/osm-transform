@@ -52,9 +52,9 @@ pub fn init(config: &Config) {
 
 pub fn run(config: &Config) -> HandlerResult{
     let mut result: Option<HandlerResult> = None;
-    if config.with_node_filtering {
+
         result = Some(extract_referenced_nodes(config));
-    }
+
     result = Some(process(config, result));
     result.unwrap()
 }
@@ -62,10 +62,14 @@ fn extract_referenced_nodes(config: &Config) -> HandlerResult {
     let mut handler_chain = HandlerChain::default()
         .add(ElementCounter::new("initial"))
         .add(AllElementsFilter{handle_types: OsmElementTypeSelection::node_only()})
-        .add(ComplexElementsFilter::ors_default())
-        .add(ReferencedNodeIdCollector::default())
-        .add(ElementCounter::new("final"))
-        ;
+        .add(ComplexElementsFilter::ors_default());
+    if config.with_node_filtering {
+        handler_chain = handler_chain.add(ReferencedNodeIdCollector::default())
+    }
+    if &config.elevation_tiffs.len() > &0 {
+        handler_chain = handler_chain.add(SkipElevationNodeCollector::default())
+    }
+    handler_chain = handler_chain.add(ElementCounter::new("final"));
 
     log::info!("Starting extraction of referenced node ids...");
     let mut stopwatch = StopWatch::new();
