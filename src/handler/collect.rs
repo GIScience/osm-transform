@@ -5,7 +5,8 @@ use osm_io::osm::model::way::Way;
 use crate::handler::{HandlerResult, HIGHEST_NODE_ID, Handler};
 
 pub(crate) struct ReferencedNodeIdCollector {
-    referenced_node_ids: BitVec //TODO @Julian check if ok
+    referenced_node_ids: BitVec,
+    count_unique: usize,
 }
 impl ReferencedNodeIdCollector {
     pub(crate) fn default() -> Self {
@@ -14,8 +15,14 @@ impl ReferencedNodeIdCollector {
 
     fn with_capacity(nbits: usize) -> Self {
         ReferencedNodeIdCollector {
-            referenced_node_ids: BitVec::from_elem(nbits, false)
+            referenced_node_ids: BitVec::from_elem(nbits, false),
+            count_unique: 0
         }
+    }
+
+    fn add_node_id(&mut self, id: i64) {
+        if matches!(self.referenced_node_ids.get(id as usize), Some(false)) { self.count_unique += 1 }
+        self.referenced_node_ids.set(id as usize, true);
     }
 }
 impl Handler for ReferencedNodeIdCollector {
@@ -26,7 +33,7 @@ impl Handler for ReferencedNodeIdCollector {
     fn handle_ways(&mut self, mut elements: Vec<Way>) -> Vec<Way> {
         for element in &mut *elements {
             for &id in element.refs() {
-                self.referenced_node_ids.set(id as usize, true);
+                self.add_node_id(id);
             }
         }
         elements
@@ -37,8 +44,7 @@ impl Handler for ReferencedNodeIdCollector {
             for member in element.members() {
                 match member {
                     Member::Node { member } => {
-                        log::trace!("relation {} references node {} - set true in bitmap", element.id(), member.id());
-                        self.referenced_node_ids.set(member.id() as usize, true);
+                        self.add_node_id(member.id());
                     }
                     Member::Way { .. } => {}
                     Member::Relation { .. } => {}
@@ -51,6 +57,7 @@ impl Handler for ReferencedNodeIdCollector {
     fn add_result(&mut self, mut result: HandlerResult) -> HandlerResult {
         log::debug!("cloning node_ids of ReferencedNodeIdCollector with len={} into HandlerResult ", self.referenced_node_ids.len());
         result.node_ids = self.referenced_node_ids.clone();//todo check if clone is necessary
+        result.counts.insert("unique_referenced_nodes".to_string(), self.count_unique as u64);
         result
     }
 }

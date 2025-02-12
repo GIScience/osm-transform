@@ -74,13 +74,7 @@ fn extract_referenced_nodes(config: &Config) -> HandlerResult {
     let handler_result = handler_chain.collect_result();
 
     log::info!("Finished extraction of referenced node ids, time: {}", stopwatch);
-    if log::log_enabled!(log::Level::Trace)  {
-        log::trace!("Generating node-id statistics...");
-        log::trace!("{}" , &handler_result.to_string_with_node_ids());
-    }
-    else {
-        log::info!("{}" , &handler_result.to_string());
-    }
+    log::info!("{}", &handler_result.to_string());
     stopwatch.reset();
     handler_result
 }
