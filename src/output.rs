@@ -77,7 +77,7 @@ impl SplittingOutputHandler {
         let mut file_info_way_relation = FileInfo::default();
         file_info_way_relation.with_writingprogram_str("rusty-routes-transformer");
 
-        let base_name = output_path.file_stem().expect("Failed to get file stem").to_str().expect("Failed to convert file stem to string");
+        let base_name = output_path.as_os_str().to_str().unwrap();
         let ways_relations_path = PathBuf::from(format!("{}_ways_relations.pbf", base_name));
 
         Self {
