@@ -58,8 +58,9 @@ impl Handler for SimpleOutputHandler {
         Vec::new()
     }
 
-    fn add_result(&mut self, result: HandlerResult) -> HandlerResult {
+    fn add_result(&mut self, mut result: HandlerResult) -> HandlerResult {
         self.close();
+        result.other.insert("output file".to_string(), format!("{:?}", &self.writer.path()));
         result
     }
 }
@@ -122,22 +123,23 @@ impl Handler for SplittingOutputHandler {
         }
         vec![]
     }
-    fn add_result(&mut self, result: HandlerResult) -> HandlerResult {
+    fn add_result(&mut self, mut result: HandlerResult) -> HandlerResult {
         self.way_relation_writer.close().expect("Failed to close way_relation_writer");
         self.node_writer.close().expect("Failed to close node writer");
-        log::info!("Reading the newly generated file {:?} and appending all elements to {:?}...", &self.way_relation_writer.path(), &self.node_writer.path());
-        // let fresh_way_relation_reader = pbf::reader::Reader::new(&PathBuf::from("test/baarle_small.pbf"));
-        let fresh_way_relation_reader = pbf::reader::Reader::new(&self.way_relation_writer.path());
-        match fresh_way_relation_reader {
-            Ok(reader) => {
-                for element in reader.elements().unwrap() {
-                    log::trace!("fresh_way_relation_reader copies element {} to node_writer", format_element_id(&element));
-                    self.node_writer.write_element(element).expect("Failed to write element");
-                }
-            }
-            Err(_) => {}
-        }
-        self.node_writer.close().expect("Failed to close node writer");
+        result.other.insert("output files".to_string(), format!("{:?}, {:?}", &self.way_relation_writer.path() , &self.node_writer.path()));
+        // log::info!("Reading the newly generated file {:?} and appending all elements to {:?}...", &self.way_relation_writer.path(), &self.node_writer.path());
+        //// let fresh_way_relation_reader = pbf::reader::Reader::new(&PathBuf::from("test/baarle_small.pbf"));
+        // let fresh_way_relation_reader = pbf::reader::Reader::new(&self.way_relation_writer.path());
+        // match fresh_way_relation_reader {
+        //     Ok(reader) => {
+        //         for element in reader.elements().unwrap() {
+        //             log::trace!("fresh_way_relation_reader copies element {} to node_writer", format_element_id(&element));
+        //             self.node_writer.write_element(element).expect("Failed to write element");
+        //         }
+        //     }
+        //     Err(_) => {}
+        // }
+        // self.node_writer.close().expect("Failed to close node writer");
         result
     }
 }

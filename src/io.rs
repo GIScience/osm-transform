@@ -6,7 +6,6 @@ use crate::Config;
 use crate::handler::HandlerChain;
 
 pub(crate) fn process_with_handler(config: &Config, handler_chain: &mut HandlerChain) -> Result<(), anyhow::Error> {
-    log::info!("Starting pbf io pipeline...");
     let mut stopwatch = StopWatch::new();
     stopwatch.start();
     let reader = pbf::reader::Reader::new(&config.input_pbf)?;
@@ -15,7 +14,6 @@ pub(crate) fn process_with_handler(config: &Config, handler_chain: &mut HandlerC
         handler_chain.process(element);
     }
     handler_chain.flush_handlers();
-    log::info!("Finished pbf io pipeline, time: {}", stopwatch);
     Ok(())
 }
 
@@ -33,7 +31,6 @@ mod tests {
     use super::*;
 
     pub fn process_file(output: String) -> Result<(), anyhow::Error> {
-        log::info!("Starting pbf io pipeline...");
         let mut stopwatch = StopWatch::new();
         stopwatch.start();
         let input_path = PathBuf::from("test/baarle_small.pbf");
@@ -87,8 +84,6 @@ mod tests {
         }
 
         writer.close()?;
-
-        log::info!("Finished pbf io pipeline, time: {}", stopwatch);
         Ok(())
     }
 

@@ -40,12 +40,12 @@ fn run_minimal() {
     let config = base_config();
     rusty_routes_transformer::init(&config);
     let result = rusty_routes_transformer::run(&config);
-    assert_eq!(result.counts.get("nodes count initial").unwrap(), &BAARLE_NODE_COUNT);
-    assert_eq!(result.counts.get("nodes count final").unwrap(), &BAARLE_NODE_COUNT);
-    assert_eq!(result.counts.get("relations count initial").unwrap(), &BAARLE_RELATION_COUNT);
-    assert_eq!(result.counts.get("relations count final").unwrap(), &FILTERED_RELATION_COUNT);
-    assert_eq!(result.counts.get("ways count initial").unwrap(), &BAARLE_WAY_COUNT);
-    assert_eq!(result.counts.get("ways count final").unwrap(), &FILTERED_WAY_COUNT);
+    assert_eq!(&result.input_node_count, &BAARLE_NODE_COUNT);
+    assert_eq!(&result.output_node_count, &BAARLE_NODE_COUNT);
+    assert_eq!(&result.input_relation_count, &BAARLE_RELATION_COUNT);
+    assert_eq!(&result.output_relation_count, &FILTERED_RELATION_COUNT);
+    assert_eq!(&result.input_way_count, &BAARLE_WAY_COUNT);
+    assert_eq!(&result.output_way_count, &FILTERED_WAY_COUNT);
 }
 #[test]
 fn run_minimal_write() {
@@ -53,12 +53,12 @@ fn run_minimal_write() {
     config.output_pbf = Some(PathBuf::from("target/tmp/output-integration-test-run_minimal_write.pbf"));
     rusty_routes_transformer::init(&config);
     let result = rusty_routes_transformer::run(&config);
-    assert_eq!(result.counts.get("nodes count initial").unwrap(), &BAARLE_NODE_COUNT);
-    assert_eq!(result.counts.get("nodes count final").unwrap(), &BAARLE_NODE_COUNT);
-    assert_eq!(result.counts.get("relations count initial").unwrap(), &BAARLE_RELATION_COUNT);
-    assert_eq!(result.counts.get("relations count final").unwrap(), &FILTERED_RELATION_COUNT);
-    assert_eq!(result.counts.get("ways count initial").unwrap(), &BAARLE_WAY_COUNT);
-    assert_eq!(result.counts.get("ways count final").unwrap(), &FILTERED_WAY_COUNT);
+    assert_eq!(&result.input_node_count, &BAARLE_NODE_COUNT);
+    assert_eq!(&result.output_node_count, &BAARLE_NODE_COUNT);
+    assert_eq!(&result.input_relation_count, &BAARLE_RELATION_COUNT);
+    assert_eq!(&result.output_relation_count, &FILTERED_RELATION_COUNT);
+    assert_eq!(&result.input_way_count, &BAARLE_WAY_COUNT);
+    assert_eq!(&result.output_way_count, &FILTERED_WAY_COUNT);
 }
 #[test]
 fn run_all() {
@@ -75,12 +75,12 @@ fn run_all() {
     config.resolution_lat= 0.0001;
     rusty_routes_transformer::init(&config);
     let result = rusty_routes_transformer::run(&config);
-    assert_eq!(result.counts.get("nodes count initial").unwrap(), &BAARLE_NODE_COUNT);
-    assert_eq!(result.counts.get("nodes count final").unwrap(), &FILTERED_NODE_COUNT);
-    assert_eq!(result.counts.get("relations count initial").unwrap(), &BAARLE_RELATION_COUNT);
-    assert_eq!(result.counts.get("relations count final").unwrap(), &FILTERED_RELATION_COUNT);
-    assert_eq!(result.counts.get("ways count initial").unwrap(), &BAARLE_WAY_COUNT);
-    assert_eq!(result.counts.get("ways count final").unwrap(), &FILTERED_WAY_COUNT);
+    assert_eq!(&result.input_node_count, &BAARLE_NODE_COUNT);
+    assert_eq!(&result.output_node_count, &FILTERED_NODE_COUNT);
+    assert_eq!(&result.input_relation_count, &BAARLE_RELATION_COUNT);
+    assert_eq!(&result.output_relation_count, &FILTERED_RELATION_COUNT);
+    assert_eq!(&result.input_way_count, &BAARLE_WAY_COUNT);
+    assert_eq!(&result.output_way_count, &FILTERED_WAY_COUNT);
     check_pbf("target/tmp/output-integration-test-run_all.pbf", Some(42645645));
 }
 #[test]
@@ -89,12 +89,12 @@ fn run_country() {
     config.country_csv = Some(PathBuf::from("test/mapping_test.csv"));
     rusty_routes_transformer::init(&config);
     let result = rusty_routes_transformer::run(&config);
-    assert_eq!(result.counts.get("nodes count 01 initial").unwrap(), &BAARLE_NODE_COUNT);
-    assert_eq!(result.counts.get("nodes count 03 final").unwrap(), &BAARLE_NODE_COUNT);
-    assert_eq!(result.counts.get("relations count 01 initial").unwrap(), &BAARLE_RELATION_COUNT);
-    assert_eq!(result.counts.get("relations count 03 final").unwrap(), &FILTERED_RELATION_COUNT);
-    assert_eq!(result.counts.get("ways count 01 initial").unwrap(), &BAARLE_WAY_COUNT);
-    assert_eq!(result.counts.get("ways count 03 final").unwrap(), &FILTERED_WAY_COUNT);
+    assert_eq!(&result.input_node_count, &BAARLE_NODE_COUNT);
+    assert_eq!(&result.output_node_count, &BAARLE_NODE_COUNT);
+    assert_eq!(&result.input_relation_count, &BAARLE_RELATION_COUNT);
+    assert_eq!(&result.output_relation_count, &FILTERED_RELATION_COUNT);
+    assert_eq!(&result.input_way_count, &BAARLE_WAY_COUNT);
+    assert_eq!(&result.output_way_count, &FILTERED_WAY_COUNT);
 }
 
 #[test]
@@ -103,12 +103,12 @@ fn run_node_filtering() {
     config.with_node_filtering = true;
     rusty_routes_transformer::init(&config);
     let result = rusty_routes_transformer::run(&config);
-    assert_eq!(result.counts.get("nodes count initial").unwrap(), &BAARLE_NODE_COUNT);
-    assert_eq!(result.counts.get("nodes count final").unwrap(), &FILTERED_NODE_COUNT);
-    assert_eq!(result.counts.get("relations count initial").unwrap(), &BAARLE_RELATION_COUNT);
-    assert_eq!(result.counts.get("relations count final").unwrap(), &FILTERED_RELATION_COUNT);
-    assert_eq!(result.counts.get("ways count initial").unwrap(), &BAARLE_WAY_COUNT);
-    assert_eq!(result.counts.get("ways count final").unwrap(), &FILTERED_WAY_COUNT);
+    assert_eq!(&result.input_node_count, &BAARLE_NODE_COUNT);
+    assert_eq!(&result.output_node_count, &FILTERED_NODE_COUNT);
+    assert_eq!(&result.input_relation_count, &BAARLE_RELATION_COUNT);
+    assert_eq!(&result.output_relation_count, &FILTERED_RELATION_COUNT);
+    assert_eq!(&result.input_way_count, &BAARLE_WAY_COUNT);
+    assert_eq!(&result.output_way_count, &FILTERED_WAY_COUNT);
 }
 
 #[test]
@@ -117,12 +117,12 @@ fn run_remove_metadata() {
     config.remove_metadata = true;
     rusty_routes_transformer::init(&config);
     let result = rusty_routes_transformer::run(&config);
-    assert_eq!(result.counts.get("nodes count initial").unwrap(), &BAARLE_NODE_COUNT);
-    assert_eq!(result.counts.get("nodes count final").unwrap(), &BAARLE_NODE_COUNT);
-    assert_eq!(result.counts.get("relations count initial").unwrap(), &BAARLE_RELATION_COUNT);
-    assert_eq!(result.counts.get("relations count final").unwrap(), &FILTERED_RELATION_COUNT);
-    assert_eq!(result.counts.get("ways count initial").unwrap(), &BAARLE_WAY_COUNT);
-    assert_eq!(result.counts.get("ways count final").unwrap(), &FILTERED_WAY_COUNT);
+    assert_eq!(&result.input_node_count, &BAARLE_NODE_COUNT);
+    assert_eq!(&result.output_node_count, &BAARLE_NODE_COUNT);
+    assert_eq!(&result.input_relation_count, &BAARLE_RELATION_COUNT);
+    assert_eq!(&result.output_relation_count, &FILTERED_RELATION_COUNT);
+    assert_eq!(&result.input_way_count, &BAARLE_WAY_COUNT);
+    assert_eq!(&result.output_way_count, &FILTERED_WAY_COUNT);
 }
 #[test]
 fn run_elevation() {
@@ -130,12 +130,12 @@ fn run_elevation() {
     config.elevation_tiffs = vec!["test/*.tif".to_string()];
     rusty_routes_transformer::init(&config);
     let result = rusty_routes_transformer::run(&config);
-    assert_eq!(result.counts.get("nodes count initial").unwrap(), &BAARLE_NODE_COUNT);
-    assert_eq!(result.counts.get("nodes count final").unwrap(), &BAARLE_NODE_COUNT);
-    assert_eq!(result.counts.get("relations count initial").unwrap(), &BAARLE_RELATION_COUNT);
-    assert_eq!(result.counts.get("relations count final").unwrap(), &FILTERED_RELATION_COUNT);
-    assert_eq!(result.counts.get("ways count initial").unwrap(), &BAARLE_WAY_COUNT);
-    assert_eq!(result.counts.get("ways count final").unwrap(), &FILTERED_WAY_COUNT);
+    assert_eq!(&result.input_node_count, &BAARLE_NODE_COUNT);
+    assert_eq!(&result.output_node_count, &BAARLE_NODE_COUNT);
+    assert_eq!(&result.input_relation_count, &BAARLE_RELATION_COUNT);
+    assert_eq!(&result.output_relation_count, &FILTERED_RELATION_COUNT);
+    assert_eq!(&result.input_way_count, &BAARLE_WAY_COUNT);
+    assert_eq!(&result.output_way_count, &FILTERED_WAY_COUNT);
 }
 #[test]
 fn run_elevation_way_splitting() {
@@ -146,12 +146,12 @@ fn run_elevation_way_splitting() {
     config.resolution_lat= 0.0001;
     rusty_routes_transformer::init(&config);
     let result = rusty_routes_transformer::run(&config);
-    assert_eq!(result.counts.get("nodes count initial").unwrap(), &BAARLE_NODE_COUNT);
-    assert!(result.counts.get("nodes count final").unwrap() > &BAARLE_NODE_COUNT);
-    assert_eq!(result.counts.get("relations count initial").unwrap(), &BAARLE_RELATION_COUNT);
-    assert_eq!(result.counts.get("relations count final").unwrap(), &FILTERED_RELATION_COUNT);
-    assert_eq!(result.counts.get("ways count initial").unwrap(), &BAARLE_WAY_COUNT);
-    assert_eq!(result.counts.get("ways count final").unwrap(), &FILTERED_WAY_COUNT);
+    assert_eq!(&result.input_node_count, &BAARLE_NODE_COUNT);
+    assert!(&result.output_node_count > &BAARLE_NODE_COUNT);
+    assert_eq!(&result.input_relation_count, &BAARLE_RELATION_COUNT);
+    assert_eq!(&result.output_relation_count, &FILTERED_RELATION_COUNT);
+    assert_eq!(&result.input_way_count, &BAARLE_WAY_COUNT);
+    assert_eq!(&result.output_way_count, &FILTERED_WAY_COUNT);
 }
 #[test]
 fn run_elevation_way_splitting_write() {
@@ -163,12 +163,12 @@ fn run_elevation_way_splitting_write() {
     config.output_pbf = Some(PathBuf::from("target/tmp/output-integration-test-run_elevation_way_splitting_write.pbf"));
     rusty_routes_transformer::init(&config);
     let result = rusty_routes_transformer::run(&config);
-    assert_eq!(result.counts.get("nodes count initial").unwrap(), &BAARLE_NODE_COUNT);
-    assert!(result.counts.get("nodes count final").unwrap() > &BAARLE_NODE_COUNT);
-    assert_eq!(result.counts.get("relations count initial").unwrap(), &BAARLE_RELATION_COUNT);
-    assert_eq!(result.counts.get("relations count final").unwrap(), &FILTERED_RELATION_COUNT);
-    assert_eq!(result.counts.get("ways count initial").unwrap(), &BAARLE_WAY_COUNT);
-    assert_eq!(result.counts.get("ways count final").unwrap(), &FILTERED_WAY_COUNT);
+    assert_eq!(&result.input_node_count, &BAARLE_NODE_COUNT);
+    assert_eq!(&result.output_node_count, &BAARLE_NODE_COUNT);
+    assert_eq!(&result.input_relation_count, &BAARLE_RELATION_COUNT);
+    assert_eq!(&result.output_relation_count, &FILTERED_RELATION_COUNT);
+    assert_eq!(&result.input_way_count, &BAARLE_WAY_COUNT);
+    assert_eq!(&result.output_way_count, &FILTERED_WAY_COUNT);
     check_pbf("target/tmp/output-integration-test-run_elevation_way_splitting_write.pbf", Some(42645645));
     check_pbf("target/tmp/output-integration-test-run_elevation_way_splitting_write.pbf", Some(1));
 }

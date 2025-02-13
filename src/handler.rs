@@ -14,6 +14,7 @@ use osm_io::osm::model::element::Element;
 use osm_io::osm::model::node::Node;
 use osm_io::osm::model::relation::Relation;
 use osm_io::osm::model::way::Way;
+use crate::Config;
 
 pub(crate) const HIGHEST_NODE_ID: i64 = 50_000_000_000;
 
@@ -92,12 +93,37 @@ impl OsmElementTypeSelection {
 }
 
 
-#[derive(Debug)]
 pub struct HandlerResult {
-    pub counts: BTreeMap<String, u64>,
     pub other: HashMap<String, String>,
     pub node_ids: BitVec,
-    pub skip_ele: BitVec
+    pub skip_ele: BitVec,
+    
+    // InputCount,
+    pub input_node_count: u64,
+    pub input_way_count: u64,
+    pub input_relation_count: u64,
+
+    // AcceptedCount,
+    pub accepted_node_count: u64,      //Referenced by accepted ways or relations
+    pub accepted_way_count: u64,       //Not filtered by tags
+    pub accepted_relation_count: u64,  //Not filtered by tags
+
+    pub country_not_found_node_count: u64,
+    pub elevation_not_found_node_count: u64,
+    pub elevation_not_relevant_node_count: u64,
+
+    pub splitted_way_count: u64,
+    pub added_node_count: u64,
+
+    // OutputCount,
+    pub output_node_count: u64,
+    pub output_way_count: u64,
+    pub output_relation_count: u64,
+
+    pub available_elevation_tiff_count: u64,
+    pub used_elevation_tiff_count: u64,
+    pub elevation_buffer_flush_count_buffer_max_reached: u64,
+    pub elevation_buffer_flush_count_total_max_reached: u64,
 }
 impl HandlerResult {
     pub(crate) fn default() -> Self {
@@ -105,14 +131,113 @@ impl HandlerResult {
     }
     fn with_capacity(nbits: usize) -> Self {
         HandlerResult {
-            counts: btreemap! {},
             other: hashmap! {},
             node_ids: BitVec::from_elem(nbits, false),
             skip_ele: BitVec::from_elem(nbits, false),
+            input_node_count: 0,
+            input_way_count: 0,
+            input_relation_count: 0,
+            accepted_node_count: 0,
+            accepted_way_count: 0,
+            accepted_relation_count: 0,
+            country_not_found_node_count: 0,
+            elevation_not_found_node_count: 0,
+            elevation_not_relevant_node_count: 0,
+            splitted_way_count: 0,
+            added_node_count: 0,
+            output_node_count: 0,
+            output_way_count: 0,
+            output_relation_count: 0,
+            available_elevation_tiff_count: 0,
+            used_elevation_tiff_count: 0,
+            elevation_buffer_flush_count_buffer_max_reached: 0,
+            elevation_buffer_flush_count_total_max_reached: 0,
         }
     }
-    pub fn to_string(&self) -> String {
-        format!("HandlerResult:\n  counts:{:?}\n  other:{:?}", &self.counts, &self.other)
+
+    pub(crate) fn format_multi_line(&self) -> String {
+        let input_node_count = self.input_node_count;
+        let input_way_count = self.input_way_count;
+        let input_relation_count = self.input_relation_count;
+        let accepted_node_count = self.accepted_node_count;
+        let accepted_way_count = self.accepted_way_count;
+        let accepted_relation_count = self.accepted_relation_count;
+        let country_not_found_node_count = self.country_not_found_node_count;
+        let elevation_not_found_node_count = self.elevation_not_found_node_count;
+        let elevation_not_relevant_node_count = self.elevation_not_relevant_node_count;
+        let splitted_way_count = self.splitted_way_count;
+        let added_node_count = self.added_node_count;
+        let output_node_count = self.output_node_count;
+        let output_way_count = self.output_way_count;
+        let output_relation_count = self.output_relation_count;
+        let available_elevation_tiff_count = self.available_elevation_tiff_count;
+        let used_elevation_tiff_count = self.used_elevation_tiff_count;
+        let elevation_buffer_flush_count_buffer_max_reached = self.elevation_buffer_flush_count_buffer_max_reached;
+        let elevation_buffer_flush_count_total_max_reached = self.elevation_buffer_flush_count_total_max_reached;
+            format!(r#"input_node_count={input_node_count}
+input_way_count={input_way_count}
+input_relation_count={input_relation_count}
+accepted_node_count={accepted_node_count}
+accepted_way_count={accepted_way_count}
+accepted_relation_count={accepted_relation_count}
+country_not_found_node_count={country_not_found_node_count}
+elevation_not_found_node_count={elevation_not_found_node_count}
+elevation_not_relevant_node_count={elevation_not_relevant_node_count}
+splitted_way_count={splitted_way_count}
+added_node_count={added_node_count}
+output_node_count={output_node_count}
+output_way_count={output_way_count}
+output_relation_count={output_relation_count}
+available_elevation_tiff_count={available_elevation_tiff_count}
+used_elevation_tiff_count={used_elevation_tiff_count}
+elevation_buffer_flush_count_buffer_max_reached={elevation_buffer_flush_count_buffer_max_reached}
+elevation_buffer_flush_count_total_max_reached={elevation_buffer_flush_count_total_max_reached}"#)
+    }
+
+    pub fn format_one_line(&self) -> String {
+        self.format_multi_line().replace("\n", ", ")
+    }
+    pub fn statistics(&self, config: &Config) -> String {
+        let input_node_count = self.input_node_count;
+        let input_way_count = self.input_way_count;
+        let input_relation_count = self.input_relation_count;
+        let accepted_node_count = self.accepted_node_count;
+        let accepted_way_count = self.accepted_way_count;
+        let accepted_relation_count = self.accepted_relation_count;
+        let country_not_found_node_count = self.country_not_found_node_count;
+        let elevation_not_found_node_count = self.elevation_not_found_node_count;
+        let elevation_not_relevant_node_count = self.elevation_not_relevant_node_count;
+        let splitted_way_count = self.splitted_way_count;
+        let added_node_count = self.added_node_count;
+        let output_node_count = self.output_node_count;
+        let output_way_count = self.output_way_count;
+        let output_relation_count = self.output_relation_count;
+        let available_elevation_tiff_count = self.available_elevation_tiff_count;
+        let used_elevation_tiff_count = self.used_elevation_tiff_count;
+        let elevation_buffer_flush_count_buffer_max_reached = self.elevation_buffer_flush_count_buffer_max_reached;
+        let elevation_buffer_flush_count_total_max_reached = self.elevation_buffer_flush_count_total_max_reached;
+
+        // derived values
+        let added_nodes = output_node_count - accepted_node_count;
+
+        format!("Element counts at specific processing stages:
+                    nodes            ways       relations
+read:     {input_node_count:>15} {input_way_count:>15} {input_relation_count:>15}
+accepted: {accepted_node_count:>15} {accepted_way_count:>15} {accepted_relation_count:>15}
+added:    {added_nodes:>15}               -               -
+written:  {output_node_count:>15} {output_way_count:>15} {output_relation_count:>15}
+
+country_not_found_node_count={country_not_found_node_count}
+elevation_not_found_node_count={elevation_not_found_node_count}
+elevation_not_relevant_node_count={elevation_not_relevant_node_count}
+splitted_way_count={splitted_way_count}
+added_node_count={added_node_count}
+
+available_elevation_tiff_count={available_elevation_tiff_count}
+used_elevation_tiff_count={used_elevation_tiff_count}
+elevation_buffer_flush_count_buffer_max_reached={elevation_buffer_flush_count_buffer_max_reached}
+elevation_buffer_flush_count_total_max_reached={elevation_buffer_flush_count_total_max_reached}
+")
     }
 }
 
@@ -556,14 +681,14 @@ pub(crate) mod tests {
     /// Assert that it is possible to run a chain of processors.
     fn test_chain() {
         let mut processor_chain = HandlerChain::default()
-            .add(ElementCounter::new("initial"))
+            .add(ElementCounter::new(ElementCountResultType::InputCount))
             .add(TestOnlyOrderRecorder::new("initial"))
 
             .add(TestOnlyIdCollector::new(10))
 
             .add(ElementPrinter::with_prefix("final: ".to_string()).with_node_ids(hashset! {8}))
             .add(TestOnlyOrderRecorder::new("final"))
-            .add(ElementCounter::new("final"))
+            .add(ElementCounter::new(ElementCountResultType::OutputCount))
             ;
         processor_chain.process(simple_node_element(1, vec![("who", "kasper")]));
         processor_chain.process(simple_node_element(2, vec![("who", "seppl")]));
@@ -572,12 +697,9 @@ pub(crate) mod tests {
         processor_chain.flush_handlers();
         let result = processor_chain.collect_result();
 
-        assert_eq!(&result.counts.get("nodes count initial").unwrap().clone(), &4,);
-        assert_eq!(&result.counts.get("nodes count final").unwrap().clone(), &4);
-        assert_eq!(&result.counts.get("relations count initial").unwrap().clone(), &0,);
-        assert_eq!(&result.counts.get("relations count final").unwrap().clone(), &0,);
-        assert_eq!(&result.counts.get("ways count initial").unwrap().clone(), &0,);
-        assert_eq!(&result.counts.get("ways count final").unwrap().clone(), &0,);
+        assert_element_counts(&result, 4, 4,
+                              0, 0,
+                              0, 0);
         assert_eq!(&result.other.get("TestOnlyOrderRecorder initial").unwrap().clone(), "node#1, node#2, node#6, node#8");
         assert_eq!(&result.other.get("TestOnlyOrderRecorder final").unwrap().clone(), "node#1, node#2, node#6, node#8");
         assert!(&result.node_ids.get(1).unwrap());
@@ -598,14 +720,14 @@ pub(crate) mod tests {
     fn test_chain_with_buffer() {
         let _ = SimpleLogger::new().init();
         let mut processor_chain = HandlerChain::default()
-            .add(ElementCounter::new("initial"))
+            .add(ElementCounter::new(ElementCountResultType::InputCount))
             .add(TestOnlyOrderRecorder::new("initial"))
 
             .add(TestOnlyElementBufferingDuplicatingEditingProcessor::default())
 
             .add(ElementPrinter::with_prefix("final".to_string()).with_node_ids((1..=200).collect()))
             .add(TestOnlyOrderRecorder::new("final"))
-            .add(ElementCounter::new("final"))
+            .add(ElementCounter::new(ElementCountResultType::OutputCount))
             ;
 
         processor_chain.process(simple_node_element(1, vec![("who", "kasper")]));
@@ -617,12 +739,9 @@ pub(crate) mod tests {
         processor_chain.flush_handlers();
         let result = processor_chain.collect_result();
 
-        assert_eq!(&result.counts.get("nodes count initial").unwrap().clone(), &4,);
-        assert_eq!(&result.counts.get("nodes count final").unwrap().clone(), &8);
-        assert_eq!(&result.counts.get("relations count initial").unwrap().clone(), &1,);
-        assert_eq!(&result.counts.get("relations count final").unwrap().clone(), &1,);
-        assert_eq!(&result.counts.get("ways count initial").unwrap().clone(), &1,);
-        assert_eq!(&result.counts.get("ways count final").unwrap().clone(), &1,);
+        assert_element_counts(&result, 4, 8,
+                              1, 1,
+                              1, 1);
         assert_eq!(&result.other.get("TestOnlyOrderRecorder initial").unwrap().clone(), "node#1, node#2, node#6, node#8, way#23, relation#66");
         assert_eq!(&result.other.get("TestOnlyOrderRecorder final").unwrap().clone(), "node#1, node#101, node#2, node#102, node#6, node#106, node#8, node#108, way#23, relation#66");
     }
@@ -635,14 +754,14 @@ pub(crate) mod tests {
     fn test_chain_with_element_adder() {
         let _ = SimpleLogger::new().init();
         let mut processor_chain = HandlerChain::default()
-            .add(ElementCounter::new("initial"))
+            .add(ElementCounter::new(ElementCountResultType::InputCount))
             .add(TestOnlyOrderRecorder::new("initial"))
 
             .add(TestOnlyElementAdder::default())
 
             .add(ElementPrinter::with_prefix("final".to_string()).with_node_ids((1..=200).collect()))
             .add(TestOnlyOrderRecorder::new("final"))
-            .add(ElementCounter::new("final"))
+            .add(ElementCounter::new(ElementCountResultType::OutputCount))
             ;
 
         processor_chain.process(simple_way_element(23, vec![1, 2, 8, 6], vec![("who", "kasper")]));
@@ -653,12 +772,9 @@ pub(crate) mod tests {
         processor_chain.flush_handlers();
         let result = processor_chain.collect_result();
 
-        assert_eq!(&result.counts.get("nodes count initial").unwrap().clone(), &4,);
-        assert_eq!(&result.counts.get("nodes count final").unwrap().clone(), &8);
-        assert_eq!(&result.counts.get("relations count initial").unwrap().clone(), &0,);
-        assert_eq!(&result.counts.get("relations count final").unwrap().clone(), &0,);
-        assert_eq!(&result.counts.get("ways count initial").unwrap().clone(), &1,);
-        assert_eq!(&result.counts.get("ways count final").unwrap().clone(), &1,);
+        assert_element_counts(&result, 4, 8,
+                              0, 0,
+                              1, 1);
         assert_eq!(&result.other.get("TestOnlyOrderRecorder initial").unwrap().clone(), "way#23, node#1, node#2, node#6, node#8");
         assert_eq!(&result.other.get("TestOnlyOrderRecorder final").unwrap().clone(), "way#23, node#101, node#1, node#102, node#2, node#106, node#6, node#108, node#8");
     }
@@ -669,14 +785,14 @@ pub(crate) mod tests {
     fn test_chain_with_element_filter() {
         let _ = SimpleLogger::new().init();
         let mut processor_chain = HandlerChain::default()
-            .add(ElementCounter::new("initial"))
+            .add(ElementCounter::new(ElementCountResultType::InputCount))
             .add(TestOnlyOrderRecorder::new("initial"))
 
             .add(TestOnlyElementFilter::default())
 
             .add(ElementPrinter::with_prefix("final".to_string()).with_node_ids((1..=200).collect()))
             .add(TestOnlyOrderRecorder::new("final"))
-            .add(ElementCounter::new("final"))
+            .add(ElementCounter::new(ElementCountResultType::OutputCount))
             ;
 
         processor_chain.process(simple_node_element(1, vec![("who", "kasper")]));
@@ -686,12 +802,9 @@ pub(crate) mod tests {
         processor_chain.flush_handlers();
         let result = processor_chain.collect_result();
 
-        assert_eq!(&result.counts.get("nodes count initial").unwrap().clone(), &4,);
-        assert_eq!(&result.counts.get("nodes count final").unwrap().clone(), &1);
-        assert_eq!(&result.counts.get("relations count initial").unwrap().clone(), &0,);
-        assert_eq!(&result.counts.get("relations count final").unwrap().clone(), &0,);
-        assert_eq!(&result.counts.get("ways count initial").unwrap().clone(), &0,);
-        assert_eq!(&result.counts.get("ways count final").unwrap().clone(), &0,);
+        assert_element_counts(&result, 4, 1,
+                              0, 0,
+                              0, 0);
         assert_eq!(&result.other.get("TestOnlyOrderRecorder initial").unwrap().clone(), "node#1, node#2, node#6, node#8");
         assert_eq!(&result.other.get("TestOnlyOrderRecorder final").unwrap().clone(), "node#1");
     }
@@ -703,14 +816,14 @@ pub(crate) mod tests {
     fn test_chain_with_element_replacer() {
         let _ = SimpleLogger::new().init();
         let mut processor_chain = HandlerChain::default()
-            .add(ElementCounter::new("initial"))
+            .add(ElementCounter::new(ElementCountResultType::InputCount))
             .add(TestOnlyOrderRecorder::new("initial"))
 
             .add(TestOnlyElementReplacer::default())
 
             .add(ElementPrinter::with_prefix("final".to_string()).with_node_ids((1..=200).collect()))
             .add(TestOnlyOrderRecorder::new("final"))
-            .add(ElementCounter::new("final"))
+            .add(ElementCounter::new(ElementCountResultType::OutputCount))
             ;
 
         processor_chain.process(simple_node_element(1, vec![("who", "kasper")]));
@@ -720,16 +833,22 @@ pub(crate) mod tests {
         processor_chain.flush_handlers();
         let result = processor_chain.collect_result();
 
-        assert_eq!(&result.counts.get("nodes count initial").unwrap().clone(), &4,);
-        assert_eq!(&result.counts.get("nodes count final").unwrap().clone(), &4);
-        assert_eq!(&result.counts.get("relations count initial").unwrap().clone(), &0,);
-        assert_eq!(&result.counts.get("relations count final").unwrap().clone(), &0,);
-        assert_eq!(&result.counts.get("ways count initial").unwrap().clone(), &0,);
-        assert_eq!(&result.counts.get("ways count final").unwrap().clone(), &0,);
+        assert_element_counts(&result,
+                              4, 4,
+                              0, 0,
+                              0, 0);
         assert_eq!(&result.other.get("TestOnlyOrderRecorder initial").unwrap().clone(), "node#1, node#2, node#6, node#8");
         assert_eq!(&result.other.get("TestOnlyOrderRecorder final").unwrap().clone(), "node#1, node#2, node#66, node#8");
     }
 
+    fn assert_element_counts(result: &HandlerResult, input_node_count: u64, output_node_count: u64, input_relation_count: u64, output_relation_count: u64, input_way_count: u64, output_way_count: u64) {
+        assert_eq!(&result.input_node_count, &input_node_count);
+        assert_eq!(&result.output_node_count, &output_node_count);
+        assert_eq!(&result.input_relation_count, &input_relation_count);
+        assert_eq!(&result.output_relation_count, &output_relation_count);
+        assert_eq!(&result.input_way_count, &input_way_count);
+        assert_eq!(&result.output_way_count, &output_way_count);
+    }
     #[test]
     /// Assert that it is possible to run the chain and let processors modify received instances,
     /// e.g. without cloning.
@@ -741,7 +860,7 @@ pub(crate) mod tests {
     fn test_chain_with_element_modifier() {
         let _ = SimpleLogger::new().init();
         let mut processor_chain = HandlerChain::default()
-            .add(ElementCounter::new("initial"))
+            .add(ElementCounter::new(ElementCountResultType::InputCount))
             .add(TestOnlyOrderRecorder::new("initial"))
 
             .add(TestOnlyElementModifier::default())
@@ -749,7 +868,7 @@ pub(crate) mod tests {
 
             .add(ElementPrinter::with_prefix("final".to_string()).with_node_ids((1..=200).collect()))
             .add(TestOnlyOrderRecorder::new("final"))
-            .add(ElementCounter::new("final"))
+            .add(ElementCounter::new(ElementCountResultType::OutputCount))
             ;
 
         processor_chain.process(simple_node_element(1, vec![("who", "kasper")]));
@@ -759,13 +878,11 @@ pub(crate) mod tests {
         processor_chain.flush_handlers();
         let result = processor_chain.collect_result();
 
-        assert_eq!(&result.counts.get("nodes count initial").unwrap().clone(), &4,);
-        //kasper with odd id was not modified and later filtered:
-        assert_eq!(&result.counts.get("nodes count final").unwrap().clone(), &3);
-        assert_eq!(&result.counts.get("relations count initial").unwrap().clone(), &0,);
-        assert_eq!(&result.counts.get("relations count final").unwrap().clone(), &0,);
-        assert_eq!(&result.counts.get("ways count initial").unwrap().clone(), &0,);
-        assert_eq!(&result.counts.get("ways count final").unwrap().clone(), &0,);
+        assert_element_counts(&result, 4,
+                              //kasper with odd id was not modified and later filtered:
+                              3,
+                              0, 0,
+                              0, 0);
         assert_eq!(&result.other.get("TestOnlyOrderRecorder initial").unwrap().clone(), "node#1, node#2, node#6, node#8");
         assert_eq!(&result.other.get("TestOnlyOrderRecorder final").unwrap().clone(), "node#2, node#6, node#8");
     }
@@ -774,7 +891,7 @@ pub(crate) mod tests {
     fn handler_chain() {
         let _ = SimpleLogger::new().init();
         let chain = HandlerChain::default()
-            .add(ElementCounter::new("initial"))
+            .add(ElementCounter::new(ElementCountResultType::InputCount))
             .add(TagValueBasedOsmElementsFilter::new(
                 OsmElementTypeSelection::node_only(),
                 existing_tag(),
@@ -785,7 +902,7 @@ pub(crate) mod tests {
                 existing_tag(),
                 Regex::new(".*z.*").unwrap(),
                 FilterType::RemoveMatching))
-            .add(ElementCounter::new("final"))
+            .add(ElementCounter::new(ElementCountResultType::OutputCount))
             .add(TestOnlyIdCollector::new(100));
 
         handle_test_nodes_and_verify_result(chain);
@@ -798,9 +915,9 @@ pub(crate) mod tests {
         node_ids.set(1usize, true);
         node_ids.set(2usize, true);
         let chain = HandlerChain::default()
-            .add(ElementCounter::new("initial"))
+            .add(ElementCounter::new(ElementCountResultType::InputCount))
             .add(NodeIdFilter { node_ids: node_ids.clone() })
-            .add(ElementCounter::new("final"))
+            .add(ElementCounter::new(ElementCountResultType::OutputCount))
             .add(TestOnlyIdCollector::new(100));
 
         handle_test_nodes_and_verify_result(chain);
@@ -814,9 +931,10 @@ pub(crate) mod tests {
 
         handler_chain.flush_handlers();
         let result = handler_chain.collect_result();
-
-        assert_eq!(&result.counts.get("nodes count initial").unwrap().clone(), &4,);
-        assert_eq!(&result.counts.get("nodes count final").unwrap().clone(), &2);
+        assert_element_counts(&result,
+                              4, 2,
+                              0, 0,
+                              0, 0);
         assert_eq!(result.node_ids[0], false);
         assert_eq!(result.node_ids[1], true);
         assert_eq!(result.node_ids[2], true);
@@ -840,11 +958,11 @@ pub(crate) mod tests {
             0.01);
 
         let mut handler_chain = HandlerChain::default()
-            .add(ElementCounter::new("initial"))
+            .add(ElementCounter::new(ElementCountResultType::InputCount))
             .add(TestOnlyOrderRecorder::new("initial"))
             .add(handler)
             .add(TestOnlyOrderRecorder::new("final"))
-            .add(ElementCounter::new("final"))
+            .add(ElementCounter::new(ElementCountResultType::OutputCount))
             .add(ElementEvaluator::new("elevation",
                                        Box::new(|node| node.tags().iter().any(|tag| tag.k() == "ele").to_string()),
                                        Box::new(|_| "".to_string()),
@@ -863,10 +981,9 @@ pub(crate) mod tests {
 
         // dbg!(&result); // This causes the test to run eternally...?!
 
-        assert_eq!(&result.counts.get("nodes count initial").unwrap().clone(), &2,);
-        assert_eq!(&result.counts.get("ways count initial").unwrap().clone(), &1,);
-        assert_eq!(&result.counts.get("nodes count final").unwrap().clone(), &3);
-        assert_eq!(&result.counts.get("ways count final").unwrap().clone(), &1,);
+        assert_element_counts(&result, 2, 3,
+                              0, 0,
+                              1, 1);
         assert_eq!(&result.other.get("TestOnlyOrderRecorder initial").unwrap().clone(), "node#101, node#102, way#201");
         assert_eq!(&result.other.get("TestOnlyOrderRecorder final").unwrap().clone(), format!("node#101, node#102, node#{}, way#201", HIGHEST_NODE_ID+1).as_str());
         assert_eq!(&result.other.get("ElementEvaluator#elevation node results").unwrap().clone(), format!("101:true, 102:true, {}:true", HIGHEST_NODE_ID+1).as_str() );

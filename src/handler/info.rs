@@ -10,28 +10,20 @@ pub(crate) struct ElementCounter {
     pub nodes_count: u64,
     pub ways_count: u64,
     pub relations_count: u64,
-    pub result_key: String,
+    pub result_type: ElementCountResultType,
 }
 impl ElementCounter {
-    pub fn new(result_key: &str) -> Self {
+    pub fn new(result_type: ElementCountResultType) -> Self {
         Self {
             nodes_count: 0,
             ways_count: 0,
             relations_count: 0,
-            result_key: result_key.to_string(),
-        }
-    }
-    pub fn with_index(index: i32, result_key: &str) -> Self {
-        Self {
-            nodes_count: 0,
-            ways_count: 0,
-            relations_count: 0,
-            result_key: format!("{:0>2} {}", index, result_key),
+            result_type,
         }
     }
 }
 impl Handler for ElementCounter {
-    fn name(&self) -> String { format!("ElementCounter {}", self.result_key) }
+    fn name(&self) -> String { format!("ElementCounter {}", self.result_type.to_string()) }
 
     fn handle_nodes(&mut self, elements: Vec<Node>) -> Vec<Node> {
         self.nodes_count += elements.len() as u64;
@@ -49,13 +41,41 @@ impl Handler for ElementCounter {
     }
 
     fn add_result(&mut self, mut result: HandlerResult) -> HandlerResult {
-        result.counts.insert(format!("nodes count {}", self.result_key), self.nodes_count);
-        result.counts.insert(format!("ways count {}", self.result_key), self.ways_count);
-        result.counts.insert(format!("relations count {}", self.result_key), self.relations_count);
+        match self.result_type {
+            ElementCountResultType::InputCount => {
+                result.input_node_count = self.nodes_count;
+                result.input_way_count = self.ways_count;
+                result.input_relation_count = self.relations_count;
+            }
+            ElementCountResultType::AcceptedCount => {
+                result.accepted_node_count = self.nodes_count;
+                result.accepted_way_count = self.ways_count;
+                result.accepted_relation_count = self.relations_count;
+            }
+            ElementCountResultType::OutputCount => {
+                result.output_node_count = self.nodes_count;
+                result.output_way_count = self.ways_count;
+                result.output_relation_count = self.relations_count;
+            }
+        }
         result
     }
 }
-
+#[derive(Debug)]
+pub(crate) enum ElementCountResultType {
+    InputCount,
+    AcceptedCount,
+    OutputCount,
+}
+impl ToString for ElementCountResultType {
+    fn to_string(&self) -> String {
+        match self {
+            ElementCountResultType::InputCount => "InputCount".to_string(),
+            ElementCountResultType::AcceptedCount => "AcceptedCount".to_string(),
+            ElementCountResultType::OutputCount => "OutputCount".to_string(),
+        }
+    }
+}
 
 pub(crate) struct ElementPrinter {
     pub prefix: String,

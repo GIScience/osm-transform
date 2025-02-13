@@ -195,7 +195,7 @@ impl GeoTiffManager {
         if counter == 0 {
             panic!("No geotiff files found for glob pattern {}", files_pattern);
         }
-        log::info!("Indexed {} geotiff files for pattern {}", counter, files_pattern);
+        log::debug!("Indexed {} geotiff files for pattern {}", counter, files_pattern);
     }
 
     fn index_geotiff(&mut self, path: PathBuf, geotiff: GeoTiff) {
@@ -633,6 +633,7 @@ impl Handler for BufferingElevationEnricher {
 
     fn add_result(&mut self, mut result: HandlerResult) -> HandlerResult {
         result.other.insert("node_cache size".to_string(), format!("{}", self.node_cache.len()));
+
         result
     }
 }

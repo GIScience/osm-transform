@@ -4,13 +4,18 @@ use std::path::PathBuf;
 use clap::Parser;
 
 use rusty_routes_transformer::{Config, init, run};
-
+use rusty_routes_transformer::handler::HandlerResult;
 
 fn main() {
     let args = Args::parse();
     let config = args.to_config();
     init(&config);
-    run(&config);
+    let handler_result = run(&config);
+    print_statistics(&config, handler_result);
+}
+
+fn print_statistics(config: &Config, handler_result: HandlerResult) {
+    println!("{}", handler_result.statistics(&config));
 }
 
 /// Preprocessor to prepare OSM PBF-Files for openrouteservice

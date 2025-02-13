@@ -17,11 +17,12 @@ use log::LevelFilter;
 use regex::Regex;
 use crate::io::process_with_handler;
 use area::AreaHandler;
+use ElementCountResultType::{AcceptedCount, InputCount, OutputCount};
 use crate::handler::{HandlerChain, HandlerResult, OsmElementTypeSelection};
 use crate::handler::collect::ReferencedNodeIdCollector;
 use crate::handler::filter::{AllElementsFilter, ComplexElementsFilter, FilterType, NodeIdFilter, TagFilterByKey};
 use crate::handler::geotiff::{BufferingElevationEnricher, GeoTiffManager};
-use crate::handler::info::{ElementCounter, ElementPrinter};
+use crate::handler::info::{ElementCountResultType, ElementCounter, ElementPrinter};
 use crate::handler::modify::MetadataRemover;
 use crate::handler::skip_ele::SkipElevationNodeCollector;
 use crate::output::{SimpleOutputHandler, SplittingOutputHandler};
@@ -51,22 +52,29 @@ pub fn init(config: &Config) {
 }
 
 pub fn run(config: &Config) -> HandlerResult {
+    let mut stopwatch = StopWatch::new();
+    stopwatch.start();
     let mut result = extract_referenced_nodes(config);
     result = process(config, result);
+    log::info!("Total processing time: {}", stopwatch);
+    stopwatch.stop();
     result
 }
+
 fn extract_referenced_nodes(config: &Config) -> HandlerResult {
     let mut handler_chain = HandlerChain::default()
-        .add(ElementCounter::new("initial"))
+        .add(ElementCounter::new(InputCount))
         .add(AllElementsFilter{handle_types: OsmElementTypeSelection::node_only()})
-        .add(ComplexElementsFilter::ors_default());
+        .add(ComplexElementsFilter::ors_default())
+        .add(ElementCounter::new(AcceptedCount));
+
     if config.with_node_filtering {
-        handler_chain = handler_chain.add(ReferencedNodeIdCollector::default())
+        handler_chain = handler_chain.add(ReferencedNodeIdCollector::default());
     }
+
     if &config.elevation_tiffs.len() > &0 {
         handler_chain = handler_chain.add(SkipElevationNodeCollector::default())
     }
-    handler_chain = handler_chain.add(ElementCounter::new("final"));
 
     log::info!("Starting extraction of referenced node ids...");
     let mut stopwatch = StopWatch::new();
@@ -75,20 +83,19 @@ fn extract_referenced_nodes(config: &Config) -> HandlerResult {
     let handler_result = handler_chain.collect_result();
 
     log::info!("Finished extraction of referenced node ids, time: {}", stopwatch);
-    log::info!("{}", &handler_result.to_string());
+    log::debug!("First pass HandlerResult: {}", &handler_result.format_one_line());
     stopwatch.reset();
     handler_result
 }
 
 fn process(config: &Config, mut first_pass_result: HandlerResult) -> HandlerResult {
-    let mut counter_id = 0;
-
     let mut handler_chain = HandlerChain::default()
+        .add(ElementCounter::new(InputCount))
         .add(ElementPrinter::with_prefix("\ninput:----------------\n".to_string())
             .with_node_ids(config.print_node_ids.clone())
             .with_way_ids(config.print_way_ids.clone())
-            .with_relation_ids(config.print_relation_ids.clone()))
-        .add(ElementCounter::with_index({counter_id+=1; counter_id}, "initial"));
+            .with_relation_ids(config.print_relation_ids.clone()));
+
     if config.remove_metadata {
         handler_chain = handler_chain.add(MetadataRemover::default())
     }
@@ -99,18 +106,19 @@ fn process(config: &Config, mut first_pass_result: HandlerResult) -> HandlerResu
         let node_id_filter = NodeIdFilter { node_ids: first_pass_result.node_ids };
         log::debug!("node_id_filter has node_ids with len={}", node_id_filter.node_ids.len());
         handler_chain = handler_chain.add(node_id_filter);
-        handler_chain = handler_chain.add(ElementCounter::with_index({counter_id+=1; counter_id}, "after_node_filter"));
     }
+
+    handler_chain = handler_chain.add(ElementCounter::new(AcceptedCount));
 
     let mut stopwatch = StopWatch::new();
     match &config.country_csv {
         Some(path_buf) => {
-            log::info!("Reading area mapping CSV");
+            log::debug!("Reading area mapping CSV");
             stopwatch.start();
             let mut area_handler = AreaHandler::default();
             area_handler.load(path_buf.clone()).expect("Area handler failed to load CSV file");
-            log::info!("Loaded: {} areas", area_handler.mapping.id.len());
-            log::info!("Finished reading area mapping, time: {}", stopwatch);
+            log::debug!("Loaded: {} areas", area_handler.mapping.id.len());
+            log::debug!("Finished reading area mapping, time: {}", stopwatch);
             handler_chain = handler_chain.add(area_handler);
             stopwatch.reset();
         }
@@ -119,9 +127,9 @@ fn process(config: &Config, mut first_pass_result: HandlerResult) -> HandlerResu
 
     if &config.elevation_tiffs.len() > &0 {
         stopwatch.start();
-        log::info!("Initializing elevation geotiff_manager");
+        log::debug!("Initializing elevation geotiff_manager");
         let geotiff_manager: GeoTiffManager = GeoTiffManager::with_file_patterns(config.elevation_tiffs.clone());
-        log::info!("Finished initializing geotiff_manager, time: {}", stopwatch);
+        log::debug!("Finished initializing geotiff_manager, time: {}", stopwatch);
         stopwatch.reset();
         let elevation_enricher = BufferingElevationEnricher::new(
             geotiff_manager,
@@ -136,7 +144,6 @@ fn process(config: &Config, mut first_pass_result: HandlerResult) -> HandlerResu
             .with_way_ids(config.print_way_ids.clone())
             .with_relation_ids(config.print_relation_ids.clone()));
         handler_chain = handler_chain.add(elevation_enricher);
-        handler_chain = handler_chain.add(ElementCounter::with_index({counter_id += 1; counter_id}, "after elevation_enricher"));
         handler_chain = handler_chain.add(ElementPrinter::with_prefix(" after elevation_enricher:----------------\n".to_string())
             .with_node_ids(config.print_node_ids.clone())
             .with_way_ids(config.print_way_ids.clone())
@@ -148,7 +155,7 @@ fn process(config: &Config, mut first_pass_result: HandlerResult) -> HandlerResu
         Regex::new("(.*:)?source(:.*)?|(.*:)?note(:.*)?|url|created_by|fixme|wikipedia").unwrap(),
         FilterType::RemoveMatching));
 
-    handler_chain = handler_chain.add(ElementCounter::with_index({counter_id += 1; counter_id}, "final"));
+    handler_chain = handler_chain.add(ElementCounter::new(OutputCount));
 
     handler_chain = handler_chain.add(ElementPrinter::with_prefix("\noutput:----------------\n".to_string())
         .with_node_ids(config.print_node_ids.clone())
@@ -158,7 +165,7 @@ fn process(config: &Config, mut first_pass_result: HandlerResult) -> HandlerResu
 
     match &config.output_pbf {
         Some(path_buf) => {
-            log::info!("Initializing output handler");
+            log::debug!("Initializing output handler");
             stopwatch.start();
             if config.elevation_way_splitting == true {
                 let mut output_handler = SplittingOutputHandler::new(path_buf.clone());
@@ -180,7 +187,7 @@ fn process(config: &Config, mut first_pass_result: HandlerResult) -> HandlerResu
     let _ = process_with_handler(config, &mut handler_chain).expect("Processing failed");
     let processing_result = handler_chain.collect_result();
     log::info!("Finished processing of pbf elements, time: {}", stopwatch);
-    log::info!("{}" , &processing_result.to_string());
+    log::debug!("Second pass HandlerResult: {}", processing_result.format_multi_line());
     stopwatch.reset();
     processing_result
 }
