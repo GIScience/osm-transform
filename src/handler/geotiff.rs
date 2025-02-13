@@ -343,7 +343,7 @@ pub(crate) struct BufferingElevationEnricher {
     max_buffer_len: usize,
     total_buffered_nodes_max: usize,
     total_buffered_nodes_count: usize,
-    skip_ele: Option<BitVec>,
+    skip_ele: BitVec,
     node_cache: HashMap<i64, LocationWithElevation>,
     next_node_id: i64,
     resolution_lon: f64,
@@ -351,7 +351,13 @@ pub(crate) struct BufferingElevationEnricher {
     elevation_way_splitting: bool,
 }
 impl BufferingElevationEnricher {
-    pub fn new(geotiff_manager: GeoTiffManager, max_buffer_len: usize, total_buffered_nodes_max: usize, skip_ele: Option<BitVec>, elevation_way_splitting: bool, resolution_lon: f64, resolution_lat: f64) -> Self {
+    pub fn new(geotiff_manager: GeoTiffManager,
+               max_buffer_len: usize,
+               total_buffered_nodes_max: usize,
+               skip_ele: BitVec,
+               elevation_way_splitting: bool,
+               resolution_lon: f64,
+               resolution_lat: f64) -> Self {
         Self {
             geotiff_manager,
             nodes_for_geotiffs: HashMap::new(),
@@ -364,7 +370,6 @@ impl BufferingElevationEnricher {
             resolution_lon,
             resolution_lat,
             elevation_way_splitting
-
         }
     }
     pub fn with_resolution(mut self, resolution_lon: f64, resolution_lat: f64) -> Self {
@@ -552,10 +557,7 @@ impl BufferingElevationEnricher {
     }
 
     fn skip_elevation(&mut self, node: &Node) -> bool {
-        if self.skip_ele.is_some() {
-            return self.skip_ele.as_ref().unwrap().get(node.id() as usize).unwrap_or(false);
-        }
-        false
+            self.skip_ele.get(node.id() as usize).unwrap_or(false)
     }
 
     fn handle_and_flush_buffers(&mut self, buffers: Vec<String>) -> Vec<Node> {
@@ -679,7 +681,7 @@ impl LocationWithElevation {
 mod tests {
     use std::fs::File;
     use std::io::BufReader;
-
+    use bit_vec::BitVec;
     use epsg::CRS;
     use georaster::geotiff::{GeoTiffReader, RasterValue};
     use log4rs::config::Logger;
@@ -1116,7 +1118,14 @@ mod tests {
     #[test]
     fn buffering_elevation_enricher_test() {
         let _ = SimpleLogger::new().init();
-        let mut handler = BufferingElevationEnricher::new(GeoTiffManager::with_file_pattern("test/region*.tif"), 4, 5, None, false, 0.01, 0.01);
+        let mut handler = BufferingElevationEnricher::new(
+            GeoTiffManager::with_file_pattern("test/region*.tif"),
+            4,
+            5,
+            BitVec::from_elem(10usize, false),
+            false,
+            0.01,
+            0.01);
 
         // The first elements should be buffered in the buffer for their tiff
         assert_eq!(0usize, handler.handle_node(simple_node_element_limburg(1, vec![])).len());
@@ -1154,7 +1163,14 @@ mod tests {
     #[test]
     fn buffering_elevation_enricher_total_max_reached() {
         let _ = SimpleLogger::new().init();
-        let mut handler = BufferingElevationEnricher::new(GeoTiffManager::with_file_pattern("test/region*.tif"),5, 6, None, false, 0.01, 0.01);
+        let mut handler = BufferingElevationEnricher::new(
+            GeoTiffManager::with_file_pattern("test/region*.tif"),
+            5,
+            6,
+            BitVec::from_elem(10usize, false),
+            false,
+            0.01,
+            0.01);
 
         // The first elements should be buffered in the buffers for their tiffs
         assert_eq!(0usize, handler.handle_node(simple_node_element_limburg(1, vec![])).len());
@@ -1180,7 +1196,14 @@ mod tests {
 
     #[test]
     fn node_cache_is_filled() {
-        let mut handler = BufferingElevationEnricher::new(GeoTiffManager::with_file_pattern("test/region*.tif"),5, 6, None, false, 0.01, 0.01);
+        let mut handler = BufferingElevationEnricher::new(
+            GeoTiffManager::with_file_pattern("test/region*.tif"),
+            5,
+            6,
+            BitVec::from_elem(10usize, false),
+            false,
+            0.01,
+            0.01);
 
         // The first elements should be buffered in the buffers for their tiffs
         assert_eq!(0usize, handler.handle_node(simple_node_element_limburg(1, vec![])).len());
@@ -1197,7 +1220,14 @@ mod tests {
     #[test]
     fn handle_way_split_nodes_returned() {
         let _ = Logger::builder().build("rusty_routes_transformer", LevelFilter::Debug);
-        let mut handler = BufferingElevationEnricher::new(GeoTiffManager::with_file_pattern("test/region*.tif"),5, 6, None, true, 0.01, 0.01);
+        let mut handler = BufferingElevationEnricher::new(
+            GeoTiffManager::with_file_pattern("test/region*.tif"),
+            5,
+            6,
+            BitVec::from_elem(10usize, false),
+            true,
+            0.01,
+            0.01);
 
         handler.node_cache.insert(1000, wgs84_coord_hd_philosophers_way_start());
         handler.node_cache.insert(1001, wgs84_coord_hd_philosophers_way_end());
@@ -1211,7 +1241,14 @@ mod tests {
     #[test]
     fn handle_way_split_nodes_added_as_refs() {
         let _ = Logger::builder().build("rusty_routes_transformer", LevelFilter::Debug);
-        let mut handler = BufferingElevationEnricher::new(GeoTiffManager::with_file_pattern("test/region*.tif"),5, 6, None, true, 0.005, 0.005);
+        let mut handler = BufferingElevationEnricher::new(
+            GeoTiffManager::with_file_pattern("test/region*.tif"),
+            5,
+            6,
+            BitVec::from_elem(10usize, false),
+            true,
+            0.005,
+            0.005);
 
         handler.node_cache.insert(1000, wgs84_coord_hd_philosophers_way_start());
         handler.node_cache.insert(1001, wgs84_coord_hd_philosophers_way_end());

@@ -116,7 +116,6 @@ impl Handler for SplittingOutputHandler {
         vec![]
     }
 
-
     fn handle_relations(&mut self, relations: Vec<Relation>) -> Vec<Relation> {
         for relation in relations {
             self.way_relation_writer.write_element(Element::Relation { relation }).expect("Failed to write relation");

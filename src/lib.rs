@@ -8,7 +8,7 @@ pub mod handler;
 extern crate maplit;
 
 use std::sync::Once;
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;
 use benchmark_rs::stopwatch::StopWatch;
 use log4rs::append::console::ConsoleAppender;
@@ -50,13 +50,10 @@ pub fn init(config: &Config) {
     });
 }
 
-pub fn run(config: &Config) -> HandlerResult{
-    let mut result: Option<HandlerResult> = None;
-
-        result = Some(extract_referenced_nodes(config));
-
-    result = Some(process(config, result));
-    result.unwrap()
+pub fn run(config: &Config) -> HandlerResult {
+    let mut result = extract_referenced_nodes(config);
+    result = process(config, result);
+    result
 }
 fn extract_referenced_nodes(config: &Config) -> HandlerResult {
     let mut handler_chain = HandlerChain::default()
@@ -83,18 +80,8 @@ fn extract_referenced_nodes(config: &Config) -> HandlerResult {
     handler_result
 }
 
-fn process(config: &Config, node_filter_result: Option<HandlerResult>) -> HandlerResult {
-    let mut node_ids = None;
-    let mut skip_ele = None;
+fn process(config: &Config, mut first_pass_result: HandlerResult) -> HandlerResult {
     let mut counter_id = 0;
-
-    match node_filter_result {
-        None => {}
-        Some(result) => {
-            node_ids = Some(result.node_ids);
-            skip_ele = Some(result.skip_ele);
-        }
-    }
 
     let mut handler_chain = HandlerChain::default()
         .add(ElementPrinter::with_prefix("\ninput:----------------\n".to_string())
@@ -108,8 +95,8 @@ fn process(config: &Config, node_filter_result: Option<HandlerResult>) -> Handle
 
     handler_chain = handler_chain.add(ComplexElementsFilter::ors_default());
 
-    if node_ids.is_some() {
-        let node_id_filter = NodeIdFilter { node_ids: node_ids.unwrap() };
+    if config.with_node_filtering {
+        let node_id_filter = NodeIdFilter { node_ids: first_pass_result.node_ids };
         log::debug!("node_id_filter has node_ids with len={}", node_id_filter.node_ids.len());
         handler_chain = handler_chain.add(node_id_filter);
         handler_chain = handler_chain.add(ElementCounter::with_index({counter_id+=1; counter_id}, "after_node_filter"));
@@ -140,7 +127,7 @@ fn process(config: &Config, node_filter_result: Option<HandlerResult>) -> Handle
             geotiff_manager,
             config.elevation_batch_size,
             config.elevation_total_buffer_size,
-            skip_ele,
+            first_pass_result.skip_ele,
             config.elevation_way_splitting,
             config.resolution_lon,
             config.resolution_lat);

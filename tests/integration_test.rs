@@ -89,12 +89,12 @@ fn run_country() {
     config.country_csv = Some(PathBuf::from("test/mapping_test.csv"));
     rusty_routes_transformer::init(&config);
     let result = rusty_routes_transformer::run(&config);
-    assert_eq!(result.counts.get("nodes count initial").unwrap(), &BAARLE_NODE_COUNT);
-    assert_eq!(result.counts.get("nodes count final").unwrap(), &BAARLE_NODE_COUNT);
-    assert_eq!(result.counts.get("relations count initial").unwrap(), &BAARLE_RELATION_COUNT);
-    assert_eq!(result.counts.get("relations count final").unwrap(), &FILTERED_RELATION_COUNT);
-    assert_eq!(result.counts.get("ways count initial").unwrap(), &BAARLE_WAY_COUNT);
-    assert_eq!(result.counts.get("ways count final").unwrap(), &FILTERED_WAY_COUNT);
+    assert_eq!(result.counts.get("nodes count 01 initial").unwrap(), &BAARLE_NODE_COUNT);
+    assert_eq!(result.counts.get("nodes count 03 final").unwrap(), &BAARLE_NODE_COUNT);
+    assert_eq!(result.counts.get("relations count 01 initial").unwrap(), &BAARLE_RELATION_COUNT);
+    assert_eq!(result.counts.get("relations count 03 final").unwrap(), &FILTERED_RELATION_COUNT);
+    assert_eq!(result.counts.get("ways count 01 initial").unwrap(), &BAARLE_WAY_COUNT);
+    assert_eq!(result.counts.get("ways count 03 final").unwrap(), &FILTERED_WAY_COUNT);
 }
 
 #[test]

@@ -15,8 +15,7 @@ use osm_io::osm::model::node::Node;
 use osm_io::osm::model::relation::Relation;
 use osm_io::osm::model::way::Way;
 
-
-const HIGHEST_NODE_ID: i64 = 50_000_000_000;
+pub(crate) const HIGHEST_NODE_ID: i64 = 50_000_000_000;
 
 pub fn format_element_id(element: &Element) -> String {
     match &element {
@@ -835,7 +834,7 @@ pub(crate) mod tests {
             GeoTiffManager::with_file_pattern("test/region*.tif"),
             5,
             6,
-            None,
+            BitVec::from_elem(10usize, false),
             true,
             0.01,
             0.01);
