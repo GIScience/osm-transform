@@ -198,34 +198,40 @@ elevation_buffer_flush_count_total_max_reached={elevation_buffer_flush_count_tot
         self.format_multi_line().replace("\n", ", ")
     }
     pub fn statistics(&self, config: &Config) -> String {
-        let input_node_count = self.input_node_count;
-        let input_way_count = self.input_way_count;
-        let input_relation_count = self.input_relation_count;
-        let accepted_node_count = self.accepted_node_count;
-        let accepted_way_count = self.accepted_way_count;
-        let accepted_relation_count = self.accepted_relation_count;
+        let i_node_ct = self.input_node_count;
+        let i_way_cnt = self.input_way_count;
+        let i_rel_cnt = self.input_relation_count;
+        let a_node_ct = self.accepted_node_count;
+        let a_way_cnt = self.accepted_way_count;
+        let a_rel_cnt = self.accepted_relation_count;
+        let o_node_ct = self.output_node_count;
+        let o_way_cnt = self.output_way_count;
+        let o_rel_cnt = self.output_relation_count;
         let country_not_found_node_count = self.country_not_found_node_count;
         let elevation_not_found_node_count = self.elevation_not_found_node_count;
         let elevation_not_relevant_node_count = self.elevation_not_relevant_node_count;
         let splitted_way_count = self.splitted_way_count;
         let added_node_count = self.added_node_count;
-        let output_node_count = self.output_node_count;
-        let output_way_count = self.output_way_count;
-        let output_relation_count = self.output_relation_count;
         let available_elevation_tiff_count = self.available_elevation_tiff_count;
         let used_elevation_tiff_count = self.used_elevation_tiff_count;
         let elevation_buffer_flush_count_buffer_max_reached = self.elevation_buffer_flush_count_buffer_max_reached;
         let elevation_buffer_flush_count_total_max_reached = self.elevation_buffer_flush_count_total_max_reached;
 
         // derived values
-        let added_nodes = output_node_count - accepted_node_count;
+        let filt_node = (i_node_ct as i64 - a_node_ct as i64) * -1;
+        let filt_ways = (i_way_cnt as i64 - a_way_cnt as i64) * -1;
+        let filt_rels = (i_rel_cnt as i64 - a_rel_cnt as i64) * -1;
+        let addd_node = (o_node_ct as i64 - a_node_ct as i64) * -1;
+        let addd_ways = (o_way_cnt as i64 - a_way_cnt as i64) * -1;
+        let addd_rels = (o_rel_cnt as i64 - a_rel_cnt as i64) * -1;
 
         format!("Element counts at specific processing stages:
-                    nodes            ways       relations
-read:     {input_node_count:>15} {input_way_count:>15} {input_relation_count:>15}
-accepted: {accepted_node_count:>15} {accepted_way_count:>15} {accepted_relation_count:>15}
-added:    {added_nodes:>15}               -               -
-written:  {output_node_count:>15} {output_way_count:>15} {output_relation_count:>15}
+         |                  nodes          |                   ways          |              relations
+         |          count | filtered/added |          count | filtered/added |          count | filtered/added
+---------+----------------+----------------+----------------+----------------+----------------+---------------
+    read |{i_node_ct:>15} |            --- |{i_way_cnt:>15} |            --- |{i_rel_cnt:>15} |            ---
+accepted |{a_node_ct:>15} |{filt_node:+15} |{a_way_cnt:>15} |{filt_ways:+15} |{a_rel_cnt:>15} |{filt_rels:+15}
+ written |{o_node_ct:>15} |{addd_node:+15} |{o_way_cnt:>15} |{addd_ways:+15} |{o_rel_cnt:>15} |{addd_rels:+15}
 
 country_not_found_node_count={country_not_found_node_count}
 elevation_not_found_node_count={elevation_not_found_node_count}
