@@ -15,7 +15,7 @@ use serde::Deserialize;
 use wkt::{Geometry, ToWkt};
 use wkt::Wkt;
 
-use crate::handler::Handler;
+use crate::handler::{Handler, HandlerResult};
 
 const GRID_SIZE: usize = 64800;
 const AREA_ID_MULTIPLE: u16 = u16::MAX;
@@ -28,6 +28,8 @@ pub struct Tile {
 pub(crate) struct AreaHandler {
     pub(crate) mapping: Mapping,
     grid: Vec<Tile>,
+    country_not_found_node_count: u64,
+    country_found_node_count: u64,
 }
 
 pub(crate) struct Mapping {
@@ -71,6 +73,8 @@ impl Default for AreaHandler {
                 }
                 grid
             },
+            country_not_found_node_count: 0,
+            country_found_node_count: 0,
         }
     }
 }
@@ -165,8 +169,10 @@ impl AreaHandler {
         let coord = Coord {x: node.coordinate().lon(), y: node.coordinate().lat()};
         match self.mapping.index[grid_index as usize] {
             0 => { // no area
+                self.country_not_found_node_count += 1;
             }
             AREA_ID_MULTIPLE => { // multiple areas
+                self.country_found_node_count += 1;
                 for area in self.mapping.area.get_vec(&(grid_index as u16)).unwrap() {
                     if area.geo.contains(&coord) {
                         result.push(self.mapping.id[&area.id].to_string())
@@ -175,6 +181,7 @@ impl AreaHandler {
             }
             x => { // single area
                 // debug!("index: {x}");
+                self.country_found_node_count += 1;
                 result.push(self.mapping.id[&x].to_string())
             }
         }
@@ -188,6 +195,13 @@ impl Handler for AreaHandler {
     fn handle_nodes(&mut self, mut elements: Vec<Node>) -> Vec<Node> {
         elements.iter_mut().for_each(|node| self.handle_node(node));
         elements
+    }
+
+    fn add_result(&mut self, mut result: HandlerResult) -> HandlerResult {
+        result.country_not_found_node_count = self.country_not_found_node_count;
+        result.country_found_node_count = self.country_found_node_count;
+        result.other.insert("mapping".to_string(), format!("index:{} area:{} id:{} name:{}", &self.mapping.index.len(), &self.mapping.area.len(), &self.mapping.id.len(), &self.mapping.name.len(), ));
+        result
     }
 }
 
