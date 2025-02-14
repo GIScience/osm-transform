@@ -113,7 +113,6 @@ pub struct HandlerResult {
     pub elevation_not_relevant_node_count: u64,
 
     pub splitted_way_count: u64,
-    pub added_node_count: u64,
 
     // OutputCount,
     pub output_node_count: u64,
@@ -144,7 +143,6 @@ impl HandlerResult {
             elevation_not_found_node_count: 0,
             elevation_not_relevant_node_count: 0,
             splitted_way_count: 0,
-            added_node_count: 0,
             output_node_count: 0,
             output_way_count: 0,
             output_relation_count: 0,
@@ -166,7 +164,6 @@ impl HandlerResult {
         let elevation_not_found_node_count = self.elevation_not_found_node_count;
         let elevation_not_relevant_node_count = self.elevation_not_relevant_node_count;
         let splitted_way_count = self.splitted_way_count;
-        let added_node_count = self.added_node_count;
         let output_node_count = self.output_node_count;
         let output_way_count = self.output_way_count;
         let output_relation_count = self.output_relation_count;
@@ -211,7 +208,6 @@ elevation_buffer_flush_count_total_max_reached={elevation_buffer_flush_count_tot
         let elevation_not_found_node_count = self.elevation_not_found_node_count;
         let elevation_not_relevant_node_count = self.elevation_not_relevant_node_count;
         let splitted_way_count = self.splitted_way_count;
-        let added_node_count = self.added_node_count;
         let available_elevation_tiff_count = self.available_elevation_tiff_count;
         let used_elevation_tiff_count = self.used_elevation_tiff_count;
         let elevation_buffer_flush_count_buffer_max_reached = self.elevation_buffer_flush_count_buffer_max_reached;
