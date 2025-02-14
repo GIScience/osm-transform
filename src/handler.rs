@@ -950,14 +950,15 @@ pub(crate) mod tests {
         let mut node_ids = BitVec::from_elem(10usize, false);
         node_ids.set(1usize, true);
         node_ids.set(2usize, true);
-        let mut handler = BufferingElevationEnricher::new(
+        let handler = BufferingElevationEnricher::new(
             GeoTiffManager::with_file_pattern("test/region*.tif"),
             5,
             6,
             BitVec::from_elem(10usize, false),
             true,
             0.01,
-            0.01);
+            0.01,
+            1.0);
 
         let mut handler_chain = HandlerChain::default()
             .add(ElementCounter::new(ElementCountResultType::InputCount))

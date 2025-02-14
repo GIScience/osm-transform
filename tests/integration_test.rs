@@ -21,7 +21,7 @@ fn base_config() -> Config {
         debug: 0,
         resolution_lon: 0.01,
         resolution_lat: 0.01,
-
+        elevation_threshold: 10.0,
     };
     config.print_way_ids.insert(7216689i64);
     config.print_node_ids.insert(1);

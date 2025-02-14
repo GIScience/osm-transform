@@ -138,7 +138,8 @@ fn process(config: &Config, mut first_pass_result: HandlerResult) -> HandlerResu
             first_pass_result.skip_ele,
             config.elevation_way_splitting,
             config.resolution_lon,
-            config.resolution_lat);
+            config.resolution_lat,
+            config.elevation_threshold);
         handler_chain = handler_chain.add(ElementPrinter::with_prefix(" before elevation_enricher:----------------\n".to_string())
             .with_node_ids(config.print_node_ids.clone())
             .with_way_ids(config.print_way_ids.clone())
@@ -209,4 +210,5 @@ pub struct Config {
     pub elevation_way_splitting: bool,
     pub resolution_lon: f64,
     pub resolution_lat: f64,
+    pub elevation_threshold: f64,
 }

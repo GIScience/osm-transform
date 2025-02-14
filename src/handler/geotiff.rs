@@ -349,6 +349,7 @@ pub(crate) struct BufferingElevationEnricher {
     resolution_lon: f64,
     resolution_lat: f64,
     elevation_way_splitting: bool,
+    elevation_threshold: f64,
 }
 impl BufferingElevationEnricher {
     pub fn new(geotiff_manager: GeoTiffManager,
@@ -357,7 +358,8 @@ impl BufferingElevationEnricher {
                skip_ele: BitVec,
                elevation_way_splitting: bool,
                resolution_lon: f64,
-               resolution_lat: f64) -> Self {
+               resolution_lat: f64,
+               elevation_threshold: f64) -> Self {
         Self {
             geotiff_manager,
             nodes_for_geotiffs: HashMap::new(),
@@ -369,7 +371,8 @@ impl BufferingElevationEnricher {
             next_node_id: HIGHEST_NODE_ID + 1,
             resolution_lon,
             resolution_lat,
-            elevation_way_splitting
+            elevation_way_splitting,
+            elevation_threshold,
         }
     }
     pub fn with_resolution(mut self, resolution_lon: f64, resolution_lat: f64) -> Self {
@@ -492,26 +495,35 @@ impl BufferingElevationEnricher {
             let from_node_id = way.refs()[from_idx];
             references.push(from_node_id);
             to_node_id = way.refs()[from_idx+1];
-            let mut from_location = self.node_cache.get(&from_node_id);
-            let mut to_location = self.node_cache.get(&to_node_id);
+            let from_location = self.node_cache.get(&from_node_id);
+            let to_location = self.node_cache.get(&to_node_id);
             if from_location.is_none() || to_location.is_none() {
                 log::trace!("{}.handle_way#{}: Cannot split way segment: node_cache does not contain nodes {} and {}", self.name(), way.id(), from_node_id, to_node_id);
                 continue;
             }
             let from_location = from_location.unwrap();
             let to_location = to_location.unwrap();
-            let intermediate_locations = WaySplitter::compute_intermediate_locations(from_location.lon, from_location.lat, to_location.lon, to_location.lat, (self.resolution_lon, self.resolution_lat));
-            log::debug!("{}.handle_way#{}: Created {} intermediate locations", self.name(), way.id(), intermediate_nodes.len());
-            intermediate_locations.iter().for_each(|location| {
-                //TODO only add node if elevation difference exceeds a certain threshold
-                let node = Node::new(self.next_node_id(), 0, location.get_coordinate(), 0, 0, 0, String::default(), true, vec![
-                    Tag::new("ele".to_string(), location.ele().to_string())
-                ]);
+            let intermediate_locations = WaySplitter::compute_intermediate_locations(
+                from_location.lon, from_location.lat,
+                to_location.lon, to_location.lat,
+                (self.resolution_lon, self.resolution_lat));
+            for index in 1..(intermediate_locations.len()-1) {
+                let location = &intermediate_locations[index];
+                let before_ele = intermediate_locations[index-1].ele();
+                let after_ele = intermediate_locations[index+1].ele();
+                // TODO: what if some elevations are not present
+                log::trace!("{}.handle_way#{}: elevation before={}, current={}, after={}",
+                    self.name(), way.id(), before_ele, location.ele(), after_ele);
+                if (location.ele() - (before_ele + after_ele) / 2.0).abs() >= self.elevation_threshold {
+                    let node = Node::new(self.next_node_id(), 0, location.get_coordinate(), 0, 0, 0, String::default(), true, vec![
+                        Tag::new("ele".to_string(), location.ele().to_string())
+                    ]);
 
-                log::debug!("created intermediate node {}", node.id());
-                references.push(node.id().clone());
-                intermediate_nodes.push(node);
-            });
+                    log::debug!("created intermediate node {}", node.id());
+                    references.push(node.id().clone());
+                    intermediate_nodes.push(node);
+                }
+            };
         }
 
         references.push(to_node_id.clone());
@@ -1126,7 +1138,8 @@ mod tests {
             BitVec::from_elem(10usize, false),
             false,
             0.01,
-            0.01);
+            0.01,
+            1.0);
 
         // The first elements should be buffered in the buffer for their tiff
         assert_eq!(0usize, handler.handle_node(simple_node_element_limburg(1, vec![])).len());
@@ -1171,7 +1184,8 @@ mod tests {
             BitVec::from_elem(10usize, false),
             false,
             0.01,
-            0.01);
+            0.01,
+            1.0);
 
         // The first elements should be buffered in the buffers for their tiffs
         assert_eq!(0usize, handler.handle_node(simple_node_element_limburg(1, vec![])).len());
@@ -1204,7 +1218,8 @@ mod tests {
             BitVec::from_elem(10usize, false),
             false,
             0.01,
-            0.01);
+            0.01,
+            1.0);
 
         // The first elements should be buffered in the buffers for their tiffs
         assert_eq!(0usize, handler.handle_node(simple_node_element_limburg(1, vec![])).len());
@@ -1228,7 +1243,8 @@ mod tests {
             BitVec::from_elem(10usize, false),
             true,
             0.01,
-            0.01);
+            0.01,
+            1.0);
 
         handler.node_cache.insert(1000, wgs84_coord_hd_philosophers_way_start());
         handler.node_cache.insert(1001, wgs84_coord_hd_philosophers_way_end());
@@ -1249,7 +1265,8 @@ mod tests {
             BitVec::from_elem(10usize, false),
             true,
             0.005,
-            0.005);
+            0.005,
+            1.0);
 
         handler.node_cache.insert(1000, wgs84_coord_hd_philosophers_way_start());
         handler.node_cache.insert(1001, wgs84_coord_hd_philosophers_way_end());

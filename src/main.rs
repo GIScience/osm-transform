@@ -81,6 +81,10 @@ pub struct Args {
     /// Resolution for way splitting in direction latitude
     #[arg(long, default_value = "0.001")]
     pub resolution_lat: f64,
+
+    /// Elevation threshold defining when to introduce intermediate nodes
+    #[arg(long, default_value = "10.0")]
+    pub elevation_threshold: f64,
 }
 impl Args {
     pub fn to_config(self) -> Config {
@@ -100,7 +104,7 @@ impl Args {
             remove_metadata: ! self.keep_metadata,
             resolution_lon: self.resolution_lon,
             resolution_lat: self.resolution_lat,
-
+            elevation_threshold: self.elevation_threshold,
         }
     }
 }
