@@ -8,7 +8,7 @@ pub mod handler;
 extern crate maplit;
 
 use std::sync::Once;
-use std::collections::{HashMap, HashSet};
+use std::collections::HashSet;
 use std::path::PathBuf;
 use benchmark_rs::stopwatch::StopWatch;
 use log4rs::append::console::ConsoleAppender;
@@ -88,7 +88,7 @@ fn extract_referenced_nodes(config: &Config) -> HandlerResult {
     handler_result
 }
 
-fn process(config: &Config, mut first_pass_result: HandlerResult) -> HandlerResult {
+fn process(config: &Config, first_pass_result: HandlerResult) -> HandlerResult {
     let mut handler_chain = HandlerChain::default()
         .add(ElementCounter::new(InputCount))
         .add(ElementPrinter::with_prefix("\ninput:----------------\n".to_string())

@@ -7,7 +7,7 @@ pub mod geotiff;
 pub(crate) mod interpolate;
 pub(crate) mod skip_ele;
 
-use std::collections::{BTreeMap, HashMap};
+use std::collections::HashMap;
 
 use bit_vec::BitVec;
 use osm_io::osm::model::element::Element;
@@ -220,6 +220,7 @@ other={other}"#)
         let elevation_not_found_node_count = self.elevation_not_found_node_count;
         let elevation_not_relevant_node_count = self.elevation_not_relevant_node_count;
         let splitted_way_count = self.splitted_way_count;
+        let added_node_count = 0; // TODO: fill with sensible value
         let available_elevation_tiff_count = self.available_elevation_tiff_count;
         let used_elevation_tiff_count = self.used_elevation_tiff_count;
         let elevation_buffer_flush_count_buffer_max_reached = self.elevation_buffer_flush_count_buffer_max_reached;
@@ -363,6 +364,7 @@ pub(crate) mod tests {
     use crate::handler::filter::*;
     use crate::handler::geotiff::{BufferingElevationEnricher, GeoTiffManager, LocationWithElevation};
     use crate::handler::info::*;
+    use std::collections::BTreeMap;
 
     fn existing_tag() -> String { "EXISTING_TAG".to_string() }
     #[allow(dead_code)]
