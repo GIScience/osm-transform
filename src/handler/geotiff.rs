@@ -429,6 +429,7 @@ impl BufferingElevationEnricher {
     }
 
     fn add_elevation_tag(node: &mut Node, raster_value: RasterValue) {
+        log::info!("add_elevation_tag for node {}", node.id());
         let result_string = format_as_elevation_string(raster_value);
         match result_string {
             None => {
@@ -615,7 +616,7 @@ impl Handler for BufferingElevationEnricher {
         if relations.len()>0 {
             relations = self.handle_relations(relations);
         }
-        (self.handle_and_flush_nodes(nodes), self.handle_and_flush_ways(ways), self.handle_and_flush_relations(relations))
+        (nodes, self.handle_and_flush_ways(ways), self.handle_and_flush_relations(relations))
     }
 
     fn handle_nodes(&mut self, nodes: Vec<Node>) -> Vec<Node> {
