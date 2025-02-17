@@ -230,9 +230,9 @@ other={other}"#)
         let filt_node = (i_node_ct as i64 - a_node_ct as i64) * -1;
         let filt_ways = (i_way_cnt as i64 - a_way_cnt as i64) * -1;
         let filt_rels = (i_rel_cnt as i64 - a_rel_cnt as i64) * -1;
-        let addd_node = (o_node_ct as i64 - a_node_ct as i64) * -1;
-        let addd_ways = (o_way_cnt as i64 - a_way_cnt as i64) * -1;
-        let addd_rels = (o_rel_cnt as i64 - a_rel_cnt as i64) * -1;
+        let addd_node = o_node_ct as i64 - a_node_ct as i64;
+        let addd_ways = o_way_cnt as i64 - a_way_cnt as i64;
+        let addd_rels = o_rel_cnt as i64 - a_rel_cnt as i64;
 
         let mut formatted_statistics = format!("Element counts at specific processing stages:
          |                  nodes          |                   ways          |              relations
