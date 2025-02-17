@@ -15,7 +15,9 @@ fn main() {
 }
 
 fn print_statistics(config: &Config, handler_result: HandlerResult) {
-    println!("{}", handler_result.statistics(&config));
+    if config.statistics_level > 0 {
+        println!("{}", handler_result.statistics(&config));
+    }
 }
 
 /// Preprocessor to prepare OSM PBF-Files for openrouteservice
@@ -47,7 +49,7 @@ pub struct Args {
     pub elevation_total_buffer_size: usize,
 
     /// Split ways at elevation changes.
-    #[arg(long)]
+    #[arg(short = 's', long)]
     pub elevation_way_splitting: bool,
 
     /// Turn debugging information on.
@@ -85,6 +87,10 @@ pub struct Args {
     /// Elevation threshold defining when to introduce intermediate nodes
     #[arg(long, default_value = "10.0")]
     pub elevation_threshold: f64,
+
+    /// Print statistics. Can be added multiple times to increase verbosity.
+    #[arg(short = 'S', long, action = clap::ArgAction::Count)]
+    pub stat: u8,
 }
 impl Args {
     pub fn to_config(self) -> Config {
@@ -105,6 +111,7 @@ impl Args {
             resolution_lon: self.resolution_lon,
             resolution_lat: self.resolution_lat,
             elevation_threshold: self.elevation_threshold,
+            statistics_level: self.stat,
         }
     }
 }

@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::error::Error;
 use std::fs::File;
 use std::io::BufReader;
@@ -350,6 +350,14 @@ pub(crate) struct BufferingElevationEnricher {
     resolution_lat: f64,
     elevation_way_splitting: bool,
     elevation_threshold: f64,
+    ele_lookups_successful: usize,
+    ele_lookups_failed: usize,
+    ele_lookups_skipped: usize,
+    //statistics
+    splitted_way_count: usize,
+    elevation_tiffs_used: HashSet<String>,
+    flush_count: usize,
+    total_buffered_nodes_max_reached_count: usize,
 }
 impl BufferingElevationEnricher {
     pub fn new(geotiff_manager: GeoTiffManager,
@@ -373,6 +381,13 @@ impl BufferingElevationEnricher {
             resolution_lat,
             elevation_way_splitting,
             elevation_threshold,
+            ele_lookups_successful: 0,
+            ele_lookups_failed: 0,
+            ele_lookups_skipped: 0,
+            splitted_way_count: 0,
+            elevation_tiffs_used: HashSet::new(),
+            flush_count: 0,
+            total_buffered_nodes_max_reached_count: 0,
         }
     }
     pub fn with_resolution(mut self, resolution_lon: f64, resolution_lat: f64) -> Self {
@@ -393,7 +408,6 @@ impl BufferingElevationEnricher {
         if geotiff_name.is_none() {
             return (None, Some(node));
         }
-
         self.nodes_for_geotiffs.entry(geotiff_name.clone().unwrap().to_string()).or_insert_with(Vec::new).push(node);
         self.total_buffered_nodes_count = self.total_buffered_nodes_count + 1;
         (geotiff_name, None)
@@ -402,10 +416,17 @@ impl BufferingElevationEnricher {
     /// Load geotiff for this buffer and add elevation to all nodes in buffer,
     /// return nodes for downstream processing and empty the buffer.
     fn handle_and_flush_buffer(&mut self, buffer_name: String) -> Vec<Node> {
+        self.elevation_tiffs_used.insert(buffer_name.clone());
+        self.flush_count += 1;
         let mut buffer_vec = self.nodes_for_geotiffs.remove(&buffer_name).expect("buffer not found");
         log::debug!("Handling and flushing buffer with {} buffered nodes for geotiff '{}'", buffer_vec.len(), buffer_name);
         let geotiff = &mut self.geotiff_manager.load_geotiff(buffer_name.as_str()).expect("could not load geotiff");
-        buffer_vec.iter_mut().for_each(|node| if !self.skip_elevation(node) { self.add_elevation(geotiff, node) });
+        buffer_vec.iter_mut().for_each(|node|
+            if self.skip_elevation(node) {
+                self.ele_lookups_skipped += 1; }
+            else {
+                self.add_elevation(geotiff, node)
+            });
         self.total_buffered_nodes_count = self.total_buffered_nodes_count - buffer_vec.len();
         buffer_vec
     }
@@ -421,21 +442,23 @@ impl BufferingElevationEnricher {
     fn add_elevation_to_cache(&mut self, node: &mut Node, lon: f64, lat: f64, raster_value: &RasterValue) {
         let result_value = format_as_elevation_value(&raster_value);
         match result_value {
-            None => {}
+            None => {
+                self.ele_lookups_failed += 1;
+                if log::log_enabled!(log::Level::Trace) {
+                    log::warn!("no elevation value for node#{}", node.id());
+                }
+            }
             Some(ele) => {
+                self.ele_lookups_successful += 1;
                 self.node_cache.insert(node.id(), LocationWithElevation { lon, lat, ele });
             }
         }
     }
 
     fn add_elevation_tag(node: &mut Node, raster_value: RasterValue) {
-        log::info!("add_elevation_tag for node {}", node.id());
         let result_string = format_as_elevation_string(raster_value);
         match result_string {
             None => {
-                if log::log_enabled!(log::Level::Trace) {
-                    log::warn!("no elevation value for node#{}", node.id());
-                }
             }
             Some(value) => {
                 node.tags_mut().push(Tag::new("ele".to_string(), value));
@@ -532,6 +555,9 @@ impl BufferingElevationEnricher {
         references.push(to_node_id.clone());
         way.refs_mut().clear();
         way.refs_mut().extend(references);
+        if intermediate_nodes.len() > 0 {
+            self.splitted_way_count += 1;
+        }
         intermediate_nodes
     }
 
@@ -548,6 +574,7 @@ impl BufferingElevationEnricher {
 
     fn flush_largest_buffers_when_total_max_reached(&mut self) -> Vec<Node> {
         if self.total_buffered_nodes_count > self.total_buffered_nodes_max {
+            self.total_buffered_nodes_max_reached_count += 1;
             let buffer_lengths = self.get_buffer_lengths_sorted_desc();
             // let num_buffers_to_flush = (buffer_lengths.len() as f64 * 0.5) as usize;
             let num_buffers_to_flush = buffer_lengths.len() / 2;
@@ -648,7 +675,14 @@ impl Handler for BufferingElevationEnricher {
 
     fn add_result(&mut self, mut result: HandlerResult) -> HandlerResult {
         result.other.insert("node_cache size".to_string(), format!("{}", self.node_cache.len()));
-
+        result.elevation_found_node_count = self.ele_lookups_successful as u64;
+        result.elevation_not_found_node_count = self.ele_lookups_failed as u64;
+        result.elevation_not_relevant_node_count = self.ele_lookups_skipped as u64;
+        result.splitted_way_count = self.splitted_way_count as u64;
+        result.elevation_tiff_count_total = self.geotiff_manager.index.get_geotiff_count() as u64;
+        result.elevation_tiff_count_used = self.elevation_tiffs_used.len() as u64;
+        result.elevation_flush_count = self.flush_count as u64;
+        result.elevation_total_buffered_nodes_max_reached_count = self.total_buffered_nodes_max_reached_count as u64;
         result
     }
 }

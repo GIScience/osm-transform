@@ -22,6 +22,7 @@ fn base_config() -> Config {
         resolution_lon: 0.01,
         resolution_lat: 0.01,
         elevation_threshold: 10.0,
+        statistics_level: 0,
     };
     config.print_way_ids.insert(7216689i64);
     config.print_node_ids.insert(1);
@@ -34,6 +35,8 @@ const BAARLE_WAY_COUNT: u64 = 463u64;
 const FILTERED_NODE_COUNT: u64 = 299u64;
 const FILTERED_RELATION_COUNT: u64 = 29u64;
 const FILTERED_WAY_COUNT: u64 = 51u64;
+const SPLIT_NODE_COUNT: u64 = 4241u64;
+const FILTERED_SPLIT_NODE_COUNT: u64 = 576u64;
 
 #[test]
 fn run_minimal() {
@@ -76,12 +79,13 @@ fn run_all() {
     rusty_routes_transformer::init(&config);
     let result = rusty_routes_transformer::run(&config);
     assert_eq!(&result.input_node_count, &BAARLE_NODE_COUNT);
-    assert_eq!(&result.output_node_count, &FILTERED_NODE_COUNT);
+    assert_eq!(&result.output_node_count, &FILTERED_SPLIT_NODE_COUNT);
     assert_eq!(&result.input_relation_count, &BAARLE_RELATION_COUNT);
     assert_eq!(&result.output_relation_count, &FILTERED_RELATION_COUNT);
     assert_eq!(&result.input_way_count, &BAARLE_WAY_COUNT);
     assert_eq!(&result.output_way_count, &FILTERED_WAY_COUNT);
     check_pbf("target/tmp/output-integration-test-run_all.pbf", Some(42645645));
+    check_pbf("target/tmp/output-integration-test-run_all.pbf", Some(50000000001));
 }
 #[test]
 fn run_country() {
@@ -164,13 +168,13 @@ fn run_elevation_way_splitting_write() {
     rusty_routes_transformer::init(&config);
     let result = rusty_routes_transformer::run(&config);
     assert_eq!(&result.input_node_count, &BAARLE_NODE_COUNT);
-    assert_eq!(&result.output_node_count, &BAARLE_NODE_COUNT);
+    assert_eq!(&result.output_node_count, &SPLIT_NODE_COUNT);
     assert_eq!(&result.input_relation_count, &BAARLE_RELATION_COUNT);
     assert_eq!(&result.output_relation_count, &FILTERED_RELATION_COUNT);
     assert_eq!(&result.input_way_count, &BAARLE_WAY_COUNT);
     assert_eq!(&result.output_way_count, &FILTERED_WAY_COUNT);
     check_pbf("target/tmp/output-integration-test-run_elevation_way_splitting_write.pbf", Some(42645645));
-    check_pbf("target/tmp/output-integration-test-run_elevation_way_splitting_write.pbf", Some(1));
+    check_pbf("target/tmp/output-integration-test-run_elevation_way_splitting_write.pbf", Some(50000000001));
 }
 
 fn check_pbf(path: &str, expected_node: Option<i64>) {

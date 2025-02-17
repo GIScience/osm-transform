@@ -119,11 +119,11 @@ pub struct HandlerResult {
     pub elevation_found_node_count: u64,
     pub elevation_not_found_node_count: u64,
     pub elevation_not_relevant_node_count: u64,
-    pub elevation_buffer_flush_count_buffer_max_reached: u64,
-    pub elevation_buffer_flush_count_total_max_reached: u64,
+    pub elevation_flush_count: u64,
+    pub elevation_total_buffered_nodes_max_reached_count: u64,
     pub splitted_way_count: u64,
-    pub available_elevation_tiff_count: u64,
-    pub used_elevation_tiff_count: u64,
+    pub elevation_tiff_count_total: u64,
+    pub elevation_tiff_count_used: u64,
 }
 impl HandlerResult {
     pub(crate) fn default() -> Self {
@@ -149,10 +149,10 @@ impl HandlerResult {
             output_node_count: 0,
             output_way_count: 0,
             output_relation_count: 0,
-            available_elevation_tiff_count: 0,
-            used_elevation_tiff_count: 0,
-            elevation_buffer_flush_count_buffer_max_reached: 0,
-            elevation_buffer_flush_count_total_max_reached: 0,
+            elevation_tiff_count_total: 0,
+            elevation_tiff_count_used: 0,
+            elevation_flush_count: 0,
+            elevation_total_buffered_nodes_max_reached_count: 0,
         }
     }
 
@@ -172,10 +172,10 @@ impl HandlerResult {
         let elevation_not_found_node_count = self.elevation_not_found_node_count;
         let elevation_not_relevant_node_count = self.elevation_not_relevant_node_count;
         let splitted_way_count = self.splitted_way_count;
-        let available_elevation_tiff_count = self.available_elevation_tiff_count;
-        let used_elevation_tiff_count = self.used_elevation_tiff_count;
-        let elevation_buffer_flush_count_buffer_max_reached = self.elevation_buffer_flush_count_buffer_max_reached;
-        let elevation_buffer_flush_count_total_max_reached = self.elevation_buffer_flush_count_total_max_reached;
+        let elevation_tiff_count_total = self.elevation_tiff_count_total;
+        let elevation_tiff_count_used = self.elevation_tiff_count_used;
+        let elevation_buffer_flush_count_buffer_max_reached = self.elevation_flush_count;
+        let elevation_buffer_flush_count_total_max_reached = self.elevation_total_buffered_nodes_max_reached_count;
         let other = self.other.iter().map(|(k, v)| format!("    {}={}", k, v)).collect::<Vec<String>>().join("\n");
             format!(r#"input_node_count={input_node_count}
 input_way_count={input_way_count}
@@ -192,8 +192,8 @@ elevation_found_node_count={elevation_found_node_count}
 elevation_not_found_node_count={elevation_not_found_node_count}
 elevation_not_relevant_node_count={elevation_not_relevant_node_count}
 splitted_way_count={splitted_way_count}
-available_elevation_tiff_count={available_elevation_tiff_count}
-used_elevation_tiff_count={used_elevation_tiff_count}
+elevation_tiff_count_total={elevation_tiff_count_total}
+elevation_tiff_count_used={elevation_tiff_count_used}
 elevation_buffer_flush_count_buffer_max_reached={elevation_buffer_flush_count_buffer_max_reached}
 elevation_buffer_flush_count_total_max_reached={elevation_buffer_flush_count_total_max_reached}
 other={other}"#)
@@ -203,6 +203,9 @@ other={other}"#)
         self.format_multi_line().replace("\n", ", ")
     }
     pub fn statistics(&self, config: &Config) -> String {
+        if config.statistics_level == 0 {
+            return "".to_string()
+        }
         let i_node_ct = self.input_node_count;
         let i_way_cnt = self.input_way_count;
         let i_rel_cnt = self.input_relation_count;
@@ -220,11 +223,10 @@ other={other}"#)
         let elevation_not_found_node_count = self.elevation_not_found_node_count;
         let elevation_not_relevant_node_count = self.elevation_not_relevant_node_count;
         let splitted_way_count = self.splitted_way_count;
-        let added_node_count = 0; // TODO: fill with sensible value
-        let available_elevation_tiff_count = self.available_elevation_tiff_count;
-        let used_elevation_tiff_count = self.used_elevation_tiff_count;
-        let elevation_buffer_flush_count_buffer_max_reached = self.elevation_buffer_flush_count_buffer_max_reached;
-        let elevation_buffer_flush_count_total_max_reached = self.elevation_buffer_flush_count_total_max_reached;
+        let elevation_tiff_count_total = self.elevation_tiff_count_total;
+        let elevation_tiff_count_used = self.elevation_tiff_count_used;
+        let elevation_flush_count = self.elevation_flush_count;
+        let elevation_total_buffered_nodes_max_reached_count = self.elevation_total_buffered_nodes_max_reached_count;
 
         // derived values
         let filt_node = (i_node_ct as i64 - a_node_ct as i64) * -1;
@@ -233,36 +235,70 @@ other={other}"#)
         let addd_node = o_node_ct as i64 - a_node_ct as i64;
         let addd_ways = o_way_cnt as i64 - a_way_cnt as i64;
         let addd_rels = o_rel_cnt as i64 - a_rel_cnt as i64;
+        let country_detections = country_found_node_count + country_not_found_node_count;
+        let elevation_detections = elevation_found_node_count + elevation_not_found_node_count + elevation_not_relevant_node_count;
+        let unsplitted_way_count = o_way_cnt - splitted_way_count;
+        let mut formatted_statistics = format!("Summary:
+========
 
-        let mut formatted_statistics = format!("Element counts at specific processing stages:
-         |                  nodes          |                   ways          |              relations
-         |          count | filtered/added |          count | filtered/added |          count | filtered/added
----------+----------------+----------------+----------------+----------------+----------------+---------------
-    read |{i_node_ct:>15} |            --- |{i_way_cnt:>15} |            --- |{i_rel_cnt:>15} |            ---
-accepted |{a_node_ct:>15} |{filt_node:+15} |{a_way_cnt:>15} |{filt_ways:+15} |{a_rel_cnt:>15} |{filt_rels:+15}
- written |{o_node_ct:>15} |{addd_node:+15} |{o_way_cnt:>15} |{addd_ways:+15} |{o_rel_cnt:>15} |{addd_rels:+15}\n");
+Element counts at specific processing stages:
+---------------------------------------------
+
+         |            nodes            |            ways             |          relations
+         |                             |                             |                      
+         |         diff |        total |         diff |        total |         diff |        total
+---------+--------------+--------------+--------------+--------------+--------------+-------------
+    read |{i_node_ct:+13} |{i_node_ct:>13} |{i_way_cnt:+13} |{i_way_cnt:>13} |{i_rel_cnt:+13} |{i_rel_cnt:>13}
+accepted |{filt_node:+13} |{a_node_ct:>13} |{filt_ways:+13} |{a_way_cnt:>13} |{filt_rels:+13} |{a_rel_cnt:>13}
+ written |{addd_node:+13} |{o_node_ct:>13} |{addd_ways:+13} |{o_way_cnt:>13} |{addd_rels:+13} |{o_rel_cnt:>13}
+ ");
+        if config.statistics_level == 1 {
+            return formatted_statistics
+        }
 
         match &config.country_csv {
             Some(_) => {
-                formatted_statistics.push_str(format!("\nCountry detection:
-Country detected for  {country_found_node_count} nodes
-Country not found for {country_not_found_node_count} nodes\n").as_str());
+                formatted_statistics.push_str(format!("
+
+Country enrichment:
+-------------------
+Country detected for {country_found_node_count} nodes
+Country not found for {country_not_found_node_count} nodes
+Country detections total: {country_detections}
+").as_str());
             }
             None => {}
         }
+
         if &config.elevation_tiffs.len() > &0 {
-            formatted_statistics.push_str(format!("\nElevation detection:
+            formatted_statistics.push_str(format!("
+
+Elevation enrichment:
+---------------------
 Elevation detected for {elevation_found_node_count} nodes
 Elevation not found for {elevation_not_found_node_count} nodes
 Elevation not relevant for {elevation_not_relevant_node_count} nodes (tunnels, bridges, ...)
+Elevation detections total: {elevation_detections} (inserted nodes get interpolated elevations)
+").as_str());
 
-Nodes with elevation added to {splitted_way_count} ways
+            if config.statistics_level > 3 {
+                formatted_statistics.push_str(format!("
+Loaded elevation tiff files: {elevation_tiff_count_total}
+Used elevation tiff files: {elevation_tiff_count_used}
+Elevation buffers flush count: {elevation_flush_count}
+Elevation buffers reached total max count: {elevation_total_buffered_nodes_max_reached_count}
+").as_str())
+            }
+        if config.elevation_way_splitting {
+            formatted_statistics.push_str(format!("
 
-available_elevation_tiff_count={available_elevation_tiff_count}
-used_elevation_tiff_count={used_elevation_tiff_count}
-elevation_buffer_flush_count_buffer_max_reached={elevation_buffer_flush_count_buffer_max_reached}
-elevation_buffer_flush_count_total_max_reached={elevation_buffer_flush_count_total_max_reached}
-            ").as_str())
+Elevation way splitting:
+------------------------
+Added {addd_node} nodes to {splitted_way_count} ways
+Unsplitted ways: {unsplitted_way_count}
+").as_str());
+        }
+
         }
         formatted_statistics
     }

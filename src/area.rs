@@ -202,7 +202,11 @@ impl Handler for AreaHandler {
     fn add_result(&mut self, mut result: HandlerResult) -> HandlerResult {
         result.country_not_found_node_count = self.country_not_found_node_count;
         result.country_found_node_count = self.country_found_node_count;
-        result.other.insert("mapping".to_string(), format!("index:{} area:{} id:{} name:{}", &self.mapping.index.len(), &self.mapping.area.len(), &self.mapping.id.len(), &self.mapping.name.len(), ));
+        result.other.insert("mapping".to_string(), format!("index:{} area:{} id:{} name:{}",
+                                                           &self.mapping.index.len(),
+                                                           &self.mapping.area.len(),
+                                                           &self.mapping.id.len(),
+                                                           &self.mapping.name.len(), ));
         result
     }
 }

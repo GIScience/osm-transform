@@ -211,4 +211,5 @@ pub struct Config {
     pub resolution_lon: f64,
     pub resolution_lat: f64,
     pub elevation_threshold: f64,
+    pub statistics_level: u8,
 }
