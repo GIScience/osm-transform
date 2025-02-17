@@ -507,6 +507,9 @@ impl BufferingElevationEnricher {
                 from_location.lon, from_location.lat,
                 to_location.lon, to_location.lat,
                 (self.resolution_lon, self.resolution_lat));
+            if intermediate_locations.len() == 0 {
+                continue;
+            }
             for index in 1..(intermediate_locations.len()-1) {
                 let location = &intermediate_locations[index];
                 let before_ele = intermediate_locations[index-1].ele();
