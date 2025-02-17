@@ -186,7 +186,9 @@ impl AreaHandler {
             }
         }
         let node = node;
-        node.tags_mut().push(Tag::new("country".to_string(), result.join(",")));
+        if ! result.is_empty() {
+            node.tags_mut().push(Tag::new("country".to_string(), result.join(",")));
+        }
     }
 }
 
