@@ -504,15 +504,11 @@ impl BufferingElevationEnricher {
             let from_location = from_location.unwrap();
             let to_location = to_location.unwrap();
             let mut intermediate_locations = WaySplitter::compute_intermediate_locations(
-                from_location.lon, from_location.lat,
-                to_location.lon, to_location.lat,
-                (self.resolution_lon, self.resolution_lat));
+                from_location, to_location, (self.resolution_lon, self.resolution_lat));
             if intermediate_locations.len() == 0 {
                 continue;
             }
             log::trace!("{}.handle_way#{}: adding {} intermediate nodes for way segment from {} to {}", self.name(), way.id(), intermediate_locations.len(), from_node_id, to_node_id);
-            intermediate_locations.insert(0, LocationWithElevation::new(from_location.lon, from_location.lat, from_location.ele));
-            intermediate_locations.push(LocationWithElevation::new(to_location.lon, to_location.lat, to_location.ele));
             for index in 1..(intermediate_locations.len()-1) {
                 let location = &intermediate_locations[index];
                 let before_ele = intermediate_locations[index-1].ele();
@@ -656,7 +652,7 @@ impl Handler for BufferingElevationEnricher {
     }
 }
 
-#[derive(Debug)]
+#[derive(Copy, Clone, Debug)]
 pub(crate) struct LocationWithElevation {
     lon: f64,
     lat: f64,
