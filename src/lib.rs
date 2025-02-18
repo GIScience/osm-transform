@@ -140,15 +140,19 @@ fn process(config: &Config, first_pass_result: HandlerResult) -> HandlerResult {
             config.resolution_lon,
             config.resolution_lat,
             config.elevation_threshold);
-        handler_chain = handler_chain.add(ElementPrinter::with_prefix(" before elevation_enricher:----------------\n".to_string())
-            .with_node_ids(config.print_node_ids.clone())
-            .with_way_ids(config.print_way_ids.clone())
-            .with_relation_ids(config.print_relation_ids.clone()));
+        if log::log_enabled!(log::Level::Debug) || log::log_enabled!(log::Level::Trace) {
+            handler_chain = handler_chain.add(ElementPrinter::with_prefix(" before elevation_enricher:----------------\n".to_string())
+                .with_node_ids(config.print_node_ids.clone())
+                .with_way_ids(config.print_way_ids.clone())
+                .with_relation_ids(config.print_relation_ids.clone()));
+        }
         handler_chain = handler_chain.add(elevation_enricher);
-        handler_chain = handler_chain.add(ElementPrinter::with_prefix(" after elevation_enricher:----------------\n".to_string())
-            .with_node_ids(config.print_node_ids.clone())
-            .with_way_ids(config.print_way_ids.clone())
-            .with_relation_ids(config.print_relation_ids.clone()));
+        if log::log_enabled!(log::Level::Debug) || log::log_enabled!(log::Level::Trace) {
+            handler_chain = handler_chain.add(ElementPrinter::with_prefix(" after elevation_enricher:----------------\n".to_string())
+                .with_node_ids(config.print_node_ids.clone())
+                .with_way_ids(config.print_way_ids.clone())
+                .with_relation_ids(config.print_relation_ids.clone()));
+        }
     }
 
     handler_chain = handler_chain.add(TagFilterByKey::new(

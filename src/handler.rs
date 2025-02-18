@@ -238,7 +238,8 @@ other={other}"#)
         let country_detections = country_found_node_count + country_not_found_node_count;
         let elevation_detections = elevation_found_node_count + elevation_not_found_node_count + elevation_not_relevant_node_count;
         let unsplitted_way_count = o_way_cnt - splitted_way_count;
-        let mut formatted_statistics = format!("Summary:
+        let mut formatted_statistics = format!("
+Summary:
 ========
 
 Element counts at specific processing stages:

@@ -390,6 +390,7 @@ impl BufferingElevationEnricher {
             total_buffered_nodes_max_reached_count: 0,
         }
     }
+    #[allow(dead_code)]
     pub fn with_resolution(mut self, resolution_lon: f64, resolution_lat: f64) -> Self {
         self.resolution_lon = resolution_lon;
         self.resolution_lat = resolution_lat;
@@ -527,7 +528,7 @@ impl BufferingElevationEnricher {
             }
             let from_location = from_location.unwrap();
             let to_location = to_location.unwrap();
-            let mut intermediate_locations = WaySplitter::compute_intermediate_locations(
+            let intermediate_locations = WaySplitter::compute_intermediate_locations(
                 from_location, to_location, (self.resolution_lon, self.resolution_lat));
             if intermediate_locations.len() == 0 {
                 continue;
@@ -559,17 +560,6 @@ impl BufferingElevationEnricher {
             self.splitted_way_count += 1;
         }
         intermediate_nodes
-    }
-
-    pub(crate) fn handle_intermediate_locations(&mut self, intermediate_locations: Vec<LocationWithElevation>) {
-        for mut intermediate_location in intermediate_locations {
-            let geotiff_name = self.geotiff_manager.find_geotiff_id_for_wgs84_coord(intermediate_location.lon(), intermediate_location.lat());
-            let mut geotiff = self.geotiff_manager.load_geotiff(geotiff_name.unwrap().as_str()).expect("could not load geotiff");
-
-            let raster_value = geotiff.get_value_for_wgs_84(intermediate_location.lon(), intermediate_location.lat());
-            let ele = format_as_elevation_value(&raster_value).unwrap();
-            intermediate_location.ele = ele;
-        }
     }
 
     fn flush_largest_buffers_when_total_max_reached(&mut self) -> Vec<Node> {
@@ -844,7 +834,7 @@ mod tests {
         Node::new(id, 1, location.get_coordinate(), 1, 1, 1, "a".to_string(), true, tags_obj)
     }
     pub fn simple_way_element(id: i64, node_refs: Vec<i64>, tags: Vec<(&str, &str)>) -> Way {
-        let mut tags_obj = tags.iter().map(|(k, v)| Tag::new(k.to_string(), v.to_string())).collect();
+        let tags_obj = tags.iter().map(|(k, v)| Tag::new(k.to_string(), v.to_string())).collect();
         Way::new(id, 1, 1, 1, 1, "a".to_string(), true, node_refs, tags_obj)
     }
     pub fn simple_node_element_hd_ma(id: i64, tags: Vec<(&str, &str)>) -> Node {
