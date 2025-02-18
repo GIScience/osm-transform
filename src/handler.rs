@@ -279,7 +279,7 @@ Elevation enrichment:
 Elevation detected for {elevation_found_node_count} nodes
 Elevation not found for {elevation_not_found_node_count} nodes
 Elevation not relevant for {elevation_not_relevant_node_count} nodes (tunnels, bridges, ...)
-Elevation detections total: {elevation_detections} (inserted nodes get interpolated elevations)
+Elevation detections total: {elevation_detections}
 ").as_str());
 
             if config.statistics_level > 3 {

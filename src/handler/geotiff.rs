@@ -439,6 +439,24 @@ impl BufferingElevationEnricher {
         self.add_elevation_to_cache(node, lon, lat, &raster_value);
         Self::add_elevation_tag(node, raster_value);
     }
+    fn get_elevation(&mut self, lon: f64, lat: f64) -> Option<f64> {
+        let geotiff_name = self.geotiff_manager.find_geotiff_id_for_wgs84_coord(lon, lat);
+        match geotiff_name {
+            None => {
+                self.ele_lookups_failed += 1;
+                if log::log_enabled!(log::Level::Trace) {
+                    log::warn!("no geotiff found for lon/lat {}/{}", lon, lat);
+                }
+                None
+            }
+            Some(geotiff_name) => {
+                let geotiff = &mut self.geotiff_manager.load_geotiff(geotiff_name.as_str()).expect("could not load geotiff");
+                let raster_value = geotiff.get_value_for_wgs_84(lon, lat);
+                let elevation_value = format_as_elevation_value(&raster_value);
+                elevation_value
+            }
+        }
+    }
 
     fn add_elevation_to_cache(&mut self, node: &mut Node, lon: f64, lat: f64, raster_value: &RasterValue) {
         let result_value = format_as_elevation_value(&raster_value);
@@ -528,10 +546,14 @@ impl BufferingElevationEnricher {
             }
             let from_location = from_location.unwrap();
             let to_location = to_location.unwrap();
-            let intermediate_locations = WaySplitter::compute_intermediate_locations(
+            let mut intermediate_locations = WaySplitter::compute_intermediate_locations(
                 from_location, to_location, (self.resolution_lon, self.resolution_lat));
             if intermediate_locations.len() == 0 {
                 continue;
+            }
+            for index in 1..(intermediate_locations.len()-1) {
+                let elevation = self.get_elevation(intermediate_locations[index].lon, intermediate_locations[index].lat);
+                intermediate_locations[index].ele = elevation.unwrap_or(0.0);
             }
             log::trace!("{}.handle_way#{}: adding {} intermediate nodes for way segment from {} to {}", self.name(), way.id(), intermediate_locations.len(), from_node_id, to_node_id);
             for index in 1..(intermediate_locations.len()-1) {
@@ -1280,6 +1302,8 @@ mod tests {
         let nodes = handler.handle_way(&mut way);
         dbg!(&nodes);
         assert!(nodes.len() > 0);
+        assert!(nodes.iter().all(|node| node.tags().iter().any(|tag| tag.k().eq("ele") && !tag.v().is_empty())));
+        assert!(nodes[0].tags().iter().any(|tag| tag.k().eq("ele") && tag.v().eq("203")));
     }
 
     #[test]
