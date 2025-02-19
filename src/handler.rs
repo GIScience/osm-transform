@@ -420,6 +420,7 @@ pub(crate) mod tests {
     use crate::handler::geotiff::{BufferingElevationEnricher, GeoTiffManager, LocationWithElevation};
     use crate::handler::info::*;
     use std::collections::BTreeMap;
+    use crate::handler::collect::ReferencedNodeIdCollector;
 
     fn existing_tag() -> String { "EXISTING_TAG".to_string() }
     #[allow(dead_code)]
@@ -1004,10 +1005,29 @@ pub(crate) mod tests {
         let chain = HandlerChain::default()
             .add(ElementCounter::new(ElementCountResultType::InputCount))
             .add(NodeIdFilter {})
-            .add(ElementCounter::new(ElementCountResultType::OutputCount))
-            .add(TestOnlyIdCollector::new(100));
+            .add(ElementCounter::new(ElementCountResultType::OutputCount));
 
         handle_test_nodes_and_verify_result(chain, &mut result);
+    }
+
+
+    #[test]
+    fn handler_chains_with_node_id_collector_and_filter() {
+        let _ = SimpleLogger::new().init();
+
+        let mut result = HandlerResult::default();
+        let mut chain1 = HandlerChain::default()
+            .add(ReferencedNodeIdCollector::default());
+
+        let mut chain2 = HandlerChain::default()
+            .add(ElementCounter::new(ElementCountResultType::InputCount))
+            .add(NodeIdFilter {})
+            .add(ElementCounter::new(ElementCountResultType::OutputCount))
+            ;
+
+        chain1.process(simple_way_element(23, vec![1, 2], vec![("who", "kasper")]), &mut result);
+
+        handle_test_nodes_and_verify_result(chain2, &mut result);
     }
 
     fn handle_test_nodes_and_verify_result(mut handler_chain: HandlerChain, result: &mut HandlerResult) {

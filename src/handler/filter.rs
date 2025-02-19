@@ -222,9 +222,7 @@ impl Handler for NodeIdFilter {
         "NodeIdFilter".to_string()
     }
     fn handle_result(&mut self, result: &mut HandlerResult) {
-        println!("before: {:?}", result.nodes);
         result.nodes.retain(|node| result.node_ids.get(node.id() as usize) == Some(true));
-        println!("after: {:?}", result.nodes);
     }
 }
 
