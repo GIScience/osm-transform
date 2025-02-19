@@ -25,40 +25,30 @@ impl ElementCounter {
 impl Handler for ElementCounter {
     fn name(&self) -> String { format!("ElementCounter {}", self.result_type.to_string()) }
 
-    fn handle_nodes(&mut self, elements: Vec<Node>) -> Vec<Node> {
-        self.nodes_count += elements.len() as u64;
-        elements
-    }
-
-    fn handle_ways(&mut self, elements: Vec<Way>) -> Vec<Way> {
-        self.ways_count += elements.len() as u64;
-        elements
-    }
-
-    fn handle_relations(&mut self, elements: Vec<Relation>) -> Vec<Relation> {
-        self.relations_count += elements.len() as u64;
-        elements
-    }
-
-    fn add_result(&mut self, result: &mut HandlerResult) {
+    fn handle_result(&mut self, result: &mut HandlerResult) {
         match self.result_type {
             ElementCountResultType::InputCount => {
-                result.input_node_count = self.nodes_count;
-                result.input_way_count = self.ways_count;
-                result.input_relation_count = self.relations_count;
+                result.input_node_count += result.nodes.len() as u64;
+                result.input_way_count += result.ways.len() as u64;
+                result.input_relation_count += result.relations.len() as u64;
             }
             ElementCountResultType::AcceptedCount => {
-                result.accepted_node_count = self.nodes_count;
-                result.accepted_way_count = self.ways_count;
-                result.accepted_relation_count = self.relations_count;
+                result.accepted_node_count += result.nodes.len() as u64;
+                result.accepted_way_count += result.ways.len() as u64;
+                result.accepted_relation_count += result.relations.len() as u64;
             }
             ElementCountResultType::OutputCount => {
-                result.output_node_count = self.nodes_count;
-                result.output_way_count = self.ways_count;
-                result.output_relation_count = self.relations_count;
+                result.output_node_count += result.nodes.len() as u64;
+                result.output_way_count += result.ways.len() as u64;
+                result.output_relation_count += result.relations.len() as u64;
             }
         }
     }
+
+    // fn handle_elements(&mut self, nodes: Vec<Node>, ways: Vec<Way>, relations: Vec<Relation>) -> (Vec<Node>, Vec<Way>, Vec<Relation>) {
+    //     //deactivate because new already implements handle_result
+    //     (vec![], vec![], vec![])
+    // }
 }
 #[derive(Debug)]
 pub(crate) enum ElementCountResultType {
@@ -177,7 +167,11 @@ impl ElementPrinter {
 }
 impl Handler for ElementPrinter {
     fn name(&self) -> String { format!("ElementPrinter {}", self.prefix) }
-
+    fn handle_result(&mut self, result: &mut HandlerResult) {
+        self.handle_nodes(result.nodes.clone());
+        self.handle_ways(result.ways.clone());
+        self.handle_relations(result.relations.clone());
+    }
     fn handle_nodes(&mut self, elements: Vec<Node>) -> Vec<Node> {
         for node in &elements {
             self.handle_node(node);

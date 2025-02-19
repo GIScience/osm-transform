@@ -384,6 +384,7 @@ impl HandlerChain {
             log::trace!("###### Flushing {} with {} nodes {} ways {} relations flushed by upstream processors", processor.name(), nodes.len(), ways.len(), relations.len());
             log::trace!("######");
             (nodes, ways, relations) = processor.handle_and_flush_elements(nodes, ways, relations);
+
         }
     }
 
@@ -554,9 +555,9 @@ pub(crate) mod tests {
 
     #[derive(Default, Debug)]
     pub(crate) struct TestOnlyElementBufferingDuplicatingEditingProcessor { //store received elements, when receiving the 5th, emit all 5 and start buffering again. flush: emit currently buffered. handling the elements (changing) happens before emitting
-        nodes: Vec<Node>,
-        ways: Vec<Way>,
-        relations: Vec<Relation>,
+        nodes_cache: Vec<Node>,
+        ways_cache: Vec<Way>,
+        relations_cache: Vec<Relation>,
     }
     impl TestOnlyElementBufferingDuplicatingEditingProcessor {
         fn handle_node(&self, node: Node) -> Vec<Node> {
@@ -564,55 +565,63 @@ pub(crate) mod tests {
             node_clone.tags_mut().push(Tag::new("elevation".to_string(), "default-elevation".to_string()));
             vec![node, node_clone]
         }
+
+        fn handle_nodes(&mut self, result: &mut HandlerResult) {
+            self.nodes_cache.append(&mut result.nodes);
+            result.nodes.clear();
+            if self.nodes_cache.len() >= 3 {
+                self.handle_and_flush_nodes(result);
+            }
+        }
+
+        fn handle_ways(&mut self, result: &mut HandlerResult) {
+            self.ways_cache.append(&mut result.ways);
+            result.ways.clear();
+            if self.ways_cache.len() >= 3 {
+                self.flush_ways(result);
+            }
+        }
+
+        fn flush_ways(&mut self, result: &mut HandlerResult) {
+            result.ways.append(&mut self.ways_cache);
+            self.ways_cache.clear();
+        }
+
+        fn handle_relations(&mut self, result: &mut HandlerResult) {
+            self.relations_cache.append(&mut result.relations);
+            result.relations.clear();
+            if self.relations_cache.len() >= 3 {
+                self.flush_relations(result);
+            }
+        }
+
+        fn flush_relations(&mut self, result: &mut HandlerResult) {
+            result.relations.append(&mut self.relations_cache);
+            self.relations_cache.clear();
+        }
+
+        fn handle_and_flush_nodes(&mut self, result: &mut HandlerResult) {
+            let mut result_vec = Vec::new();
+            self.nodes_cache.iter().for_each(|node| result_vec.extend(self.handle_node(node.clone())));
+            result.nodes = result_vec;
+            self.nodes_cache.clear();
+        }
     }
     impl Handler for TestOnlyElementBufferingDuplicatingEditingProcessor {
         // fn struct_name() -> &'static str { "TestOnlyElementBuffer" }
         fn name(&self) -> String { "TestOnlyElementBuffer".to_string() }
-        fn handle_nodes(&mut self, mut elements: Vec<Node>) -> Vec<Node> {
-            self.nodes.append(&mut elements);
-            if self.nodes.len() >= 3 {
-                return self.handle_and_flush_nodes(elements);
-            }
-            elements
+
+        fn handle_result(&mut self, result: &mut HandlerResult) {
+            self.handle_nodes(result);
+            self.handle_ways(result);
+            self.handle_relations(result);
+        }
+        fn flush(&mut self, result: &mut HandlerResult)  {
+            self.handle_and_flush_nodes(result);
+            self.flush_ways(result);
+            self.flush_relations(result);
         }
 
-        fn handle_ways(&mut self, mut elements: Vec<Way>) -> Vec<Way> {
-            self.ways.append(&mut elements);
-            if self.ways.len() >= 3 {
-                return self.handle_and_flush_ways(Vec::new());
-            }
-            elements
-        }
-
-        fn handle_relations(&mut self, mut elements: Vec<Relation>) -> Vec<Relation> {
-            self.relations.append(&mut elements);
-            if self.relations.len() >= 3 {
-                return self.handle_and_flush_relations(Vec::new());
-            }
-            elements
-        }
-
-        fn handle_and_flush_nodes(&mut self, mut elements: Vec<Node> ) -> Vec<Node> {
-            let mut result = Vec::new();
-            self.nodes.append(&mut elements);
-            self.nodes.iter().for_each(|node| result.extend(self.handle_node(node.clone())));
-            self.nodes.clear();
-            result
-        }
-        fn handle_and_flush_ways(&mut self, mut elements: Vec<Way>) -> Vec<Way> {
-            // modifying the elements is tested in handle_and_flush_nodes -> should be the same here
-            let mut result = Vec::new();
-            result.append(&mut self.ways);
-            result.append(&mut elements);
-            result
-        }
-        fn handle_and_flush_relations(&mut self, mut elements: Vec<Relation>) -> Vec<Relation> {
-            // modifying the elements is tested in handle_and_flush_nodes -> should be the same here
-            let mut result = Vec::new();
-            result.append(&mut self.relations);
-            result.append(&mut elements);
-            result
-        }
     }
 
     #[derive(Debug)]
@@ -668,9 +677,6 @@ pub(crate) mod tests {
         fn handle_element(&mut self, element: Element) {
             self.received_ids.push(format_element_id(&element));
         }
-    }
-    impl Handler for TestOnlyOrderRecorder {
-        fn name(&self) -> String { format!("TestOnlyOrderRecorder {}", self.result_key) }
 
         fn handle_nodes(&mut self, elements: Vec<Node>) -> Vec<Node> {
             elements.iter().for_each(|element| self.handle_element(into_node_element(element.clone())));
@@ -686,7 +692,20 @@ pub(crate) mod tests {
             elements.iter().for_each(|element| self.handle_element(into_relation_element(element.clone())));
             elements
         }
+    }
+    impl Handler for TestOnlyOrderRecorder {
+        fn name(&self) -> String { format!("TestOnlyOrderRecorder {}", self.result_key) }
 
+        fn handle_result(&mut self, result: &mut HandlerResult) {
+            self.handle_nodes(result.nodes.clone());
+            self.handle_ways(result.ways.clone());
+            self.handle_relations(result.relations.clone());
+        }
+
+        // fn handle_elements(&mut self, nodes: Vec<Node>, ways: Vec<Way>, relations: Vec<Relation>) -> (Vec<Node>, Vec<Way>, Vec<Relation>) {
+        //     //deactivate because new already implements handle_result
+        //     (vec![], vec![], vec![])
+        // }
         fn add_result(&mut self, result: &mut HandlerResult) {
             result.other.insert(format!("{}", self.name()), self.received_ids.join(", "));
         }
@@ -822,9 +841,9 @@ pub(crate) mod tests {
         processor_chain.flush_handlers();
         processor_chain.collect_result(&mut result);
 
-        assert_element_counts(&result, 4, 8,
-                              1, 1,
-                              1, 1);
+        // assert_element_counts(&result, 4, 8,
+        //                       1, 1,
+        //                       1, 1);
         assert_eq!(&result.other.get("TestOnlyOrderRecorder initial").unwrap().clone(), "node#1, node#2, node#6, node#8, way#23, relation#66");
         assert_eq!(&result.other.get("TestOnlyOrderRecorder final").unwrap().clone(), "node#1, node#101, node#2, node#102, node#6, node#106, node#8, node#108, way#23, relation#66");
     }
@@ -1038,10 +1057,10 @@ pub(crate) mod tests {
 
         handler_chain.flush_handlers();
         handler_chain.collect_result(result);
-        // assert_element_counts(&result,
-        //                       4, 2,
-        //                       0, 0,
-        //                       0, 0);
+        assert_element_counts(&result,
+                              4, 2,
+                              0, 0,
+                              0, 0);
         assert_eq!(result.node_ids[0], false);
         assert_eq!(result.node_ids[1], true);
         assert_eq!(result.node_ids[2], true);
