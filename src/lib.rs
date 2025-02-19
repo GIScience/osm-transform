@@ -54,14 +54,16 @@ pub fn init(config: &Config) {
 pub fn run(config: &Config) -> HandlerResult {
     let mut stopwatch = StopWatch::new();
     stopwatch.start();
-    let mut result = extract_referenced_nodes(config);
-    result = process(config, result);
+
+    let mut result = HandlerResult::default();
+    extract_referenced_nodes(config, &mut result);
+    process(config, &mut result);
     log::info!("Total processing time: {}", stopwatch);
     stopwatch.stop();
     result
 }
 
-fn extract_referenced_nodes(config: &Config) -> HandlerResult {
+fn extract_referenced_nodes(config: &Config, result: &mut HandlerResult){
     let mut handler_chain = HandlerChain::default()
         .add(ElementCounter::new(InputCount))
         .add(AllElementsFilter{handle_types: OsmElementTypeSelection::node_only()})
@@ -79,16 +81,15 @@ fn extract_referenced_nodes(config: &Config) -> HandlerResult {
     log::info!("Starting extraction of referenced node ids...");
     let mut stopwatch = StopWatch::new();
     stopwatch.start();
-    let _ = process_with_handler(config, &mut handler_chain).expect("Extraction of referenced node ids failed");
-    let handler_result = handler_chain.collect_result();
+    let _ = process_with_handler(config, &mut handler_chain, result).expect("Extraction of referenced node ids failed");
+    handler_chain.collect_result(result);
 
     log::info!("Finished extraction of referenced node ids, time: {}", stopwatch);
-    log::debug!("First pass HandlerResult: {}", &handler_result.format_one_line());
+    log::debug!("First pass HandlerResult: {}", result.format_one_line());
     stopwatch.reset();
-    handler_result
 }
 
-fn process(config: &Config, first_pass_result: HandlerResult) -> HandlerResult {
+fn process(config: &Config, first_pass_result: &mut HandlerResult) {
     let mut handler_chain = HandlerChain::default()
         .add(ElementCounter::new(InputCount))
         .add(ElementPrinter::with_prefix("\ninput:----------------\n".to_string())
@@ -103,9 +104,7 @@ fn process(config: &Config, first_pass_result: HandlerResult) -> HandlerResult {
     handler_chain = handler_chain.add(ComplexElementsFilter::ors_default());
 
     if config.with_node_filtering {
-        let node_id_filter = NodeIdFilter { node_ids: first_pass_result.node_ids };
-        log::debug!("node_id_filter has node_ids with len={}", node_id_filter.node_ids.len());
-        handler_chain = handler_chain.add(node_id_filter);
+        handler_chain = handler_chain.add(NodeIdFilter { });
     }
 
     handler_chain = handler_chain.add(ElementCounter::new(AcceptedCount));
@@ -135,7 +134,7 @@ fn process(config: &Config, first_pass_result: HandlerResult) -> HandlerResult {
             geotiff_manager,
             config.elevation_batch_size,
             config.elevation_total_buffer_size,
-            first_pass_result.skip_ele,
+            first_pass_result.skip_ele.clone(),
             config.elevation_way_splitting,
             config.resolution_lon,
             config.resolution_lat,
@@ -189,12 +188,12 @@ fn process(config: &Config, first_pass_result: HandlerResult) -> HandlerResult {
     log::info!("Starting processing of pbf elements...");
     let mut stopwatch = StopWatch::new();
     stopwatch.start();
-    let _ = process_with_handler(config, &mut handler_chain).expect("Processing failed");
-    let processing_result = handler_chain.collect_result();
+    let _ = process_with_handler(config, &mut handler_chain, first_pass_result).expect("Processing failed");
+    handler_chain.collect_result(first_pass_result);
     log::info!("Finished processing of pbf elements, time: {}", stopwatch);
-    log::debug!("Second pass HandlerResult: {}", processing_result.format_multi_line());
+    log::debug!("Second pass HandlerResult: {}", first_pass_result.format_multi_line());
     stopwatch.reset();
-    processing_result
+
 }
 
 #[derive(Debug, Default)]

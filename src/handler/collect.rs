@@ -5,24 +5,40 @@ use osm_io::osm::model::way::Way;
 use crate::handler::{HandlerResult, HIGHEST_NODE_ID, Handler};
 
 pub(crate) struct ReferencedNodeIdCollector {
-    referenced_node_ids: BitVec,
     count_unique: usize,
 }
 impl ReferencedNodeIdCollector {
     pub(crate) fn default() -> Self {
-        Self::with_capacity(HIGHEST_NODE_ID as usize)
-    }
-
-    fn with_capacity(nbits: usize) -> Self {
-        ReferencedNodeIdCollector {
-            referenced_node_ids: BitVec::from_elem(nbits, false),
-            count_unique: 0
+        Self {
+            count_unique: 0,
         }
     }
 
-    fn add_node_id(&mut self, id: i64) {
-        if matches!(self.referenced_node_ids.get(id as usize), Some(false)) { self.count_unique += 1 }
-        self.referenced_node_ids.set(id as usize, true);
+
+    fn handle_ways_result(&mut self, result: &mut HandlerResult)  {
+        for element in & result.ways {
+            for &id in element.refs() {
+                self.add_node_id(&mut result.node_ids, id);
+            }
+        }
+    }
+
+    fn handle_relations_result(&mut self, result: &mut HandlerResult)  {
+        for element in &mut result.relations{
+            for member in element.members() {
+                match member {
+                    Member::Node { member } => {
+                        self.add_node_id(&mut result.node_ids, member.id());
+                    }
+                    Member::Way { .. } => {}
+                    Member::Relation { .. } => {}
+                }
+            }
+        }
+    }
+    fn add_node_id(&mut self, node_ids: &mut BitVec, id: i64)  {
+        if matches!(node_ids.get(id as usize), Some(false)) { self.count_unique += 1 }
+        node_ids.set(id as usize, true);
     }
 }
 impl Handler for ReferencedNodeIdCollector {
@@ -30,34 +46,9 @@ impl Handler for ReferencedNodeIdCollector {
         "ReferencedNodeIdCollector".to_string()
     }
 
-    fn handle_ways(&mut self, mut elements: Vec<Way>) -> Vec<Way> {
-        for element in &mut *elements {
-            for &id in element.refs() {
-                self.add_node_id(id);
-            }
-        }
-        elements
-    }
-
-    fn handle_relations(&mut self, mut elements: Vec<Relation>) -> Vec<Relation> {
-        for element in &mut *elements {
-            for member in element.members() {
-                match member {
-                    Member::Node { member } => {
-                        self.add_node_id(member.id());
-                    }
-                    Member::Way { .. } => {}
-                    Member::Relation { .. } => {}
-                }
-            }
-        }
-        elements
-    }
-
-    fn add_result(&mut self, mut result: HandlerResult) -> HandlerResult {
-        log::debug!("cloning node_ids of ReferencedNodeIdCollector with len={} into HandlerResult ", self.referenced_node_ids.len());
-        result.node_ids = self.referenced_node_ids.clone();//todo check if clone is necessary
-        result
+    fn handle_result(&mut self, result: &mut HandlerResult) {
+        self.handle_ways_result(result);
+        self.handle_relations_result(result);
     }
 }
 

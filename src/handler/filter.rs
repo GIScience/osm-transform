@@ -5,7 +5,7 @@ use osm_io::osm::model::relation::Relation;
 use osm_io::osm::model::tag::Tag;
 use osm_io::osm::model::way::Way;
 use regex::Regex;
-use crate::handler::{OsmElementTypeSelection, Handler};
+use crate::handler::{OsmElementTypeSelection, Handler, HandlerResult};
 use crate::handler::predicate::{HasOneOfTagKeysPredicate, HasTagKeyValuePredicate, HasNoneOfTagKeysPredicate};
 
 #[derive(Debug)]
@@ -214,32 +214,17 @@ impl Handler for AllElementsFilter {
 }
 
 
-pub(crate) struct NodeIdFilter {
-    pub(crate) node_ids: BitVec
-}
-impl NodeIdFilter {
-
-    fn is_node_referenced(& self, id: i64) -> bool {
-        match self.node_ids.get(id as usize).unwrap_or(false) {
-            true => {
-                log::trace!("node {} found in bitmap", id);
-                true
-            }
-            false => {
-                log::trace!("node {} is not in bitmap - filtering", id);
-                false
-            }
-        }
-    }
-}
+pub(crate) struct NodeIdFilter {}
+impl NodeIdFilter {}
 
 impl Handler for NodeIdFilter {
     fn name(&self) -> String {
         "NodeIdFilter".to_string()
     }
-    fn handle_nodes(&mut self, mut elements: Vec<Node>) -> Vec<Node> {
-        elements.retain(|node| self.is_node_referenced(node.id()));
-        elements
+    fn handle_result(&mut self, result: &mut HandlerResult) {
+        println!("before: {:?}", result.nodes);
+        result.nodes.retain(|node| result.node_ids.get(node.id() as usize) == Some(true));
+        println!("after: {:?}", result.nodes);
     }
 }
 

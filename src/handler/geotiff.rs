@@ -685,7 +685,7 @@ impl Handler for BufferingElevationEnricher {
         result
     }
 
-    fn add_result(&mut self, mut result: HandlerResult) -> HandlerResult {
+    fn add_result(&mut self, result: &mut HandlerResult) {
         result.other.insert("node_cache size".to_string(), format!("{}", self.node_cache.len()));
         result.elevation_found_node_count = self.ele_lookups_successful as u64;
         result.elevation_not_found_node_count = self.ele_lookups_failed as u64;
@@ -695,7 +695,6 @@ impl Handler for BufferingElevationEnricher {
         result.elevation_tiff_count_used = self.elevation_tiffs_used.len() as u64;
         result.elevation_flush_count = self.flush_count as u64;
         result.elevation_total_buffered_nodes_max_reached_count = self.total_buffered_nodes_max_reached_count as u64;
-        result
     }
 }
 

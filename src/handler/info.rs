@@ -40,7 +40,7 @@ impl Handler for ElementCounter {
         elements
     }
 
-    fn add_result(&mut self, mut result: HandlerResult) -> HandlerResult {
+    fn add_result(&mut self, result: &mut HandlerResult) {
         match self.result_type {
             ElementCountResultType::InputCount => {
                 result.input_node_count = self.nodes_count;
@@ -58,7 +58,6 @@ impl Handler for ElementCounter {
                 result.output_relation_count = self.relations_count;
             }
         }
-        result
     }
 }
 #[derive(Debug)]

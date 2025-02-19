@@ -3,15 +3,15 @@ use anyhow;
 use benchmark_rs::stopwatch::StopWatch;
 use osm_io::osm::pbf;
 use crate::Config;
-use crate::handler::HandlerChain;
+use crate::handler::{HandlerChain, HandlerResult};
 
-pub(crate) fn process_with_handler(config: &Config, handler_chain: &mut HandlerChain) -> Result<(), anyhow::Error> {
+pub(crate) fn process_with_handler(config: &Config, handler_chain: &mut HandlerChain, result: &mut HandlerResult) -> Result<(), anyhow::Error> {
     let mut stopwatch = StopWatch::new();
     stopwatch.start();
     let reader = pbf::reader::Reader::new(&config.input_pbf)?;
 
     for element in reader.elements()? {
-        handler_chain.process(element);
+        handler_chain.process(element, result);
     }
     handler_chain.flush_handlers();
     Ok(())

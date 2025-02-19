@@ -55,10 +55,9 @@ impl Handler for SimpleOutputHandler {
         Vec::new()
     }
 
-    fn add_result(&mut self, mut result: HandlerResult) -> HandlerResult {
+    fn add_result(&mut self, result: &mut HandlerResult) {
         self.close();
         result.other.insert("output file".to_string(), format!("{:?}", &self.writer.path()));
-        result
     }
 }
 
@@ -120,7 +119,7 @@ impl Handler for SplittingOutputHandler {
         }
         vec![]
     }
-    fn add_result(&mut self, mut result: HandlerResult) -> HandlerResult {
+    fn add_result(&mut self, result: &mut HandlerResult) {
         self.way_relation_writer.close().expect("Failed to close way_relation_writer");
         self.node_writer.close().expect("Failed to close node writer");
         result.other.insert("output files".to_string(), format!("{:?}, {:?}", &self.way_relation_writer.path() , &self.node_writer.path()));
@@ -136,6 +135,5 @@ impl Handler for SplittingOutputHandler {
             Err(_) => {}
         }
         self.node_writer.close().expect("Failed to close node writer");
-        result
     }
 }

@@ -45,9 +45,8 @@ impl Handler for SkipElevationNodeCollector {
         elements
     }
 
-    fn add_result(&mut self, mut result: HandlerResult) -> HandlerResult {
+    fn add_result(&mut self, result: &mut HandlerResult) {
         result.skip_ele = self.skip_elevation_node_ids.clone();
-        result
     }
 }
 
