@@ -54,36 +54,42 @@ impl Handler for ReferencedNodeIdCollector {
 
 #[cfg(test)]
 mod test {
-    use crate::handler::{HIGHEST_NODE_ID, Handler};
-    use crate::handler::tests::{simple_node, TestOnlyIdCollector};
+    use crate::handler::{HIGHEST_NODE_ID, Handler, HandlerResult};
+    use crate::handler::tests::{simple_node, simple_way, TestOnlyIdCollector};
 
     #[test]
     fn node_id_collector(){
         let mut collector = TestOnlyIdCollector::new(10);
-        assert_eq!(10, collector.node_ids.len());
-        collector.handle_nodes(vec![simple_node(2, vec![])]);
-        assert_eq!(false, collector.node_ids.get(0).unwrap_or(false));
-        assert_eq!(false, collector.node_ids.get(1).unwrap_or(false));
-        assert_eq!(true, collector.node_ids.get(2).unwrap_or(false));
+        let mut result = HandlerResult::default();
+        result.nodes.push(simple_node(2, vec![]));
+        collector.handle_result(&mut result);
+        assert_eq!(false, result.node_ids.get(0).unwrap_or(false));
+        assert_eq!(false, result.node_ids.get(1).unwrap_or(false));
+        assert_eq!(true, result.node_ids.get(2).unwrap_or(false));
     }
     #[test]
     #[should_panic(expected = "index out of bounds: 12 >= 10")]
     fn node_id_collector_out_of_bounds(){
         let mut collector = TestOnlyIdCollector::new(10);
-        collector.handle_nodes(vec![simple_node(12,vec![])]);
+        let mut result = HandlerResult::default();
+        result.ways.push(simple_way(12, vec![], vec![]));
+        collector.handle_result(&mut result);
     }
     #[test]
     fn node_id_collector_out_of_bounds_real(){
         let mut collector = TestOnlyIdCollector::new(HIGHEST_NODE_ID as usize);
+        let mut result = HandlerResult::default();
+        result.nodes.push(simple_node(1, vec![]));
+        collector.handle_result(&mut result);
+        assert_eq!(false, result.node_ids.get(0).unwrap_or(false));
+        assert_eq!(true, result.node_ids.get(1).unwrap_or(false));
+        assert_eq!(false, result.node_ids.get(2).unwrap_or(false));
+        assert_eq!(false, result.node_ids.get(11414456780).unwrap_or(false));
 
-        collector.handle_nodes(vec![simple_node(1, vec![])]);
-        assert_eq!(false, collector.node_ids.get(0).unwrap_or(false));
-        assert_eq!(true, collector.node_ids.get(1).unwrap_or(false));
-        assert_eq!(false, collector.node_ids.get(2).unwrap_or(false));
-        assert_eq!(false, collector.node_ids.get(11414456780).unwrap_or(false));
-
-        collector.handle_nodes(vec![simple_node(11414456780, vec![])]);
-        assert_eq!(true, collector.node_ids.get(11414456780).unwrap_or(false));
+        result.clear_elements();
+        result.nodes.push(simple_node(11414456780, vec![]));
+        collector.handle_result(&mut result);
+        assert_eq!(true, result.node_ids.get(11414456780).unwrap_or(false));
     }
 
 }

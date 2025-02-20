@@ -621,49 +621,17 @@ impl BufferingElevationEnricher {
         }
         result
     }
-}
 
-impl Handler for BufferingElevationEnricher {
-    fn name(&self) -> String { "BufferingElevationEnricher".to_string() }
 
-    fn handle_elements(&mut self, mut nodes: Vec<Node>, mut ways: Vec<Way>, mut relations: Vec<Relation>) -> (Vec<Node>, Vec<Way>, Vec<Relation>) {
-        log::trace!("{}.handle_elements() called with {} nodes, {} ways, {} relations", self.name(), nodes.len(), ways.len(), relations.len());
 
-        if nodes.len() > 0 {
-            nodes = self.handle_nodes(nodes);
-        }
-        if ways.len() > 0 {
-            for way in ways.iter_mut() {
-                nodes.extend(self.handle_way(way));
-            }
-        }
-        if relations.len() > 0 {
-            relations = self.handle_relations(relations);
-        }
-        (nodes, ways, relations)
-    }
 
-    fn handle_and_flush_elements(&mut self, mut nodes: Vec<Node>, mut ways: Vec<Way>, mut relations: Vec<Relation>) -> (Vec<Node>, Vec<Way>, Vec<Relation>) {
-        log::debug!("{}.handle_and_flush_elements() called with {} nodes, {} ways, {} relations", self.name(), nodes.len(), ways.len(), relations.len());
 
-        nodes = self.handle_and_flush_nodes(nodes);
-        if ways.len()>0 {
-            for way in ways.iter_mut() {
-                nodes.extend(self.handle_way(way));
-            }
-        }
-        if relations.len()>0 {
-            relations = self.handle_relations(relations);
-        }
-        (nodes, self.handle_and_flush_ways(ways), self.handle_and_flush_relations(relations))
-    }
-
-    fn handle_nodes(&mut self, nodes: Vec<Node>) -> Vec<Node> {
-        let mut result = Vec::new();
+    fn handle_nodes(&mut self, mut nodes: Vec<Node>) -> Vec<Node> {
+        let mut result_vec = Vec::new();
         for node in nodes {
-            result.extend(self.handle_node(node));
+            result_vec.extend(self.handle_node(node));
         }
-        result
+        result_vec
     }
 
     fn handle_ways(&mut self, mut ways: Vec<Way>) -> Vec<Way> {
@@ -683,6 +651,41 @@ impl Handler for BufferingElevationEnricher {
             result.extend(self.handle_and_flush_buffer(buffer_name));
         }
         result
+    }
+}
+
+impl Handler for BufferingElevationEnricher {
+    fn name(&self) -> String { "BufferingElevationEnricher".to_string() }
+
+    fn handle_result(&mut self, result: &mut HandlerResult) {
+        log::trace!("{}.handle_result() called with {} nodes, {} ways, {} relations", self.name(), result.nodes.len(), result.ways.len(), result.relations.len());
+
+        if result.nodes.len() > 0 {
+            result.nodes = self.handle_nodes(result.nodes.clone());
+        }
+        if result.ways.len() > 0 {
+            for way in result.ways.iter_mut() {
+                result.nodes.extend(self.handle_way(way));
+            }
+        }
+        if result.relations.len() > 0 {
+            result.relations = self.handle_relations(result.relations.clone());
+        }
+
+    }
+
+    fn flush(&mut self, result: &mut HandlerResult) {
+        log::debug!("{}.flush() called with {} nodes, {} ways, {} relations", self.name(), result.nodes.len(), result.ways.len(), result.relations.len());
+
+        result.nodes = self.handle_and_flush_nodes(result.nodes.clone());
+        if result.ways.len()>0 {
+            for way in result.ways.iter_mut() {
+                result.nodes.extend(self.handle_way(way));
+            }
+        }
+        if result.relations.len()>0 {
+            result.relations = self.handle_relations(result.relations.clone());
+        }
     }
 
     fn add_result(&mut self, result: &mut HandlerResult) {

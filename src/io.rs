@@ -13,7 +13,7 @@ pub(crate) fn process_with_handler(config: &Config, handler_chain: &mut HandlerC
     for element in reader.elements()? {
         handler_chain.process(element, result);
     }
-    handler_chain.flush_handlers();
+    handler_chain.flush_handlers(result);
     Ok(())
 }
 

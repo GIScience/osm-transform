@@ -26,6 +26,7 @@ impl Handler for ElementCounter {
     fn name(&self) -> String { format!("ElementCounter {}", self.result_type.to_string()) }
 
     fn handle_result(&mut self, result: &mut HandlerResult) {
+        log::trace!("{}.handle_result called: counting nodes+={}, ways+={}, relations+={}", self.name(), result.nodes.len(), result.ways.len(), result.relations.len());
         match self.result_type {
             ElementCountResultType::InputCount => {
                 result.input_node_count += result.nodes.len() as u64;
@@ -44,12 +45,8 @@ impl Handler for ElementCounter {
             }
         }
     }
-
-    // fn handle_elements(&mut self, nodes: Vec<Node>, ways: Vec<Way>, relations: Vec<Relation>) -> (Vec<Node>, Vec<Way>, Vec<Relation>) {
-    //     //deactivate because new already implements handle_result
-    //     (vec![], vec![], vec![])
-    // }
 }
+
 #[derive(Debug)]
 pub(crate) enum ElementCountResultType {
     InputCount,

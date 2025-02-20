@@ -48,25 +48,10 @@ impl TagValueBasedOsmElementsFilter {
 impl Handler for TagValueBasedOsmElementsFilter {
     fn name(&self) -> String { "TagValueBasedOsmElementsFilter".to_string() }
 
-    fn handle_nodes(&mut self, mut elements: Vec<Node>) -> Vec<Node> {
-        if self.handle_types.node {
-            elements.retain(|element| self.accept_by_tags(element.tags()));
-        }
-        elements
-    }
-
-    fn handle_ways(&mut self, mut elements: Vec<Way>) -> Vec<Way> {
-        if self.handle_types.way {
-            elements.retain(|element| self.accept_by_tags(element.tags()));
-        }
-        elements
-    }
-
-    fn handle_relations(&mut self, mut elements: Vec<Relation>) -> Vec<Relation> {
-        if self.handle_types.relation {
-            elements.retain(|element| self.accept_by_tags(element.tags()));
-        }
-        elements
+    fn handle_result(&mut self, result: &mut HandlerResult) {
+        if self.handle_types.node { result.nodes.retain(|node| self.accept_by_tags(node.tags())) };
+        if self.handle_types.way { result.ways.retain(|way| self.accept_by_tags(way.tags())) };
+        if self.handle_types.relation { result.relations.retain(|relation| self.accept_by_tags(relation.tags())) };
     }
 }
 
@@ -91,35 +76,21 @@ impl TagKeyBasedOsmElementsFilter {
         let contains_any_key = tags.iter().any(|tag| self.tag_keys.contains(tag.k()));
         match self.filter_type {
             FilterType::AcceptMatching => {
-                return contains_any_key
+                contains_any_key
             }
             FilterType::RemoveMatching => {
-                return !contains_any_key
+                !contains_any_key
             }
         }
     }
 }
 impl Handler for TagKeyBasedOsmElementsFilter {
     fn name(&self) -> String { "TagKeyBasedOsmElementsFilter".to_string() }
-    fn handle_nodes(&mut self, mut elements: Vec<Node>) -> Vec<Node> {
-        if self.handle_types.node {
-            elements.retain(|element| self.accept_by_tags(element.tags()));
-        }
-        elements
-    }
 
-    fn handle_ways(&mut self, mut elements: Vec<Way>) -> Vec<Way> {
-        if self.handle_types.way {
-            elements.retain(|element| self.accept_by_tags(element.tags()));
-        }
-        elements
-    }
-
-    fn handle_relations(&mut self, mut elements: Vec<Relation>) -> Vec<Relation> {
-        if self.handle_types.relation {
-            elements.retain(|element| self.accept_by_tags(element.tags()));
-        }
-        elements
+    fn handle_result(&mut self, result: &mut HandlerResult) {
+        result.nodes.retain(|node| self.accept_by_tags(node.tags()));
+        result.ways.retain(|way| self.accept_by_tags(way.tags()));
+        result.relations.retain(|relation| self.accept_by_tags(relation.tags()));
     }
 }
 
@@ -327,7 +298,7 @@ mod test {
     use osm_io::osm::model::way::Way;
     use regex::Regex;
     use crate::handler::filter::{ComplexElementsFilter, FilterType, TagFilterByKey, TagKeyBasedOsmElementsFilter};
-    use crate::handler::{Handler, OsmElementTypeSelection};
+    use crate::handler::{Handler, HandlerResult, OsmElementTypeSelection};
 
     #[test]
     fn test_tag_filter_by_key_with_remove_matching() {
@@ -447,24 +418,34 @@ mod test {
             OsmElementTypeSelection::all(),
             vec!["bad".to_string(), "ugly".to_string()],
             FilterType::RemoveMatching);
-        assert_eq!(filter.handle_nodes(vec![Node::new(1, 1, Coordinate::new(1.0f64, 1.1f64), 1, 1, 1, "a".to_string(), true,
-                                                vec![
-                                                    Tag::new("good".to_string(), "1".to_string()),
-                                                    Tag::new("bad".to_string(), "2".to_string()),
-                                                ])])
-                       .len(), 0);
-        assert_eq!(filter.handle_nodes(vec![Node::new(1, 1, Coordinate::new(1.0f64, 1.1f64), 1, 1, 1, "a".to_string(), true,
-                                                vec![
-                                                    Tag::new("good".to_string(), "1".to_string()),
-                                                    Tag::new("nice".to_string(), "2".to_string()),
-                                                ])])
-                       .len(), 1);
-        assert_eq!(filter.handle_nodes(vec![Node::new(1, 1, Coordinate::new(1.0f64, 1.1f64), 1, 1, 1, "a".to_string(), true,
-                                                vec![
-                                                    Tag::new("ugly".to_string(), "1".to_string()),
-                                                    Tag::new("bad".to_string(), "2".to_string()),
-                                                ])])
-                       .len(), 0);
+        let mut result = HandlerResult::default();
+
+        result.nodes.push(Node::new(1, 1, Coordinate::new(1.0f64, 1.1f64), 1, 1, 1, "a".to_string(), true,
+                                    vec![
+                                        Tag::new("good".to_string(), "1".to_string()),
+                                        Tag::new("bad".to_string(), "2".to_string()),
+                                    ]));
+        filter.handle_result(&mut result);
+        assert_eq!(result.nodes.len(), 0);
+
+        result.clear_elements();
+        result.nodes.push(Node::new(1, 1, Coordinate::new(1.0f64, 1.1f64), 1, 1, 1, "a".to_string(), true,
+                                    vec![
+                                        Tag::new("good".to_string(), "1".to_string()),
+                                        Tag::new("nice".to_string(), "2".to_string()),
+                                    ]));
+        filter.handle_result(&mut result);
+        assert_eq!(result.nodes.len(), 1);
+
+        result.clear_elements();
+        result.nodes.push(Node::new(1, 1, Coordinate::new(1.0f64, 1.1f64), 1, 1, 1, "a".to_string(), true,
+                                    vec![
+                                        Tag::new("ugly".to_string(), "1".to_string()),
+                                        Tag::new("bad".to_string(), "2".to_string()),
+                                    ]));
+        filter.handle_result(&mut result);
+        assert_eq!(result.nodes.len(), 0);
+
     }
 
     #[test]
@@ -474,25 +455,33 @@ mod test {
             vec!["bad".to_string(), "ugly".to_string()],
             FilterType::AcceptMatching,
         );
+        let mut result = HandlerResult::default();
 
-        assert_eq!(filter.handle_nodes(vec![Node::new(1, 1, Coordinate::new(1.0f64, 1.1f64), 1, 1, 1, "a".to_string(), true,
-                                                vec![
-                                                    Tag::new("good".to_string(), "1".to_string()),
-                                                    Tag::new("bad".to_string(), "2".to_string()),
-                                                ])])
-                       .len(), 1);
-        assert_eq!(filter.handle_nodes(vec![Node::new(1, 1, Coordinate::new(1.0f64, 1.1f64), 1, 1, 1, "a".to_string(), true,
-                                                                     vec![
-                                                    Tag::new("good".to_string(), "1".to_string()),
-                                                    Tag::new("nice".to_string(), "2".to_string()),
-                                                ])])
-                       .len(), 0);
-        assert_eq!(filter.handle_nodes(vec![Node::new(1, 1, Coordinate::new(1.0f64, 1.1f64), 1, 1, 1, "a".to_string(), true,
-                                                vec![
-                                                    Tag::new("ugly".to_string(), "1".to_string()),
-                                                    Tag::new("bad".to_string(), "2".to_string()),
-                                                ])])
-                       .len(), 1);
+        result.nodes.push(Node::new(1, 1, Coordinate::new(1.0f64, 1.1f64), 1, 1, 1, "a".to_string(), true,
+                                    vec![
+                                        Tag::new("good".to_string(), "1".to_string()),
+                                        Tag::new("bad".to_string(), "2".to_string()),
+                                    ]));
+        filter.handle_result(&mut result);
+        assert_eq!(result.nodes.len(), 1);
+
+        result.clear_elements();
+        result.nodes.push(Node::new(1, 1, Coordinate::new(1.0f64, 1.1f64), 1, 1, 1, "a".to_string(), true,
+                                    vec![
+                                        Tag::new("good".to_string(), "1".to_string()),
+                                        Tag::new("nice".to_string(), "2".to_string()),
+                                    ]));
+        filter.handle_result(&mut result);
+        assert_eq!(result.nodes.len(), 0);
+
+        result.clear_elements();
+        result.nodes.push(Node::new(1, 1, Coordinate::new(1.0f64, 1.1f64), 1, 1, 1, "a".to_string(), true,
+                                    vec![
+                                        Tag::new("ugly".to_string(), "1".to_string()),
+                                        Tag::new("bad".to_string(), "2".to_string()),
+                                    ]));
+        filter.handle_result(&mut result);
+        assert_eq!(result.nodes.len(), 1);
     }
 
     #[test]
