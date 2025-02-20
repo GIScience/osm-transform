@@ -1077,10 +1077,10 @@ pub(crate) mod tests {
         handler_chain.collect_result(&mut result);
 
         // dbg!(&result); // This causes the test to run eternally...?!
-        //
-        // assert_element_counts(&result, 2, 3,
-        //                       0, 0,
-        //                       1, 1);
+
+        assert_element_counts(&result, 2, 3,
+                              0, 0,
+                              1, 1);
         assert_eq!(&result.other.get("TestOnlyOrderRecorder initial").unwrap().clone(), "node#101, node#102, way#201");
         assert_eq!(&result.other.get("TestOnlyOrderRecorder final").unwrap().clone(), format!("node#101, node#102, node#{}, way#201", HIGHEST_NODE_ID+1).as_str());
         assert_eq!(&result.other.get("ElementEvaluator#elevation node results").unwrap().clone(), format!("101:true, 102:true, {}:true", HIGHEST_NODE_ID+1).as_str() );
