@@ -57,7 +57,9 @@ pub fn run(config: &Config) -> HandlerResult {
 
     let mut result = HandlerResult::default();
     extract_referenced_nodes(config, &mut result);
+    result.clear_counts();
     process(config, &mut result);
+
     log::info!("Total processing time: {}", stopwatch);
     stopwatch.stop();
     result
@@ -77,7 +79,7 @@ fn extract_referenced_nodes(config: &Config, result: &mut HandlerResult){
     if &config.elevation_tiffs.len() > &0 {
         handler_chain = handler_chain.add(SkipElevationNodeCollector::default())
     }
-
+    //todo add IdCollector{handle_types: OsmElementTypeSelection::way_relation()}
     log::info!("Starting extraction of referenced node ids...");
     let mut stopwatch = StopWatch::new();
     stopwatch.start();
@@ -103,7 +105,7 @@ fn process(config: &Config, first_pass_result: &mut HandlerResult) {
 
     handler_chain = handler_chain.add(ComplexElementsFilter::ors_default());
 
-    if config.with_node_filtering {
+    if config.with_node_filtering {//todo move up before metadata remover
         handler_chain = handler_chain.add(NodeIdFilter { });
     }
 

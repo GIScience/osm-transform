@@ -107,9 +107,10 @@ pub struct HandlerResult {
     pub ways: Vec<Way>,
     pub relations: Vec<Relation>,
 
-    pub other: HashMap<String, String>,
-    pub node_ids: BitVec,
-    pub skip_ele: BitVec,
+    pub node_ids: BitVec, //todo rename to accept_node_ids
+    //todo add: pub accept_way_ids: BitVec,
+    //todo add: pub accept_relation_ids: BitVec,
+    pub skip_ele: BitVec, //todo rename to nodes_without_elevation_ids
     
     // InputCount,
     pub input_node_count: u64,
@@ -137,6 +138,8 @@ pub struct HandlerResult {
     pub splitted_way_count: u64,
     pub elevation_tiff_count_total: u64,
     pub elevation_tiff_count_used: u64,
+
+    pub other: HashMap<String, String>,
 }
 impl HandlerResult {
     pub(crate) fn default() -> Self {
@@ -147,9 +150,10 @@ impl HandlerResult {
             nodes: vec![],
             ways: vec![],
             relations: vec![],
-            other: hashmap! {},
+
             node_ids: BitVec::from_elem(nbits, false),
             skip_ele: BitVec::from_elem(nbits, false),
+
             input_node_count: 0,
             input_way_count: 0,
             input_relation_count: 0,
@@ -169,6 +173,8 @@ impl HandlerResult {
             elevation_tiff_count_used: 0,
             elevation_flush_count: 0,
             elevation_total_buffered_nodes_max_reached_count: 0,
+
+            other: hashmap! {},
         }
     }
 
@@ -324,6 +330,28 @@ Unsplitted ways: {unsplitted_way_count}
         self.nodes.clear();
         self.ways.clear();
         self.relations.clear();
+    }
+    pub(crate) fn clear_counts(&mut self) {
+        self.input_node_count = 0;
+        self.input_way_count = 0;
+        self.input_relation_count = 0;
+        self.accepted_node_count = 0;
+        self.accepted_way_count = 0;
+        self.accepted_relation_count = 0;
+        self.country_not_found_node_count = 0;
+        self.country_found_node_count = 0;
+        self.elevation_found_node_count = 0;
+        self.elevation_not_found_node_count = 0;
+        self.elevation_not_relevant_node_count = 0;
+        self.splitted_way_count = 0;
+        self.output_node_count = 0;
+        self.output_way_count = 0;
+        self.output_relation_count = 0;
+        self.elevation_tiff_count_total = 0;
+        self.elevation_tiff_count_used = 0;
+        self.elevation_flush_count = 0;
+        self.elevation_total_buffered_nodes_max_reached_count = 0;
+        self.other.clear();
     }
 }
 
