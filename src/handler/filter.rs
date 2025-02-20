@@ -264,14 +264,9 @@ impl Handler for ComplexElementsFilter {
         "ComplexElementsFilter".to_string()
     }
 
-    fn handle_ways(&mut self, mut elements: Vec<Way>) -> Vec<Way> {
-        elements.retain(|way| self.is_way_accepted(way));
-        elements
-    }
-
-    fn handle_relations(&mut self, mut elements: Vec<Relation>) -> Vec<Relation> {
-        elements.retain(|relation| self.is_relation_accepted(relation));
-        elements
+    fn handle_result(&mut self, result: &mut HandlerResult) {
+        result.ways.retain(|way| self.is_way_accepted(way));
+        result.relations.retain(|relation| self.is_relation_accepted(relation));
     }
 }
 
@@ -398,7 +393,7 @@ mod test {
         assert_eq!(node.tags().len(), 0);
     }
     #[test]
-    fn filter_elements_remove_by_keys() {
+    fn test_tag_key_based_osm_elements_filter_elements_removed_by_keys() {
         let mut filter = TagKeyBasedOsmElementsFilter::new(
             OsmElementTypeSelection::all(),
             vec!["bad".to_string(), "ugly".to_string()],
@@ -434,7 +429,7 @@ mod test {
     }
 
     #[test]
-    fn filter_elements_accept_by_keys() {
+    fn test_tag_key_based_osm_elements_filter_elements_accepted_by_keys() {
         let mut filter = TagKeyBasedOsmElementsFilter::new(
             OsmElementTypeSelection::all(),
             vec!["bad".to_string(), "ugly".to_string()],
@@ -470,56 +465,79 @@ mod test {
     }
 
     #[test]
-    fn complex_filter_with_ors_default() {
+    fn test_complex_elements_filter_with_ors_default() {
         let mut filter = ComplexElementsFilter::ors_default();
+        let mut result = HandlerResult::default();
+
         // has key to keep and key-value to keep, bad key 'building' should not take effect => should be accepted
-        assert_eq!(filter.handle_ways(vec![Way::new(1, 1, 1, 1, 1, "a".to_string(), true, vec![],
-                                              vec![
-                                                  Tag::new("route".to_string(), "xyz".to_string()),
-                                                  Tag::new("railway".to_string(), "platform".to_string()),
-                                                  Tag::new("building".to_string(), "x".to_string()),
-                                              ])]).len(), 1);
+        result.ways.push(Way::new(1, 1, 1, 1, 1, "a".to_string(), true, vec![],
+                                  vec![
+                                      Tag::new("route".to_string(), "xyz".to_string()),
+                                      Tag::new("railway".to_string(), "platform".to_string()),
+                                      Tag::new("building".to_string(), "x".to_string()),
+                                  ]));
+        filter.handle_result(&mut result);
+        assert_eq!(result.ways.len(), 1);
 
         // has key to keep, bad key 'building' should not take effect => should be accepted
-        assert_eq!(filter.handle_ways(vec![Way::new(2, 1, 1, 1, 1, "a".to_string(), true, vec![],
-                                              vec![
-                                                  Tag::new("route".to_string(), "xyz".to_string()),
-                                                  Tag::new("building".to_string(), "x".to_string()),
-                                              ])]).len(), 1);
+        result.clear();
+        result.ways.push(Way::new(2, 1, 1, 1, 1, "a".to_string(), true, vec![],
+                                  vec![
+                                      Tag::new("route".to_string(), "xyz".to_string()),
+                                      Tag::new("building".to_string(), "x".to_string()),
+                                  ]));
+        filter.handle_result(&mut result);
+        assert_eq!(result.ways.len(), 1);
 
         // has key-value to keep, bad key 'building' should not take effect => should be accepted
-        assert_eq!(filter.handle_ways(vec![Way::new(3, 1, 1, 1, 1, "a".to_string(), true, vec![],
+        result.clear();
+        result.ways.push(Way::new(3, 1, 1, 1, 1, "a".to_string(), true, vec![],
                                               vec![
                                                   Tag::new("railway".to_string(), "platform".to_string()),
                                                   Tag::new("building".to_string(), "x".to_string()),
-                                              ])]).len(), 1);
+                                              ]));
+        filter.handle_result(&mut result);
+        assert_eq!(result.ways.len(), 1);
 
         // has no key or key-value to keep, but also no bad key => should be accepted
-        assert_eq!(filter.handle_ways(vec![Way::new(4, 1, 1, 1, 1, "a".to_string(), true, vec![],
+        result.clear();
+        result.ways.push(Way::new(4, 1, 1, 1, 1, "a".to_string(), true, vec![],
                                               vec![
                                                   Tag::new("railway".to_string(), "wrong-value".to_string()),
                                                   Tag::new("something".to_string(), "else".to_string()),
-                                              ])]).len(), 1);
+                                              ]));
+        filter.handle_result(&mut result);
+        assert_eq!(result.ways.len(), 1);
 
         // has no key or key-value to keep, some other key, but also one bad key => should be filtered
-        assert_eq!(filter.handle_ways(vec![Way::new(5, 1, 1, 1, 1, "a".to_string(), true, vec![],
+        result.clear();
+        result.ways.push(Way::new(5, 1, 1, 1, 1, "a".to_string(), true, vec![],
                                               vec![
                                                   Tag::new("railway".to_string(), "wrong-value".to_string()),
                                                   Tag::new("something".to_string(), "else".to_string()),
                                                   Tag::new("building".to_string(), "x".to_string()),
-                                              ])]).len(), 0);
+                                              ]));
+        filter.handle_result(&mut result);
+        assert_eq!(result.ways.len(), 0);
 
         // has only one bad key => should be filtered
-        assert_eq!(filter.handle_ways(vec![Way::new(6, 1, 1, 1, 1, "a".to_string(), true, vec![],
+        result.clear();
+        result.ways.push(Way::new(6, 1, 1, 1, 1, "a".to_string(), true, vec![],
                                               vec![
                                                   Tag::new("building".to_string(), "x".to_string()),
-                                              ])]).len(), 0);
+                                              ]));
+        filter.handle_result(&mut result);
+        assert_eq!(result.ways.len(), 0);
 
         // has only one other key => should be accepted
-        assert_eq!(filter.handle_ways(vec![Way::new(7, 1, 1, 1, 1, "a".to_string(), true, vec![],
+        result.clear();
+        result.ways.push(Way::new(7, 1, 1, 1, 1, "a".to_string(), true, vec![],
                                               vec![
                                                   Tag::new("something".to_string(), "x".to_string()),
-                                              ])]).len(), 1);
+                                              ]));
+        filter.handle_result(&mut result);
+        assert_eq!(result.ways.len(), 1);
+
     }
 
 }

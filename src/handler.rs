@@ -38,11 +38,6 @@ pub trait Handler {
     fn handle_result(&mut self, result: &mut HandlerResult){}
 
     fn flush(&mut self, result: &mut HandlerResult)  {
-        // let (nodes, ways, relations) = self.handle_and_flush_elements(result.nodes.clone(), result.ways.clone(), result.relations.clone());
-        // result.nodes = nodes;
-        // result.ways = ways;
-        // result.relations = relations;
-
         self.handle_result(result)
     }
     fn handle_elements(&mut self, nodes: Vec<Node>, ways: Vec<Way>, relations: Vec<Relation>) -> (Vec<Node>, Vec<Way>, Vec<Relation>){
@@ -326,10 +321,21 @@ Unsplitted ways: {unsplitted_way_count}
         formatted_statistics
     }
 
+    pub(crate) fn clear(&mut self) {
+        self.clear_elements();
+        self.clear_ids();
+        self.clear_counts();
+    }
     pub(crate) fn clear_elements(&mut self) {
         self.nodes.clear();
         self.ways.clear();
         self.relations.clear();
+    }
+    pub(crate) fn clear_ids(&mut self) {
+        self.node_ids.clear();
+        //todo self.way_ids.clear();
+        //todo self.relation_ids.clear();
+        self.skip_ele.clear();
     }
     pub(crate) fn clear_counts(&mut self) {
         self.input_node_count = 0;
@@ -487,6 +493,9 @@ pub(crate) mod tests {
         Way::new(id, 1, 1, 1, 1, String::from("a_user"), true, refs, tags_obj)
     }
     pub fn simple_relation_element(id: i64, members: Vec<(MemberType, i64, &str)>, tags: Vec<(&str, &str)>) -> Element {
+        Element::Relation { relation: simple_relation(id, members, tags) }
+    }
+    pub fn simple_relation(id: i64, members: Vec<(MemberType, i64, &str)>, tags: Vec<(&str, &str)>) -> Relation {
         let members_obj = members.iter().map(|(t, id, role)| {
             match t {
                 MemberType::Node => { Member::Node { member: MemberData::new(id.clone(), role.to_string()) } }
@@ -495,7 +504,7 @@ pub(crate) mod tests {
             }
         }).collect();
         let tags_obj = tags.iter().map(|(k, v)| Tag::new(k.to_string(), v.to_string())).collect();
-        relation_element(id, 1, 1, 1, 1, "a_user".to_string(), true, members_obj, tags_obj)
+        Relation::new(id, 1, 1, 1, 1, "a_user".to_string(), true, members_obj, tags_obj)
     }
     pub fn node_element(id: i64, version: i32, coordinate: Coordinate, timestamp: i64, changeset: i64, uid: i32, user: String, visible: bool, tags: Vec<Tag>) -> Element {
         Element::Node { node: Node::new(id, version, coordinate, timestamp, changeset, uid, user, visible, tags) }
@@ -1039,8 +1048,7 @@ pub(crate) mod tests {
         let mut chain2 = HandlerChain::default()
             .add(ElementCounter::new(ElementCountResultType::InputCount))
             .add(NodeIdFilter {})
-            .add(ElementCounter::new(ElementCountResultType::OutputCount))
-            ;
+            .add(ElementCounter::new(ElementCountResultType::OutputCount));
 
         chain1.process(simple_way_element(23, vec![1, 2], vec![("who", "kasper")]), &mut result);
 
@@ -1095,8 +1103,7 @@ pub(crate) mod tests {
             .add(ElementEvaluator::new("way_refs",
                                        Box::new(|_| "".to_string()),
                                        Box::new(|way| way.refs().iter().map(|id| id.to_string()).collect::<Vec<String>>().join(",")),
-                                       Box::new(|_| "".to_string())))
-            ;
+                                       Box::new(|_| "".to_string())));
 
         handler_chain.process(as_node_element(node_without_ele_from_location(101, location_with_elevation_hd_philosophers_way_start(), vec![])), &mut result);
         handler_chain.process(as_node_element(node_without_ele_from_location(102, location_with_elevation_hd_philosophers_way_end(), vec![])), &mut result);
@@ -1115,7 +1122,16 @@ pub(crate) mod tests {
         assert_eq!(&result.other.get("ElementEvaluator#way_refs:way#201").unwrap().clone(), format!("101,{},102",HIGHEST_NODE_ID+1).as_str());
     }
 
-    fn process_elements(handler_chain: &mut HandlerChain, result: &mut HandlerResult, elements: Vec<(MemberType, i64)>) {
+    fn add_to_result(result: &mut HandlerResult, elements: Vec<(MemberType, i64)>) {
+        for (member_type, id) in elements {
+            match member_type {
+                MemberType::Node => result.nodes.push(simple_node(id, vec![])),
+                MemberType::Way => result.ways.push(simple_way(id, vec![], vec![])),
+                MemberType::Relation => result.relations.push(simple_relation(id, vec![], vec![])),
+            }
+        }
+    }
+    fn process_elements_one_by_one(handler_chain: &mut HandlerChain, result: &mut HandlerResult, elements: Vec<(MemberType, i64)>) {
         for (member_type, id) in elements {
             match member_type {
                 MemberType::Node => handler_chain.process(simple_node_element(id, vec![]), result),
@@ -1126,9 +1142,34 @@ pub(crate) mod tests {
         handler_chain.flush_handlers(result);
         handler_chain.collect_result(result);
     }
+    fn flush_elements_one_by_one(handler_chain: &mut HandlerChain, result: &mut HandlerResult, elements: Vec<(MemberType, i64)>) {
+        for (member_type, id) in elements {
+            match member_type {
+                MemberType::Node => {
+                    result.nodes.push(simple_node(id, vec![]));
+                    handler_chain.flush_handlers(result); },
+                MemberType::Way => {
+                    result.ways.push(simple_way(id, vec![], vec![]));
+                    handler_chain.flush_handlers(result);
+                },
+                MemberType::Relation => {
+                    result.relations.push(simple_relation(id, vec![], vec![]));
+                    handler_chain.flush_handlers(result);
+                },
+            }
+        }
+
+        handler_chain.collect_result(result);
+    }
+
+    fn flush_elements_in_one_call(handler_chain: &mut HandlerChain, result: &mut HandlerResult, elements: Vec<(MemberType, i64)>) {
+        add_to_result(result, elements);
+        handler_chain.flush_handlers(result);
+        handler_chain.collect_result(result);
+    }
 
     #[test]
-    fn handler_chain_with_all_elements_filter_node_only() {
+    fn test_handler_chain_with_all_elements_filter_node_only() {
         let _ = SimpleLogger::new().init();
         let handle_type = OsmElementTypeSelection::node_only();
 
@@ -1136,10 +1177,9 @@ pub(crate) mod tests {
         let mut handler_chain = HandlerChain::default()
             .add(TestOnlyOrderRecorder::new("initial"))
             .add(AllElementsFilter{handle_types: handle_type})
-            .add(TestOnlyOrderRecorder::new("final"))
-            ;
+            .add(TestOnlyOrderRecorder::new("final"));
 
-        process_elements(&mut handler_chain, &mut result, vec![
+        process_elements_one_by_one(&mut handler_chain, &mut result, vec![
             (MemberType::Node, 1), (MemberType::Way, 11), (MemberType::Relation, 21),
             (MemberType::Node, 2), (MemberType::Way, 12), (MemberType::Relation, 22),
             (MemberType::Node, 3), (MemberType::Way, 13), (MemberType::Relation, 23),
@@ -1149,7 +1189,7 @@ pub(crate) mod tests {
         assert_eq!("way#11, relation#21, way#12, relation#22, way#13, relation#23", &result.other.get("TestOnlyOrderRecorder final").unwrap().clone());
     }
     #[test]
-    fn handler_chain_with_all_elements_filter_way_only() {
+    fn test_handler_chain_with_all_elements_filter_way_only() {
         let _ = SimpleLogger::new().init();
         let handle_type = OsmElementTypeSelection::way_only();
 
@@ -1157,10 +1197,9 @@ pub(crate) mod tests {
         let mut handler_chain = HandlerChain::default()
             .add(TestOnlyOrderRecorder::new("initial"))
             .add(AllElementsFilter{handle_types: handle_type})
-            .add(TestOnlyOrderRecorder::new("final"))
-            ;
+            .add(TestOnlyOrderRecorder::new("final"));
 
-        process_elements(&mut handler_chain, &mut result, vec![
+        process_elements_one_by_one(&mut handler_chain, &mut result, vec![
             (MemberType::Node, 1), (MemberType::Way, 11), (MemberType::Relation, 21),
             (MemberType::Node, 2), (MemberType::Way, 12), (MemberType::Relation, 22),
             (MemberType::Node, 3), (MemberType::Way, 13), (MemberType::Relation, 23),
@@ -1170,7 +1209,7 @@ pub(crate) mod tests {
         assert_eq!("node#1, relation#21, node#2, relation#22, node#3, relation#23", &result.other.get("TestOnlyOrderRecorder final").unwrap().clone());
     }
     #[test]
-    fn handler_chain_with_all_elements_filter_all() {
+    fn test_handler_chain_process_elements_with_all_elements_filter_all() {
         let _ = SimpleLogger::new().init();
         let handle_type = OsmElementTypeSelection::all();
 
@@ -1178,10 +1217,9 @@ pub(crate) mod tests {
         let mut handler_chain = HandlerChain::default()
             .add(TestOnlyOrderRecorder::new("initial"))
             .add(AllElementsFilter{handle_types: handle_type})
-            .add(TestOnlyOrderRecorder::new("final"))
-            ;
+            .add(TestOnlyOrderRecorder::new("final"));
 
-        process_elements(&mut handler_chain, &mut result, vec![
+        process_elements_one_by_one(&mut handler_chain, &mut result, vec![
             (MemberType::Node, 1), (MemberType::Way, 11), (MemberType::Relation, 21),
             (MemberType::Node, 2), (MemberType::Way, 12), (MemberType::Relation, 22),
             (MemberType::Node, 3), (MemberType::Way, 13), (MemberType::Relation, 23),
@@ -1189,6 +1227,97 @@ pub(crate) mod tests {
 
         assert_eq!("node#1, way#11, relation#21, node#2, way#12, relation#22, node#3, way#13, relation#23", &result.other.get("TestOnlyOrderRecorder initial").unwrap().clone());
         assert_eq!("", &result.other.get("TestOnlyOrderRecorder final").unwrap().clone());
+    }
+    #[test]
+    fn test_handler_chain_flush_one_by_one_with_all_elements_filter_all() {
+        let _ = SimpleLogger::new().init();
+        let handle_type = OsmElementTypeSelection::all();
+
+        let mut result = HandlerResult::default();
+        let mut handler_chain = HandlerChain::default()
+            .add(TestOnlyOrderRecorder::new("initial"))
+            .add(AllElementsFilter{handle_types: handle_type})
+            .add(TestOnlyOrderRecorder::new("final"));
+
+        flush_elements_one_by_one(&mut handler_chain, &mut result, vec![
+            (MemberType::Node, 1), (MemberType::Way, 11), (MemberType::Relation, 21),
+            (MemberType::Node, 2), (MemberType::Way, 12), (MemberType::Relation, 22),
+            (MemberType::Node, 3), (MemberType::Way, 13), (MemberType::Relation, 23),
+        ]);
+
+        assert_eq!("node#1, way#11, relation#21, node#2, way#12, relation#22, node#3, way#13, relation#23", &result.other.get("TestOnlyOrderRecorder initial").unwrap().clone());
+        assert_eq!("", &result.other.get("TestOnlyOrderRecorder final").unwrap().clone());
+    }
+    #[test]
+    fn test_handler_chain_flush_in_one_call_with_all_elements_filter_all() {
+        let _ = SimpleLogger::new().init();
+        let handle_type = OsmElementTypeSelection::all();
+
+        let mut result = HandlerResult::default();
+        let mut handler_chain = HandlerChain::default()
+            .add(TestOnlyOrderRecorder::new("initial"))
+            .add(AllElementsFilter{handle_types: handle_type})
+            .add(TestOnlyOrderRecorder::new("final"));
+
+        flush_elements_in_one_call(&mut handler_chain, &mut result, vec![
+            (MemberType::Node, 1), (MemberType::Way, 11), (MemberType::Relation, 21),
+            (MemberType::Node, 2), (MemberType::Way, 12), (MemberType::Relation, 22),
+            (MemberType::Node, 3), (MemberType::Way, 13), (MemberType::Relation, 23),
+        ]);
+
+        assert_eq!("node#1, node#2, node#3, way#11, way#12, way#13, relation#21, relation#22, relation#23", &result.other.get("TestOnlyOrderRecorder initial").unwrap().clone());
+        assert_eq!("", &result.other.get("TestOnlyOrderRecorder final").unwrap().clone());
+    }
+
+    #[test]
+    fn test_handler_chain_process_with_complex_elements_filter() {
+        let _ = SimpleLogger::new().init();
+
+        let mut result = HandlerResult::default();
+        let mut handler_chain = HandlerChain::default()
+            .add(TestOnlyOrderRecorder::new("initial"))
+            .add(ComplexElementsFilter::ors_default())
+            .add(TestOnlyOrderRecorder::new("final"));
+
+        //should be removed:
+        handler_chain.process(simple_way_element(1, vec![], vec![("building", "x")]), &mut result);
+        handler_chain.process(simple_relation_element(1, vec![], vec![("building", "x")]), &mut result);
+        //should be accepted:
+        handler_chain.process(simple_way_element(2, vec![], vec![("route", "xyz")]), &mut result);
+        handler_chain.process(simple_relation_element(2, vec![], vec![("route", "xyz")]), &mut result);
+        //nodes should be accepted and passed through:
+        handler_chain.process(simple_node_element(1, vec![]), &mut result);
+
+        handler_chain.flush_handlers(&mut result);
+        handler_chain.collect_result(&mut result);
+
+        assert_eq!("way#1, relation#1, way#2, relation#2, node#1", &result.other.get("TestOnlyOrderRecorder initial").unwrap().clone());
+        assert_eq!("way#2, relation#2, node#1",                    &result.other.get("TestOnlyOrderRecorder final").unwrap().clone());
+    }
+    #[test]
+    fn test_handler_chain_flush_in_one_call_with_complex_elements_filter() {
+        let _ = SimpleLogger::new().init();
+
+        let mut result = HandlerResult::default();
+        let mut handler_chain = HandlerChain::default()
+            .add(TestOnlyOrderRecorder::new("initial"))
+            .add(ComplexElementsFilter::ors_default())
+            .add(TestOnlyOrderRecorder::new("final"));
+
+        //should be removed:
+        result.ways.push(simple_way(1, vec![], vec![("building", "x")]));
+        result.relations.push(simple_relation(1, vec![], vec![("building", "x")]));
+        //should be accepted:
+        result.ways.push(simple_way(2, vec![], vec![("route", "xyz")]));
+        result.relations.push(simple_relation(2, vec![], vec![("route", "xyz")]));
+        //nodes should be accepted and passed through:
+        result.nodes.push(simple_node(1, vec![]));
+
+        handler_chain.flush_handlers(&mut result);
+        handler_chain.collect_result(&mut result);
+
+        assert_eq!("node#1, way#1, way#2, relation#1, relation#2", &result.other.get("TestOnlyOrderRecorder initial").unwrap().clone());
+        assert_eq!("node#1, way#2, relation#2",                    &result.other.get("TestOnlyOrderRecorder final").unwrap().clone());
     }
 
 }
