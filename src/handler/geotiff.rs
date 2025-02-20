@@ -876,7 +876,7 @@ mod tests {
         assert!(node.tags().iter().any(|tag| tag.k().eq("ele") && !tag.v().is_empty()));
     }
     #[test]
-    fn geotiff_limburg_load() {
+    fn test_geotiff_limburg_load() {
         let geotiff = create_geotiff_limburg();
         assert_eq!(geotiff.pixels_vertical, 991);
         assert_eq!(geotiff.pixels_horizontal, 1016);
@@ -962,7 +962,7 @@ mod tests {
     }
 
     #[test]
-    fn geotiff_limburg_get_value_for_pixel_coord() {
+    fn test_geotiff_limburg_get_value_for_pixel_coord() {
         let mut geotiff = create_geotiff_limburg();
 
         let value = geotiff.get_value_for_pixel_coord(540u32, 978u32);
@@ -975,7 +975,7 @@ mod tests {
     }
 
     #[test]
-    fn geotiff_limburg_get_value_for_wgs_84() {
+    fn test_geotiff_limburg_get_value_for_wgs_84() {
         let mut geotiff = create_geotiff_limburg();
         let test_point = wgs84_coordinate_limburg_traffic_circle();
         let value = geotiff.get_value_for_wgs_84(test_point.lon(), test_point.lat());
@@ -984,7 +984,7 @@ mod tests {
     }
 
     #[test]
-    fn geotiff_ma_hd_get_value_for_wgs_84() {
+    fn test_geotiff_ma_hd_get_value_for_wgs_84() {
         let mut geotiff = create_geotiff_ma_hd();
         let test_point = wgs84_coordinate_hd_river();
         let value = geotiff.get_value_for_wgs_84(test_point.lon(), test_point.lat());
@@ -993,7 +993,7 @@ mod tests {
     }
 
     #[test]
-    fn experiment_from_user_string() {
+    fn test_experiment_from_user_string() {
         let srs_resolver = DynamicSrsResolver::new();
         proj_methods("ETRS89 / UTM zone 32N|ETRS89|",
                      "geotiffreader.geo_params", &srs_resolver);
@@ -1022,7 +1022,7 @@ mod tests {
     }
 
     #[test]
-    fn proj_from_epsg_code_from_user_string() {
+    fn test_proj_from_epsg_code_from_user_string() {
         dbg!(Proj::from_epsg_code(4326).expect("not found"));
         dbg!(Proj::from_user_string("+proj=longlat +datum=WGS84 +no_defs +type=crs").expect("not found"));
 
@@ -1031,7 +1031,7 @@ mod tests {
     }
 
     #[test]
-    fn transform_4326_to_4326() {
+    fn test_transform_4326_to_4326() {
         let point_3d = transform(
             &Proj::from_epsg_code(4326).expect("not found"),
             &Proj::from_epsg_code(4326).expect("not found"),
@@ -1040,7 +1040,7 @@ mod tests {
         assert_eq!(point_3d.1, 50.38536322f64);
     }
     #[test]
-    fn transform_25832_to_4326() {
+    fn test_transform_25832_to_4326() {
         let point_3d = transform(
             &Proj::from_epsg_code(25832).expect("not found"),
             &Proj::from_epsg_code(4326).expect("not found"),
@@ -1049,7 +1049,7 @@ mod tests {
         assert!(are_floats_close_7(point_3d.1, 50.38536322f64));
     }
     #[test]
-    fn transform_4326_to_25832() {
+    fn test_transform_4326_to_25832() {
         let point_3d = transform(
             &Proj::from_epsg_code(4326).expect("not found"),
             &Proj::from_epsg_code(25832).expect("not found"),
@@ -1060,7 +1060,7 @@ mod tests {
     }
 
     #[test]
-    fn transform_4326_to_25832_2() {
+    fn test_transform_4326_to_25832_2() {
         let point_3d = transform(
             &Proj::from_epsg_code(4326).expect("not found"),
             &Proj::from_epsg_code(25832).expect("not found"),
@@ -1071,7 +1071,7 @@ mod tests {
     }
 
     #[test]
-    fn proj4rs_transform_5174_to_4326() {
+    fn test_proj4rs_transform_5174_to_4326() {
         //values taken from https://github.com/3liz/proj4rs/
         let mut point_3d = (198236.3200000003, 453407.8560000006, 0.0);
         dbg!(&point_3d);
@@ -1087,14 +1087,14 @@ mod tests {
         assert!(are_floats_close(point_3d.1, 37.58308534678718, 1e-2));
     }
     #[test]
-    fn wgs_84_to_tiff_coord_4326() {
+    fn test_wgs_84_to_tiff_coord_4326() {
         let geotiff = create_fake_geotiff(Proj::from_epsg_code(4326).unwrap(), "test/region_limburg_an_der_lahn.tif");
         let tiff_coord = geotiff.wgs_84_to_tiff_coord(wgs84_coordinate_limburg_traffic_circle().lon(), wgs84_coordinate_limburg_traffic_circle().lat());
         assert_eq!(tiff_coord.0, 8.06185930f64);
         assert_eq!(tiff_coord.1, 50.38536322f64);
     }
     #[test]
-    fn wgs_84_to_tiff_coord_25832() {
+    fn test_wgs_84_to_tiff_coord_25832() {
         let geotiff = create_fake_geotiff(Proj::from_epsg_code(25832).unwrap(), "test/region_limburg_an_der_lahn.tif");
         let tiff_coord = geotiff.wgs_84_to_tiff_coord(wgs84_coordinate_limburg_traffic_circle().lon(), wgs84_coordinate_limburg_traffic_circle().lat());
         assert!(are_floats_close(tiff_coord.0, 433305.7043197789f64, 1e-2));
@@ -1102,7 +1102,7 @@ mod tests {
     }
 
     #[test]
-    fn geotiff_limburg_to_pixel_coord_and_get_value_for_pixel_coord() {
+    fn test_geotiff_limburg_to_pixel_coord_and_get_value_for_pixel_coord() {
         //Values and expected results picket from QGIS
         let mut geotiff = create_geotiff_limburg();
         check_tiff_to_pixel_coord_and_get_value_for_pixel_coord(&mut geotiff, (435123.07f64, 5587878.78f64), (520u32, 73u32), RasterValue::F32(238.54259));
@@ -1113,7 +1113,7 @@ mod tests {
         check_tiff_to_pixel_coord_and_get_value_for_pixel_coord(&mut geotiff, (434743f64, 5582302f64), (482u32, 630u32), RasterValue::F32(109.42));
     }
     #[test]
-    fn geotiff_ma_hd_to_pixel_coord_and_get_value_for_pixel_coord() {
+    fn test_geotiff_ma_hd_to_pixel_coord_and_get_value_for_pixel_coord() {
         //Values and expected results picket from QGIS
         let mut geotiff = create_geotiff_ma_hd();
         check_tiff_to_pixel_coord_and_get_value_for_pixel_coord(&mut geotiff, wgs84_coord_hd_mountain().get_tuple_lon_lat(), (425u32, 342u32), RasterValue::I16(573));
@@ -1129,7 +1129,7 @@ mod tests {
     }
 
     #[test]
-    fn elevation_lookup() { //passing test from osm-transform
+    fn test_elevation_lookup() { //passing test from osm-transform
         let mut geotiff = create_geotiff_limburg();
         let tiff_coord = geotiff.wgs_84_to_tiff_coord(8.0513629, 50.3876977);
         dbg!(&tiff_coord);
@@ -1180,7 +1180,7 @@ mod tests {
     }
 
     #[test]
-    fn buffering_elevation_enricher_test() {
+    fn test_chain_with_buffering_elevation_enricher() {
         let _ = SimpleLogger::new().init();
         let mut handler = BufferingElevationEnricher::new(
             GeoTiffManager::with_file_pattern("test/region*.tif"),
@@ -1226,7 +1226,7 @@ mod tests {
     }
 
     #[test]
-    fn buffering_elevation_enricher_total_max_reached() {
+    fn test_buffering_elevation_enricher_total_max_reached() {
         let _ = SimpleLogger::new().init();
         let mut handler = BufferingElevationEnricher::new(
             GeoTiffManager::with_file_pattern("test/region*.tif"),
@@ -1261,7 +1261,7 @@ mod tests {
     }
 
     #[test]
-    fn node_cache_is_filled() {
+    fn test_node_cache_is_filled() {
         let mut handler = BufferingElevationEnricher::new(
             GeoTiffManager::with_file_pattern("test/region*.tif"),
             5,
@@ -1285,7 +1285,7 @@ mod tests {
     }
 
     #[test]
-    fn handle_way_split_nodes_returned() {
+    fn test_handle_way_split_nodes_returned() {
         let _ = Logger::builder().build("rusty_routes_transformer", LevelFilter::Debug);
         let mut handler = BufferingElevationEnricher::new(
             GeoTiffManager::with_file_pattern("test/region*.tif"),
@@ -1309,7 +1309,7 @@ mod tests {
     }
 
     #[test]
-    fn handle_way_split_nodes_added_as_refs() {
+    fn test_handle_way_split_nodes_added_as_refs() {
         let _ = Logger::builder().build("rusty_routes_transformer", LevelFilter::Debug);
         let mut handler = BufferingElevationEnricher::new(
             GeoTiffManager::with_file_pattern("test/region*.tif"),
