@@ -162,25 +162,10 @@ impl Handler for AllElementsFilter {
         "AllElementsFilter".to_string()
     }
 
-    fn handle_nodes(&mut self, elements:Vec<Node>) -> Vec<Node> {
-        match self.handle_types.node {
-            true => { Vec::new() }
-            false => { elements }
-        }
-    }
-
-    fn handle_ways(&mut self, elements: Vec<Way>) -> Vec<Way> {
-        match self.handle_types.way {
-            true => { Vec::new() }
-            false => { elements }
-        }
-    }
-
-    fn handle_relations(&mut self, elements: Vec<Relation>) -> Vec<Relation> {
-        match self.handle_types.relation {
-            true => { Vec::new() }
-            false => { elements }
-        }
+    fn handle_result(&mut self, result: &mut HandlerResult) {
+        if self.handle_types.node { result.nodes.clear() };
+        if self.handle_types.way { result.ways.clear() };
+        if self.handle_types.relation { result.relations.clear() };
     }
 }
 

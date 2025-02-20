@@ -1086,4 +1086,81 @@ pub(crate) mod tests {
         assert_eq!(&result.other.get("ElementEvaluator#elevation node results").unwrap().clone(), format!("101:true, 102:true, {}:true", HIGHEST_NODE_ID+1).as_str() );
         assert_eq!(&result.other.get("ElementEvaluator#way_refs:way#201").unwrap().clone(), format!("101,{},102",HIGHEST_NODE_ID+1).as_str());
     }
+
+    fn process_elements(handler_chain: &mut HandlerChain, result: &mut HandlerResult, elements: Vec<(MemberType, i64)>) {
+        for (member_type, id) in elements {
+            match member_type {
+                MemberType::Node => handler_chain.process(simple_node_element(id, vec![]), result),
+                MemberType::Way => handler_chain.process(simple_way_element(id, vec![], vec![]), result),
+                MemberType::Relation => handler_chain.process(simple_relation_element(id, vec![], vec![]), result),
+            }
+        }
+        handler_chain.flush_handlers(result);
+        handler_chain.collect_result(result);
+    }
+
+    #[test]
+    fn handler_chain_with_all_elements_filter_node_only() {
+        let _ = SimpleLogger::new().init();
+        let handle_type = OsmElementTypeSelection::node_only();
+
+        let mut result = HandlerResult::default();
+        let mut handler_chain = HandlerChain::default()
+            .add(TestOnlyOrderRecorder::new("initial"))
+            .add(AllElementsFilter{handle_types: handle_type})
+            .add(TestOnlyOrderRecorder::new("final"))
+            ;
+
+        process_elements(&mut handler_chain, &mut result, vec![
+            (MemberType::Node, 1), (MemberType::Way, 11), (MemberType::Relation, 21),
+            (MemberType::Node, 2), (MemberType::Way, 12), (MemberType::Relation, 22),
+            (MemberType::Node, 3), (MemberType::Way, 13), (MemberType::Relation, 23),
+        ]);
+
+        assert_eq!("node#1, way#11, relation#21, node#2, way#12, relation#22, node#3, way#13, relation#23", &result.other.get("TestOnlyOrderRecorder initial").unwrap().clone());
+        assert_eq!("way#11, relation#21, way#12, relation#22, way#13, relation#23", &result.other.get("TestOnlyOrderRecorder final").unwrap().clone());
+    }
+    #[test]
+    fn handler_chain_with_all_elements_filter_way_only() {
+        let _ = SimpleLogger::new().init();
+        let handle_type = OsmElementTypeSelection::way_only();
+
+        let mut result = HandlerResult::default();
+        let mut handler_chain = HandlerChain::default()
+            .add(TestOnlyOrderRecorder::new("initial"))
+            .add(AllElementsFilter{handle_types: handle_type})
+            .add(TestOnlyOrderRecorder::new("final"))
+            ;
+
+        process_elements(&mut handler_chain, &mut result, vec![
+            (MemberType::Node, 1), (MemberType::Way, 11), (MemberType::Relation, 21),
+            (MemberType::Node, 2), (MemberType::Way, 12), (MemberType::Relation, 22),
+            (MemberType::Node, 3), (MemberType::Way, 13), (MemberType::Relation, 23),
+        ]);
+
+        assert_eq!("node#1, way#11, relation#21, node#2, way#12, relation#22, node#3, way#13, relation#23", &result.other.get("TestOnlyOrderRecorder initial").unwrap().clone());
+        assert_eq!("node#1, relation#21, node#2, relation#22, node#3, relation#23", &result.other.get("TestOnlyOrderRecorder final").unwrap().clone());
+    }
+    #[test]
+    fn handler_chain_with_all_elements_filter_all() {
+        let _ = SimpleLogger::new().init();
+        let handle_type = OsmElementTypeSelection::all();
+
+        let mut result = HandlerResult::default();
+        let mut handler_chain = HandlerChain::default()
+            .add(TestOnlyOrderRecorder::new("initial"))
+            .add(AllElementsFilter{handle_types: handle_type})
+            .add(TestOnlyOrderRecorder::new("final"))
+            ;
+
+        process_elements(&mut handler_chain, &mut result, vec![
+            (MemberType::Node, 1), (MemberType::Way, 11), (MemberType::Relation, 21),
+            (MemberType::Node, 2), (MemberType::Way, 12), (MemberType::Relation, 22),
+            (MemberType::Node, 3), (MemberType::Way, 13), (MemberType::Relation, 23),
+        ]);
+
+        assert_eq!("node#1, way#11, relation#21, node#2, way#12, relation#22, node#3, way#13, relation#23", &result.other.get("TestOnlyOrderRecorder initial").unwrap().clone());
+        assert_eq!("", &result.other.get("TestOnlyOrderRecorder final").unwrap().clone());
+    }
+
 }
