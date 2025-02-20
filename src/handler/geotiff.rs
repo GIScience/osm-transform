@@ -1,13 +1,10 @@
-use std::collections::{HashMap, HashSet};
-use std::error::Error;
-use std::fs::File;
-use std::io::BufReader;
-use std::panic;
-use std::path::PathBuf;
-use itertools::Itertools;
+use crate::handler::interpolate::WaySplitter;
+use crate::handler::{Handler, HandlerResult, HIGHEST_NODE_ID};
+use crate::srs::DynamicSrsResolver;
 use bit_vec::BitVec;
 use georaster::geotiff::{GeoTiffReader, RasterValue};
 use glob::glob;
+use itertools::Itertools;
 use log::error;
 use osm_io::osm::model::coordinate::Coordinate;
 use osm_io::osm::model::node::Node;
@@ -15,10 +12,13 @@ use osm_io::osm::model::relation::Relation;
 use osm_io::osm::model::tag::Tag;
 use osm_io::osm::model::way::Way;
 use proj4rs::Proj;
-use rstar::{AABB, Envelope, Point, PointDistance, RTree, RTreeObject};
-use crate::handler::{Handler, HandlerResult, HIGHEST_NODE_ID};
-use crate::handler::interpolate::WaySplitter;
-use crate::srs::DynamicSrsResolver;
+use rstar::{Envelope, Point, PointDistance, RTree, RTreeObject, AABB};
+use std::collections::{HashMap, HashSet};
+use std::error::Error;
+use std::fs::File;
+use std::io::BufReader;
+use std::panic;
+use std::path::PathBuf;
 
 pub struct GeoTiff {
     proj_wgs_84: Proj,
@@ -743,20 +743,20 @@ impl LocationWithElevation {
 
 #[cfg(test)]
 mod tests {
-    use std::fs::File;
-    use std::io::BufReader;
     use bit_vec::BitVec;
     use epsg::CRS;
     use georaster::geotiff::{GeoTiffReader, RasterValue};
-    use log4rs::config::Logger;
     use log::LevelFilter;
+    use log4rs::config::Logger;
     use osm_io::osm::model::node::Node;
     use osm_io::osm::model::tag::Tag;
     use osm_io::osm::model::way::Way;
     use proj4rs::Proj;
     use simple_logger::SimpleLogger;
+    use std::fs::File;
+    use std::io::BufReader;
 
-    use crate::handler::geotiff::{BufferingElevationEnricher, format_as_elevation_string, GeoTiff, GeoTiffManager, round_f32, round_f64, transform, LocationWithElevation};
+    use crate::handler::geotiff::{format_as_elevation_string, round_f32, round_f64, transform, BufferingElevationEnricher, GeoTiff, GeoTiffManager, LocationWithElevation};
     use crate::handler::{Handler, HIGHEST_NODE_ID};
     use crate::srs::DynamicSrsResolver;
 
