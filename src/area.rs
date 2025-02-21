@@ -55,6 +55,15 @@ pub(crate) struct AreaIntersect {
     geo: MultiPolygon<f64>,
 }
 
+pub fn wkt_string_to_multipolygon(wkt_string: &str) -> Result<MultiPolygon<f64>, Box<dyn Error>> {
+    let geo: Wkt<f64> = Wkt::from_str(wkt_string)?;
+    match geo.item {
+        Geometry::MultiPolygon(mp) => Ok(mp.into()),
+        Geometry::Polygon(p) => Ok(p.into()),
+        _ => Err("Unsupported geometry type".into()),
+    }
+}
+
 impl Default for AreaHandler {
     fn default() -> Self {
         Self {
@@ -95,26 +104,22 @@ impl AreaHandler {
         let mut index: u16 = 1;
         for result in rdr.deserialize() {
             let record: Record = result?;
-            let geo: Wkt<f64> = Wkt::from_str(record.geo.as_str())?;
-            let _ls = match geo.item {
-                Geometry::MultiPolygon(mp) => {
-                    let converted: MultiPolygon = mp.into();
-                    self.add_area(index, &record.id, &record.name, &converted);
+            let converted = wkt_string_to_multipolygon(record.geo.as_str());
+            match converted {
+                Ok (mp) => {
+                    self.add_area(index, &record.id, &record.name, &mp);
                 }
-                Geometry::Polygon(p) => {
-                    let converted: MultiPolygon = p.into();
-                    self.add_area(index, &record.id, &record.name, &converted);
-                }
-                _ => {
+                Err(e) => {
                     log::warn!("Area CSV file contains row with unsupported geometry! ID: {}, Name: {}", record.id, record.name);
                 }
-            };
+            }
             index = index + 1;
         }
         AreaHandler::save_area_records(file_basename, &self.mapping);
 
         Ok(())
     }
+
 
     fn add_area(&mut self, index: u16, id: &String, name: &String, area_geometry: &MultiPolygon) {
         self.mapping.id.insert(index, id.to_string());
@@ -161,7 +166,7 @@ impl AreaHandler {
         wtr.flush().expect("failed to flush");
     }
     fn handle_node(&mut self, node: &mut Node) {
-        let mut result: Vec<String> = Vec::new();
+        let mut result_vec: Vec<String> = Vec::new();
         if node.coordinate().lat() >= 90.0 || node.coordinate().lat() <= -90.0 {
             return;
         }
@@ -175,33 +180,33 @@ impl AreaHandler {
                 self.country_found_node_count += 1;
                 for area in self.mapping.area.get_vec(&(grid_index as u16)).unwrap() {
                     if area.geo.contains(&coord) {
-                        result.push(self.mapping.id[&area.id].to_string())
+                        result_vec.push(self.mapping.id[&area.id].to_string())
                     }
                 }
             }
-            x => { // single area
+            area_id => { // single area
                 // debug!("index: {x}");
                 self.country_found_node_count += 1;
-                result.push(self.mapping.id[&x].to_string())
+                result_vec.push(self.mapping.id[&area_id].to_string())
             }
         }
         let node = node;
-        if ! result.is_empty() {
-            node.tags_mut().push(Tag::new("country".to_string(), result.join(",")));
+        if ! result_vec.is_empty() {
+            node.tags_mut().push(Tag::new("country".to_string(), result_vec.join(",")));
         }
     }
 }
 
 impl Handler for AreaHandler {
     fn name(&self) -> String { "AreaHandler".to_string() }
-    fn handle_nodes(&mut self, mut elements: Vec<Node>) -> Vec<Node> {
-        elements.iter_mut().for_each(|node| self.handle_node(node));
-        elements
+
+    fn handle_result(&mut self, result: &mut HandlerResult) {
+        result.nodes.iter_mut().for_each(|node| self.handle_node(node));
+        result.country_not_found_node_count = self.country_not_found_node_count;
+        result.country_found_node_count = self.country_found_node_count;
     }
 
     fn add_result(&mut self, result: &mut HandlerResult){
-        result.country_not_found_node_count = self.country_not_found_node_count;
-        result.country_found_node_count = self.country_found_node_count;
         result.other.insert("mapping".to_string(), format!("index:{} area:{} id:{} name:{}",
                                                            &self.mapping.index.len(),
                                                            &self.mapping.area.len(),
@@ -212,5 +217,69 @@ impl Handler for AreaHandler {
 
 #[cfg(test)]
 mod tests {
-    //TODO: Add unit tests for AreaHandler
+    use osm_io::osm::model::coordinate::Coordinate;
+    use super::*;
+    struct LonLat {
+        lon: f64,
+        lat: f64,
+    }
+    impl LonLat {
+        fn new(lon: f64, lat: f64) -> Self {
+            Self { lon, lat }
+        }
+        fn c(&self) -> Coordinate {
+            Coordinate::new(self.lat, self.lon)
+        }
+    }
+    #[ignore]
+    #[test]
+    fn test_area_handler() {
+        let mut area_handler = AreaHandler::default();
+        // outer rings counter clockwise and closed, two touching areas, e.g. with one common edge
+        area_handler.add_area(
+            1, &"SQA".to_string(), &"Squareland".to_string(),
+            &wkt_string_to_multipolygon("POLYGON((1.0 1.0, 1.0 2.0, 2.0 2.0, 2.0 1.0, 1.0 1.0))").unwrap()
+        );
+        area_handler.add_area(
+            2, &"REC".to_string(), &"Rectanglia".to_string(),
+            &wkt_string_to_multipolygon("MULTIPOLYGON(((2.0 1.0, 2.0 2.0, 4.0 2.0, 4.0 1.0, 2.0 1.0)))").unwrap()
+        );
+        // a single, unconnected tiangular area
+        area_handler.add_area(
+            3, &"TRI".to_string(), &"Trianglia".to_string(),
+            &wkt_string_to_multipolygon("MULTIPOLYGON(((5.0 1.0, 7.0 1.0, 6.0 2.0, 5.0 1.0)))").unwrap()
+            // &wkt_string_to_multipolygon("MULTIPOLYGON(((5.0 1.0, 6.0 2.0, 7.0 1.0, 5.0 1.0)))").unwrap()
+        );
+
+        AreaHandler::save_area_records("test_area_handler", &area_handler.mapping);
+        /*
+        |
+       2| ssbrrrr   t
+        | ssbrrrr  ttt
+       1| ssbrrrr ttttt
+        |
+        +----------------
+          1 2 3 4 5 6 7 8
+         */
+        //MULTIPOINT((1.5 1.5), (3.0 1.5), (2.0 1.5), (6.0 1.5), (1.0 3.0))
+
+        let mut result = HandlerResult::default();
+        result.nodes.push(Node::new(0, 1, LonLat::new(1.5, 1.5).c(), 1, 1, 1, "s".to_string(), true, vec![]));
+        result.nodes.push(Node::new(1, 1, LonLat::new(3.0, 1.5).c(), 1, 1, 1, "r".to_string(), true, vec![]));
+        result.nodes.push(Node::new(2, 1, LonLat::new(2.0, 1.5).c(), 1, 1, 1, "b".to_string(), true, vec![]));
+        result.nodes.push(Node::new(3, 1, LonLat::new(6.0, 1.5).c(), 1, 1, 1, "t".to_string(), true, vec![]));
+        result.nodes.push(Node::new(4, 1, LonLat::new(1.0, 3.0).c(), 1, 1, 1, "_".to_string(), true, vec![]));
+
+        area_handler.handle_result(&mut result);
+        println!("{} {} {:?}", &result.nodes[0].id(),  &result.nodes[0].user(), &result.nodes[0].tags());
+        println!("{} {} {:?}", &result.nodes[1].id(),  &result.nodes[1].user(), &result.nodes[1].tags());
+        println!("{} {} {:?}", &result.nodes[2].id(),  &result.nodes[2].user(), &result.nodes[2].tags());
+        println!("{} {} {:?}", &result.nodes[3].id(),  &result.nodes[3].user(), &result.nodes[3].tags());
+        println!("{} {} {:?}", &result.nodes[4].id(),  &result.nodes[4].user(), &result.nodes[4].tags());
+        assert!(result.nodes[0].tags().iter().any(|tag| { tag.k() == "country" && tag.v() == "SQA"}));
+        assert!(result.nodes[1].tags().iter().any(|tag| { tag.k() == "country" && tag.v() == "REC"}));
+        assert!(result.nodes[2].tags().iter().any(|tag| { tag.k() == "country" && (tag.v() == "SQA,REC" || tag.v() == "REC,SQA")}));
+        assert!(result.nodes[3].tags().iter().all(|tag| { tag.k() == "country" && tag.v() == "TRI"}));
+        assert!(result.nodes[4].tags().iter().all(|tag| tag.k() != "country"));
+    }
 }
