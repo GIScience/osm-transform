@@ -140,7 +140,7 @@ impl HandlerResult {
     pub(crate) fn default() -> Self {
         Self::with_capacity(HIGHEST_NODE_ID as usize)
     }
-    fn with_capacity(nbits: usize) -> Self {
+    pub(crate) fn with_capacity(nbits: usize) -> Self {
         HandlerResult {
             nodes: vec![],
             ways: vec![],
@@ -171,6 +171,21 @@ impl HandlerResult {
 
             other: hashmap! {},
         }
+    }
+    pub(crate) fn with_nodes(&self, nodes: Vec<Node>) -> Self {
+        let mut result = Self::default();
+        result.nodes = nodes;
+        result
+    }
+    pub(crate) fn with_ways(&self, ways: Vec<Way>) -> Self {
+        let mut result = Self::default();
+        result.ways = ways;
+        result
+    }
+    pub(crate) fn with_relations(&self, relations: Vec<Relation>) -> Self {
+        let mut result = Self::default();
+        result.relations = relations;
+        result
     }
 
     pub(crate) fn format_multi_line(&self) -> String {

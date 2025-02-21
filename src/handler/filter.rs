@@ -124,31 +124,22 @@ impl Handler for TagFilterByKey {
         "TagFilterByKey".to_string()
     }
 
-    fn handle_nodes(&mut self, mut nodes: Vec<Node>) -> Vec<Node> {
+    fn handle_result(&mut self, result: &mut HandlerResult) {
         if self.handle_types.node {
-            for node in nodes.iter_mut() {
+            for node in result.nodes.iter_mut() {
                 self.filter_tags(node.tags_mut());
             }
         }
-        nodes
-    }
-
-    fn handle_ways(&mut self, mut ways: Vec<Way>) -> Vec<Way> {
         if self.handle_types.way {
-            for way in ways.iter_mut() {
+            for way in result.ways.iter_mut() {
                 self.filter_tags( way.tags_mut());
             }
         }
-        ways
-    }
-
-    fn handle_relations(&mut self, mut relations: Vec<Relation>) -> Vec<Relation> {
         if self.handle_types.relation {
-            for relation in relations.iter_mut() {
+            for relation in result.relations.iter_mut() {
                 self.filter_tags(&mut relation.tags_mut());
             }
         }
-        relations
     }
 }
 
@@ -281,13 +272,13 @@ mod test {
     use crate::handler::{Handler, HandlerResult, OsmElementTypeSelection};
 
     #[test]
-    fn test_tag_filter_by_key_with_remove_matching() {
+    fn test_tag_filter_by_key_handle_result_with_remove_matching() {
         let mut tag_filter = TagFilterByKey::new(
             OsmElementTypeSelection::node_only(),
             Regex::new(".*bad.*").unwrap(),
             FilterType::RemoveMatching);
 
-        let handled_nodes = tag_filter.handle_nodes(vec![Node::new(1, 1, Coordinate::new(1.0f64, 1.1f64), 1, 1, 1, "a".to_string(), true,
+        let mut result = HandlerResult::default().with_nodes(vec![Node::new(1, 1, Coordinate::new(1.0f64, 1.1f64), 1, 1, 1, "a".to_string(), true,
                                                              vec![
                                                                  Tag::new("bad".to_string(), "hotzenplotz".to_string()),
                                                                  Tag::new("good".to_string(), "kasper".to_string()),
@@ -295,8 +286,31 @@ mod test {
                                                                  Tag::new("more-good".to_string(), "grandma".to_string()),
                                                                  Tag::new("badest".to_string(), "voldemort".to_string()),
                                                              ])]);
-        assert_eq!(1, handled_nodes.len());
-        let node = handled_nodes.get(0).unwrap();
+        tag_filter.handle_result(&mut result);
+        let node = result.nodes.get(0).unwrap();
+        assert_eq!(node.tags().len(), 2);
+        assert_eq!(node.tags()[0].k(), &"good");
+        assert_eq!(node.tags()[0].v(), &"kasper");
+        assert_eq!(node.tags()[1].k(), &"more-good");
+        assert_eq!(node.tags()[1].v(), &"grandma");
+    }
+    #[test]
+    fn test_tag_filter_by_key_flush_with_remove_matching() {
+        let mut tag_filter = TagFilterByKey::new(
+            OsmElementTypeSelection::node_only(),
+            Regex::new(".*bad.*").unwrap(),
+            FilterType::RemoveMatching);
+
+        let mut result = HandlerResult::default().with_nodes(vec![Node::new(1, 1, Coordinate::new(1.0f64, 1.1f64), 1, 1, 1, "a".to_string(), true,
+                                                             vec![
+                                                                 Tag::new("bad".to_string(), "hotzenplotz".to_string()),
+                                                                 Tag::new("good".to_string(), "kasper".to_string()),
+                                                                 Tag::new("more-bad".to_string(), "vader".to_string()),
+                                                                 Tag::new("more-good".to_string(), "grandma".to_string()),
+                                                                 Tag::new("badest".to_string(), "voldemort".to_string()),
+                                                             ])]);
+        tag_filter.flush(&mut result);
+        let node = result.nodes.get(0).unwrap();
         assert_eq!(node.tags().len(), 2);
         assert_eq!(node.tags()[0].k(), &"good");
         assert_eq!(node.tags()[0].v(), &"kasper");
@@ -305,13 +319,13 @@ mod test {
     }
 
     #[test]
-    fn test_tag_filter_by_key_with_remove_matching_complex_regex() {
+    fn test_tag_filter_by_key_handle_result_with_remove_matching_complex_regex() {
         let mut tag_filter = TagFilterByKey::new(
             OsmElementTypeSelection::node_only(),
             Regex::new("(.*:)?source(:.*)?|(.*:)?note(:.*)?|url|created_by|fixme|wikipedia").unwrap(),
             FilterType::RemoveMatching);
 
-        let handled_nodes = tag_filter.handle_nodes(vec![Node::new(1, 1, Coordinate::new(1.0f64, 1.1f64), 1, 1, 1, "a".to_string(), true,
+        let mut result = HandlerResult::default().with_nodes(vec![Node::new(1, 1, Coordinate::new(1.0f64, 1.1f64), 1, 1, 1, "a".to_string(), true,
                                                              vec![
                                                                  Tag::new("closed:source".to_string(), "bad".to_string()),
                                                                  Tag::new("source".to_string(), "bad".to_string()),
@@ -325,8 +339,36 @@ mod test {
                                                                  Tag::new("wikipedia".to_string(), "bad".to_string()),
                                                                  Tag::new("wikimedia".to_string(), "good".to_string()),
                                                              ])]);
-        assert_eq!(1, handled_nodes.len());
-        let node = handled_nodes.get(0).unwrap();
+        tag_filter.handle_result(&mut result);
+        let node = result.nodes.get(0).unwrap();
+        assert_eq!(node.tags().len(), 1);
+        for tag in node.tags() {
+            assert_eq!(tag.v(), "good")
+        }
+    }
+    #[test]
+    fn test_tag_filter_by_key_flush_with_remove_matching_complex_regex() {
+        let mut tag_filter = TagFilterByKey::new(
+            OsmElementTypeSelection::node_only(),
+            Regex::new("(.*:)?source(:.*)?|(.*:)?note(:.*)?|url|created_by|fixme|wikipedia").unwrap(),
+            FilterType::RemoveMatching);
+
+        let mut result = HandlerResult::default().with_nodes(vec![Node::new(1, 1, Coordinate::new(1.0f64, 1.1f64), 1, 1, 1, "a".to_string(), true,
+                                                             vec![
+                                                                 Tag::new("closed:source".to_string(), "bad".to_string()),
+                                                                 Tag::new("source".to_string(), "bad".to_string()),
+                                                                 Tag::new("source:x".to_string(), "bad".to_string()),
+                                                                 Tag::new("x:source:y".to_string(), "bad".to_string()),
+                                                                 Tag::new("opensource".to_string(), "bad".to_string()), //really?
+                                                                 Tag::new("note".to_string(), "bad".to_string()),
+                                                                 Tag::new("url".to_string(), "bad".to_string()),
+                                                                 Tag::new("created_by".to_string(), "bad".to_string()),
+                                                                 Tag::new("fixme".to_string(), "bad".to_string()),
+                                                                 Tag::new("wikipedia".to_string(), "bad".to_string()),
+                                                                 Tag::new("wikimedia".to_string(), "good".to_string()),
+                                                             ])]);
+        tag_filter.flush(&mut result);
+        let node = result.nodes.get(0).unwrap();
         assert_eq!(node.tags().len(), 1);
         for tag in node.tags() {
             assert_eq!(tag.v(), "good")
@@ -339,8 +381,7 @@ mod test {
             OsmElementTypeSelection::all(),
             Regex::new(".*good.*").unwrap(),
             FilterType::AcceptMatching);
-
-        let handled_nodes = tag_filter.handle_nodes(vec![Node::new(1, 1, Coordinate::new(1.0f64, 1.1f64), 1, 1, 1, "a".to_string(), true,
+        let mut result = HandlerResult::default().with_nodes(vec![Node::new(1, 1, Coordinate::new(1.0f64, 1.1f64), 1, 1, 1, "a".to_string(), true,
                                                              vec![
                                                                  Tag::new("bad".to_string(), "hotzenplotz".to_string()),
                                                                  Tag::new("good".to_string(), "kasper".to_string()),
@@ -348,9 +389,8 @@ mod test {
                                                                  Tag::new("more-good".to_string(), "grandma".to_string()),
                                                                  Tag::new("badest".to_string(), "voldemort".to_string()),
                                                              ])]);
-        assert_eq!(1, handled_nodes.len());
-        // let node = &handled_nodes[0];
-        let node = handled_nodes.get(0).unwrap();
+        tag_filter.handle_result(&mut result);
+        let node = result.nodes.get(0).unwrap();
         assert_eq!(node.tags().len(), 2);
         assert_eq!(node.tags().len(), 2);
         assert_eq!(node.tags()[0].k(), &"good");
@@ -365,14 +405,14 @@ mod test {
             Regex::new(".*").unwrap(),
             FilterType::RemoveMatching);
 
-        let handled_nodes = tag_filter.handle_nodes(vec![Node::new(1, 1, Coordinate::new(1.0f64, 1.1f64), 1, 1, 1, "a".to_string(), true,
+        let mut result = HandlerResult::default().with_nodes(vec![Node::new(1, 1, Coordinate::new(1.0f64, 1.1f64), 1, 1, 1, "a".to_string(), true,
                                                              vec![
                                                                  Tag::new("a".to_string(), "1".to_string()),
                                                                  Tag::new("b".to_string(), "2".to_string()),
                                                                  Tag::new("c".to_string(), "3".to_string()),
                                                              ])]);
-        assert_eq!(1, handled_nodes.len());
-        let node = handled_nodes.get(0).unwrap();
+        tag_filter.handle_result(&mut result);
+        let node = result.nodes.get(0).unwrap();
         assert_eq!(node.tags().len(), 3);
     }
     #[test]
@@ -382,14 +422,14 @@ mod test {
             Regex::new(".*").unwrap(),
             FilterType::RemoveMatching);
 
-        let handled_nodes = tag_filter.handle_nodes(vec![Node::new(1, 1, Coordinate::new(1.0f64, 1.1f64), 1, 1, 1, "a".to_string(), true,
+        let mut result = HandlerResult::default().with_nodes(vec![Node::new(1, 1, Coordinate::new(1.0f64, 1.1f64), 1, 1, 1, "a".to_string(), true,
                                                              vec![
                                                                  Tag::new("a".to_string(), "1".to_string()),
                                                                  Tag::new("b".to_string(), "2".to_string()),
                                                                  Tag::new("c".to_string(), "3".to_string()),
                                                              ])]);
-        assert_eq!(handled_nodes.len(), 1);
-        let node = handled_nodes.get(0).unwrap();
+        tag_filter.handle_result(&mut result);
+        let node = result.nodes.get(0).unwrap();
         assert_eq!(node.tags().len(), 0);
     }
     #[test]
