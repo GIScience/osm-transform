@@ -206,7 +206,7 @@ impl GeoTiffManager {
     }
 
     pub fn load_geotiff(&mut self, file_path: &str) -> Result<GeoTiff, Box<dyn Error>> {
-        log::debug!("Loading geotiff {}", file_path);
+        log::trace!("Loading geotiff {}", file_path);
         let img_file = BufReader::new(File::open(file_path).expect(format!("Could not open input file {}", file_path).as_str()));
         let geotiffreader = GeoTiffReader::open(img_file).expect(format!("Could not read input file {} as tiff", file_path).as_str());
 

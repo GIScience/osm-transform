@@ -380,6 +380,7 @@ Unsplitted ways: {unsplitted_way_count}
 #[derive(Default)]
 pub(crate) struct HandlerChain {
     pub processors: Vec<Box<dyn Handler>>,
+    first_node_received: bool,
     flushed_nodes: bool,
     flushed_ways:  bool,
 }
@@ -392,11 +393,13 @@ impl HandlerChain {
         log::trace!("######");
         log::trace!("###### Processing {}", format_element_id(&element));
         log::trace!("######");
-        result.nodes.clear();
-        result.ways.clear();
-        result.relations.clear();
+        result.clear_elements();
         match element {
             Element::Node { node } => {
+                if !self.first_node_received {
+                    log::info!("Reading nodes...");
+                    self.first_node_received = true;
+                }
                 result.nodes.push(node.clone());
                 self.handle_element(vec![node], vec![], vec![], result);
             },
@@ -404,6 +407,7 @@ impl HandlerChain {
                 if !self.flushed_nodes {
                     self.flush_handlers(result);
                     self.flushed_nodes = true;
+                    log::info!("Reading ways...");
                 }
                 result.ways.push(way.clone());
                 self.handle_element(vec![], vec![way], vec![], result)
@@ -412,15 +416,14 @@ impl HandlerChain {
                 if !self.flushed_ways {
                     self.flush_handlers(result);
                     self.flushed_ways = true;
+                    log::info!("Reading relations...");
                 }
                 result.relations.push(relation.clone());
                 self.handle_element(vec![], vec![], vec![relation], result)
             },
             _ => (),
         }
-        result.nodes.clear();
-        result.ways.clear();
-        result.relations.clear();
+        result.clear_elements();
     }
 
     fn handle_element(&mut self, mut nodes: Vec<Node>, mut ways: Vec<Way>, mut relations: Vec<Relation>, result: &mut HandlerResult) {
@@ -445,9 +448,7 @@ impl HandlerChain {
             processor.flush(result)
         }
         log::trace!("HandlerChain.flush_handlers all handlers have flushed - clearing elements");
-        result.nodes.clear();
-        result.ways.clear();
-        result.relations.clear();
+        result.clear_elements();
     }
 
     pub(crate) fn collect_result(&mut self, result: &mut HandlerResult) {

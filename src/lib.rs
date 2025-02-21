@@ -14,6 +14,7 @@ use benchmark_rs::stopwatch::StopWatch;
 use log4rs::append::console::ConsoleAppender;
 use log4rs::config::{Appender, Logger, Root};
 use log::LevelFilter;
+use osm_io::osm::pbf;
 use regex::Regex;
 use crate::io::process_with_handler;
 use area::AreaHandler;
@@ -52,20 +53,32 @@ pub fn init(config: &Config) {
 }
 
 pub fn run(config: &Config) -> HandlerResult {
-    let mut stopwatch = StopWatch::new();
-    stopwatch.start();
+    let mut stopwatch_total = StopWatch::new();
+    stopwatch_total.start();
 
     let mut result = HandlerResult::default();
-    extract_referenced_nodes(config, &mut result);
-    result.clear_counts();
-    process(config, &mut result);
+    // let (node_count, way_count, relation_count) = count_elements(config).expect("Counting elements failed");
+    run_filter_chain(config, &mut result);
+    run_processing_chain(config, &mut result);
 
-    log::info!("Total processing time: {}", stopwatch);
-    stopwatch.stop();
+    log::info!("Total processing time: {}", stopwatch_total);
+    stopwatch_total.stop();
+    result
+}
+fn count_elements(config: &Config) -> Result<(i64, i64, i64), anyhow::Error> {
+    log::info!("Counting pbf elements...");
+    let mut stopwatch = StopWatch::new();
+    stopwatch.start();
+    let reader = pbf::reader::Reader::new(&config.input_pbf)?;
+    let result = reader.count_objects();
+    log::info!("Counting pbf elements {:?} nodes, ways, relations, time: {}", &result, stopwatch);
     result
 }
 
-fn extract_referenced_nodes(config: &Config, result: &mut HandlerResult){
+fn run_filter_chain(config: &Config, result: &mut HandlerResult){
+    let mut stopwatch_run_filter_chain = StopWatch::new();
+    stopwatch_run_filter_chain.start();
+    log::info!("Filtering pbf elements...");
     let mut handler_chain = HandlerChain::default()
         .add(ElementCounter::new(InputCount))
         .add(AllElementsFilter{handle_types: OsmElementTypeSelection::node_only()})
@@ -80,18 +93,14 @@ fn extract_referenced_nodes(config: &Config, result: &mut HandlerResult){
         handler_chain = handler_chain.add(SkipElevationNodeCollector::default())
     }
     //todo add IdCollector{handle_types: OsmElementTypeSelection::way_relation()}
-    log::info!("Starting extraction of referenced node ids...");
-    let mut stopwatch = StopWatch::new();
-    stopwatch.start();
     let _ = process_with_handler(config, &mut handler_chain, result).expect("Extraction of referenced node ids failed");
     handler_chain.collect_result(result);
-
-    log::info!("Finished extraction of referenced node ids, time: {}", stopwatch);
-    log::debug!("First pass HandlerResult: {}", result.format_one_line());
-    stopwatch.reset();
+    log::info!("Filtering pbf elements done, time: {}", stopwatch_run_filter_chain);
+    stopwatch_run_filter_chain.stop();
 }
 
-fn process(config: &Config, first_pass_result: &mut HandlerResult) {
+fn run_processing_chain(config: &Config, result: &mut HandlerResult) {
+    result.clear_counts();
     let mut handler_chain = HandlerChain::default()
         .add(ElementCounter::new(InputCount))
         .add(ElementPrinter::with_prefix("\ninput:----------------\n".to_string())
@@ -114,46 +123,47 @@ fn process(config: &Config, first_pass_result: &mut HandlerResult) {
     let mut stopwatch = StopWatch::new();
     match &config.country_csv {
         Some(path_buf) => {
-            log::debug!("Reading area mapping CSV");
+            log::info!("Creating spatial country index...");
             stopwatch.start();
             let mut area_handler = AreaHandler::default();
             area_handler.load(path_buf.clone()).expect("Area handler failed to load CSV file");
             log::debug!("Loaded: {} areas", area_handler.mapping.id.len());
-            log::debug!("Finished reading area mapping, time: {}", stopwatch);
-            handler_chain = handler_chain.add(area_handler);
+            log::info!("Creating spatial country index done, time: {}", stopwatch);
             stopwatch.reset();
+
+            handler_chain = handler_chain.add(area_handler);
         }
-        None => ()
+        None => (),
     }
 
     if &config.elevation_tiffs.len() > &0 {
         stopwatch.start();
-        log::debug!("Initializing elevation geotiff_manager");
+        log::info!("Creating spatial elevation index...");
         let geotiff_manager: GeoTiffManager = GeoTiffManager::with_file_patterns(config.elevation_tiffs.clone());
-        log::debug!("Finished initializing geotiff_manager, time: {}", stopwatch);
-        stopwatch.reset();
         let elevation_enricher = BufferingElevationEnricher::new(
             geotiff_manager,
             config.elevation_batch_size,
             config.elevation_total_buffer_size,
-            first_pass_result.skip_ele.clone(),
+            result.skip_ele.clone(),
             config.elevation_way_splitting,
             config.resolution_lon,
             config.resolution_lat,
             config.elevation_threshold);
-        if log::log_enabled!(log::Level::Debug) || log::log_enabled!(log::Level::Trace) {
-            handler_chain = handler_chain.add(ElementPrinter::with_prefix(" before elevation_enricher:----------------\n".to_string())
+        if log::log_enabled!(log::Level::Trace) {
+            handler_chain = handler_chain.add(ElementPrinter::with_prefix(" before BufferingElevationEnricher:----------------\n".to_string())
                 .with_node_ids(config.print_node_ids.clone())
                 .with_way_ids(config.print_way_ids.clone())
                 .with_relation_ids(config.print_relation_ids.clone()));
         }
         handler_chain = handler_chain.add(elevation_enricher);
-        if log::log_enabled!(log::Level::Debug) || log::log_enabled!(log::Level::Trace) {
-            handler_chain = handler_chain.add(ElementPrinter::with_prefix(" after elevation_enricher:----------------\n".to_string())
+        if log::log_enabled!(log::Level::Trace) {
+            handler_chain = handler_chain.add(ElementPrinter::with_prefix(" after BufferingElevationEnricher:----------------\n".to_string())
                 .with_node_ids(config.print_node_ids.clone())
                 .with_way_ids(config.print_way_ids.clone())
                 .with_relation_ids(config.print_relation_ids.clone()));
         }
+        log::info!("Creating spatial elevation index done, time: {}", stopwatch);
+        stopwatch.reset();
     }
 
     handler_chain = handler_chain.add(TagFilterByKey::new(
@@ -171,8 +181,6 @@ fn process(config: &Config, first_pass_result: &mut HandlerResult) {
 
     match &config.output_pbf {
         Some(path_buf) => {
-            log::debug!("Initializing output handler");
-            stopwatch.start();
             if config.elevation_way_splitting == true {
                 let mut output_handler = SplittingOutputHandler::new(path_buf.clone());
                 output_handler.init();
@@ -182,20 +190,18 @@ fn process(config: &Config, first_pass_result: &mut HandlerResult) {
                 output_handler.init();
                 handler_chain = handler_chain.add(output_handler);
             }
-            stopwatch.reset();
         }
         None => {}
     }
 
-    log::info!("Starting processing of pbf elements...");
-    let mut stopwatch = StopWatch::new();
-    stopwatch.start();
-    let _ = process_with_handler(config, &mut handler_chain, first_pass_result).expect("Processing failed");
-    handler_chain.collect_result(first_pass_result);
-    log::info!("Finished processing of pbf elements, time: {}", stopwatch);
-    log::debug!("Second pass HandlerResult: {}", first_pass_result.format_multi_line());
+    log::info!("Processing pbf elements...");
     stopwatch.reset();
-
+    stopwatch.start();
+    let _ = process_with_handler(config, &mut handler_chain, result).expect("Processing failed");
+    handler_chain.collect_result(result);
+    log::info!("Processing pbf elements done, time: {}", stopwatch);
+    log::debug!("Processing pbf elements HandlerResult: {}", result.format_multi_line());
+    stopwatch.reset();
 }
 
 #[derive(Debug, Default)]

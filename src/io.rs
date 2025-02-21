@@ -6,8 +6,6 @@ use crate::Config;
 use crate::handler::{HandlerChain, HandlerResult};
 
 pub(crate) fn process_with_handler(config: &Config, handler_chain: &mut HandlerChain, result: &mut HandlerResult) -> Result<(), anyhow::Error> {
-    let mut stopwatch = StopWatch::new();
-    stopwatch.start();
     let reader = pbf::reader::Reader::new(&config.input_pbf)?;
 
     for element in reader.elements()? {

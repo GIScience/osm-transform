@@ -1,4 +1,5 @@
 use std::path::PathBuf;
+use benchmark_rs::stopwatch::StopWatch;
 use osm_io::osm::model::element::Element;
 use osm_io::osm::model::node::Node;
 use osm_io::osm::model::relation::Relation;
@@ -80,11 +81,6 @@ impl SplittingOutputHandler {
         self.way_relation_writer.write_header().expect("way_relation writer failed to write header");
     }
 
-    pub fn close(&mut self) {
-        log::info!("Closing both writers");
-        self.node_writer.close().expect("Failed to close writer");
-        self.way_relation_writer.close().expect("Failed to close writer");
-    }
 }
 
 impl Handler for SplittingOutputHandler {
@@ -109,7 +105,10 @@ impl Handler for SplittingOutputHandler {
         self.way_relation_writer.close().expect("Failed to close way_relation_writer");
         self.node_writer.close().expect("Failed to close node writer");
         result.other.insert("output files".to_string(), format!("{:?}, {:?}", &self.way_relation_writer.path() , &self.node_writer.path()));
-        log::info!("Reading the newly generated file {:?} and appending all elements to {:?}...", &self.way_relation_writer.path(), &self.node_writer.path());
+        log::debug!("Reading the newly generated file {:?} and appending all elements to {:?}...", &self.way_relation_writer.path(), &self.node_writer.path());
+        log::info!("Merging output to {:?}...", &self.node_writer.path().as_os_str());
+        let mut stopwatch = StopWatch::new();
+        stopwatch.start();
         let fresh_way_relation_reader = pbf::reader::Reader::new(&self.way_relation_writer.path());
         match fresh_way_relation_reader {
             Ok(reader) => {
@@ -121,5 +120,7 @@ impl Handler for SplittingOutputHandler {
             Err(_) => {}
         }
         self.node_writer.close().expect("Failed to close node writer");
+        log::info!("Merging output to {:?} done, time: {}", &self.node_writer.path(), stopwatch);
+        stopwatch.stop();
     }
 }
