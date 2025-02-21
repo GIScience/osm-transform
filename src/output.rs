@@ -34,25 +34,17 @@ impl SimpleOutputHandler {
 impl Handler for SimpleOutputHandler {
     fn name(&self) -> String { "OutputHandler".to_string() }
 
-    fn handle_nodes(&mut self, elements: Vec<Node>) -> Vec<Node> {
-        for element in elements {
-            self.writer.write_element(into_node_element(element)).expect("Failed to write node");
-        }
-        Vec::new()
-    }
-
-    fn handle_ways(&mut self, elements: Vec<Way>) -> Vec<Way> {
-        for element in elements {
-            self.writer.write_element(into_way_element(element)).expect("Failed to write way");
-        }
-        Vec::new()
-    }
-
-    fn handle_relations(&mut self, elements: Vec<Relation>) -> Vec<Relation> {
-        for element in elements {
-            self.writer.write_element(into_relation_element(element)).expect("Failed to write relation");
-        }
-        Vec::new()
+    fn handle_result(&mut self, result: &mut HandlerResult) {
+        result.nodes.iter().for_each(|node| {
+            self.writer.write_element( Element::Node { node: node.clone() }).expect("Failed to write node");
+        });
+        result.ways.iter().for_each(|way| {
+            self.writer.write_element( Element::Way { way: way.clone() }).expect("Failed to write way");
+        });
+        result.relations.iter().for_each(|relation| {
+            self.writer.write_element( Element::Relation { relation: relation.clone() }).expect("Failed to write relation");
+        });
+        result.clear_elements();
     }
 
     fn add_result(&mut self, result: &mut HandlerResult) {
@@ -99,26 +91,20 @@ impl Handler for SplittingOutputHandler {
     fn name(&self) -> String {
         "SplittingOutputHandler".to_string()
     }
-    fn handle_nodes(&mut self, nodes: Vec<Node>) -> Vec<Node> {
-        for node in nodes {
-            self.node_writer.write_element( Element::Node { node } ).expect("Failed to write node");
-        }
-        vec![]
+
+    fn handle_result(&mut self, result: &mut HandlerResult) {
+        result.nodes.iter().for_each(|node| {
+            self.node_writer.write_element( Element::Node { node: node.clone() }).expect("Failed to write node");
+        });
+        result.ways.iter().for_each(|way| {
+            self.way_relation_writer.write_element( Element::Way { way: way.clone() }).expect("Failed to write way");
+        });
+        result.relations.iter().for_each(|relation| {
+            self.way_relation_writer.write_element( Element::Relation { relation: relation.clone() }).expect("Failed to write relation");
+        });
+        result.clear_elements();
     }
 
-    fn handle_ways(&mut self, ways: Vec<Way>) -> Vec<Way> {
-        for way in ways {
-            self.way_relation_writer.write_element(Element::Way { way }).expect("Failed to write way");
-        }
-        vec![]
-    }
-
-    fn handle_relations(&mut self, relations: Vec<Relation>) -> Vec<Relation> {
-        for relation in relations {
-            self.way_relation_writer.write_element(Element::Relation { relation }).expect("Failed to write relation");
-        }
-        vec![]
-    }
     fn add_result(&mut self, result: &mut HandlerResult) {
         self.way_relation_writer.close().expect("Failed to close way_relation_writer");
         self.node_writer.close().expect("Failed to close node writer");
