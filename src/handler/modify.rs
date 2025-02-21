@@ -1,7 +1,7 @@
 use osm_io::osm::model::node::Node;
 use osm_io::osm::model::relation::Relation;
 use osm_io::osm::model::way::Way;
-use crate::handler::Handler;
+use crate::handler::{Handler, HandlerResult};
 
 #[derive(Default)]
 pub(crate) struct MetadataRemover;
@@ -23,19 +23,10 @@ impl Handler for MetadataRemover {
         "MetadataRemover".to_string()
     }
 
-    fn handle_nodes(&mut self, mut elements: Vec<Node>) -> Vec<Node> {
-        elements.iter_mut().for_each(|element| self.handle_node(element));
-        elements
-    }
-
-    fn handle_ways(&mut self, mut elements: Vec<Way>) -> Vec<Way> {
-        elements.iter_mut().for_each(|element| self.handle_way(element));
-        elements
-    }
-
-    fn handle_relations(&mut self, mut elements: Vec<Relation>) -> Vec<Relation> {
-        elements.iter_mut().for_each(|element| self.handle_relation(element));
-        elements
+    fn handle_result(&mut self, result: &mut HandlerResult) {
+        result.nodes.iter_mut().for_each(|element| self.handle_node(element));
+        result.ways.iter_mut().for_each(|element| self.handle_way(element));
+        result.relations.iter_mut().for_each(|element| self.handle_relation(element));
     }
 }
 
@@ -47,17 +38,19 @@ mod test {
     use osm_io::osm::model::relation::{Member, MemberData, Relation};
     use osm_io::osm::model::tag::Tag;
     use osm_io::osm::model::way::Way;
-    use crate::handler::Handler;
+    use crate::handler::{Handler, HandlerResult};
     use crate::handler::modify::MetadataRemover;
 
     #[test]
     fn metadata_remover_node() {
         let mut metadata_remover = MetadataRemover::default();
-        let binding = metadata_remover.handle_nodes(vec![Node::new(1, 1, Coordinate::new(1.0f64, 1.1f64), 1, 1, 1, "a".to_string(), true,vec![
+        let mut result = HandlerResult::default();
+        result.nodes.push(Node::new(1, 1, Coordinate::new(1.0f64, 1.1f64), 1, 1, 1, "a".to_string(), true,vec![
             Tag::new("a".to_string(), "x".to_string()),
             Tag::new("b".to_string(), "y".to_string()),
-        ])]);
-        let node = binding.get(0).unwrap();
+        ]));
+        metadata_remover.handle_result(&mut result);
+        let node = &result.nodes[0];
 
         assert_eq!(node.id(), 1);
         assert_eq!(node.version(), 0);
@@ -77,11 +70,13 @@ mod test {
     #[test]
     fn metadata_remover_way() {
         let mut metadata_remover = MetadataRemover::default();
-        let binding = metadata_remover.handle_ways(vec![Way::new(1, 1, 1, 1, 1, "user".to_string(), true, vec![4, 6], vec![
+        let mut result = HandlerResult::default();
+        result.ways.push(Way::new(1, 1, 1, 1, 1, "user".to_string(), true, vec![4, 6], vec![
             Tag::new("a".to_string(), "x".to_string()),
             Tag::new("b".to_string(), "y".to_string()),
-        ])]);
-        let way = binding.get(0).unwrap();
+        ]));
+        metadata_remover.handle_result(&mut result);
+        let way = &result.ways[0];
         assert_eq!(way.id(), 1);
         assert_eq!(way.version(), 0);
         assert_eq!(way.timestamp(), 0);
@@ -100,7 +95,8 @@ mod test {
     #[test]
     fn metadata_remover_relation() {
         let mut metadata_remover = MetadataRemover::default();
-        let binding = metadata_remover.handle_relations(vec![Relation::new(1, 1, 1, 1, 1, "user".to_string(), true, vec![
+        let mut result = HandlerResult::default();
+        result.relations.push(Relation::new(1, 1, 1, 1, 1, "user".to_string(), true, vec![
             Member::Node { member: MemberData::new(5, "a".to_string()) },
             Member::Node { member: MemberData::new(6, "b".to_string()) },
             Member::Way { member: MemberData::new(10, "b".to_string()) },
@@ -108,8 +104,9 @@ mod test {
         ], vec![
             Tag::new("a".to_string(), "x".to_string()),
             Tag::new("b".to_string(), "y".to_string()),
-        ])]);
-        let relation = binding.get(0).unwrap();
+        ]));
+        metadata_remover.handle_result(&mut result);
+        let relation = &result.relations[0];
         assert_eq!(relation.id(), 1);
         assert_eq!(relation.version(), 0);
         assert_eq!(relation.timestamp(), 0);
