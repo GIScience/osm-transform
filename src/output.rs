@@ -114,6 +114,7 @@ impl Handler for SplittingOutputHandler {
             Ok(reader) => {
                 for element in reader.elements().unwrap() {
                     log::trace!("fresh_way_relation_reader copies element {} to node_writer", format_element_id(&element));
+                    //todo print progress
                     self.node_writer.write_element(element).expect("Failed to write element");
                 }
             }

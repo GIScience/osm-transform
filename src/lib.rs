@@ -57,7 +57,7 @@ pub fn run(config: &Config) -> HandlerResult {
     stopwatch_total.start();
 
     let mut result = HandlerResult::default();
-    count_elements(config, &mut result);
+    count_elements(config, &mut result);//todo add cli option for this - only really needed for very large files
     run_filter_chain(config, &mut result);
     run_processing_chain(config, &mut result);
 
@@ -99,7 +99,7 @@ fn run_filter_chain(config: &Config, result: &mut HandlerResult){
     let info_msg = "1.Pass: Filtering pbf elements";
     info!("{}...", info_msg);
     let mut handler_chain = HandlerChain::default()
-        .add(ElementCounter::new(InputCount))
+        .add(ElementCounter::new(InputCount))//todo needed? let io count?
         .add(AllElementsFilter{handle_types: OsmElementTypeSelection::node_only()})
         .add(ComplexElementsFilter::ors_default())
         .add(ElementCounter::new(AcceptedCount));
@@ -118,7 +118,7 @@ fn run_filter_chain(config: &Config, result: &mut HandlerResult){
     stopwatch_run_filter_chain.stop();
 }
 
-fn run_processing_chain(config: &Config, result: &mut HandlerResult) {
+fn run_processing_chain(config: &Config, result: &mut HandlerResult) {//TODO use bitvec filters also for ways and relations
     result.clear_non_input_counts();
     let mut handler_chain = HandlerChain::default()
         .add(ElementCounter::new(InputCount))
@@ -131,7 +131,7 @@ fn run_processing_chain(config: &Config, result: &mut HandlerResult) {
         handler_chain = handler_chain.add(MetadataRemover::default())
     }
 
-    handler_chain = handler_chain.add(ComplexElementsFilter::ors_default());
+    handler_chain = handler_chain.add(ComplexElementsFilter::ors_default());//todo remove when bitvec filters are used
 
     if config.with_node_filtering {//todo move up before metadata remover
         handler_chain = handler_chain.add(NodeIdFilter { });
@@ -196,7 +196,6 @@ fn run_processing_chain(config: &Config, result: &mut HandlerResult) {
         .with_node_ids(config.print_node_ids.clone())
         .with_way_ids(config.print_way_ids.clone())
         .with_relation_ids(config.print_relation_ids.clone()));
-
 
     match &config.output_pbf {
         Some(path_buf) => {

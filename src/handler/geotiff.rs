@@ -5,7 +5,7 @@ use bit_vec::BitVec;
 use georaster::geotiff::{GeoTiffReader, RasterValue};
 use glob::glob;
 use itertools::Itertools;
-use log::error;
+use log::{debug, error, log_enabled, trace, warn};
 use osm_io::osm::model::coordinate::Coordinate;
 use osm_io::osm::model::node::Node;
 use osm_io::osm::model::relation::Relation;
@@ -181,7 +181,7 @@ impl GeoTiffManager {
                                         counter += 1;
                                     }
                                     Err(error) => {
-                                        log::error!("{:?}", error);
+                                        error!("{:?}", error);
                                     }
                                 }
                             }
@@ -195,18 +195,18 @@ impl GeoTiffManager {
         if counter == 0 {
             panic!("No geotiff files found for glob pattern {}", files_pattern);
         }
-        log::debug!("Indexed {} geotiff files for pattern {}", counter, files_pattern);
+        debug!("Indexed {} geotiff files for pattern {}", counter, files_pattern);
     }
 
     fn index_geotiff(&mut self, path: PathBuf, geotiff: GeoTiff) {
         if self.index.get_geotiff_by_id(path.to_str().unwrap()).is_none() {
             self.index.add_geotiff(geotiff, path.to_str().unwrap());
-            log::debug!("Successfully indexed geotiff file {:?}", path);
+            debug!("Successfully indexed geotiff file {:?}", path);
         }
     }
 
     pub fn load_geotiff(&mut self, file_path: &str) -> Result<GeoTiff, Box<dyn Error>> {
-        log::trace!("Loading geotiff {}", file_path);
+        trace!("Loading geotiff {}", file_path);
         let img_file = BufReader::new(File::open(file_path).expect(format!("Could not open input file {}", file_path).as_str()));
         let geotiffreader = GeoTiffReader::open(img_file).expect(format!("Could not read input file {} as tiff", file_path).as_str());
 
@@ -277,13 +277,6 @@ impl GeoTiffIndex for RSGeoTiffIndex {
 
     fn find_geotiff_id_for_wgs84_coord(&mut self, lon: f64, lat: f64) -> Vec<String> {
         let point_to_find = [lon, lat];
-        // for b in self.rtree.iter(){
-        //     dbg!(b);
-        // }
-        // dbg!(&point_to_find);
-        // self.rtree.iter().for_each(|b| {
-        //     println!("{:?}: {}", b.pixel_size, b.id);
-        // });
         self.rtree.locate_all_at_point(&point_to_find)
             .map(|bbox| (bbox.pixel_size, bbox.id.clone()))
             .sorted_by(|a, b| a.0.partial_cmp(&b.0).unwrap())
@@ -327,7 +320,7 @@ impl RTreeObject for RSBoundingBox
 }
 impl PointDistance for RSBoundingBox {
     fn distance_2(&self, _point: &<Self::Envelope as Envelope>::Point) -> <<Self::Envelope as Envelope>::Point as Point>::Scalar {
-        log::warn!("distance_2 was called - but is not implemented");
+        warn!("distance_2 was called - but is not implemented");
         todo!()
     }
 
@@ -420,7 +413,7 @@ impl BufferingElevationEnricher {
         self.elevation_tiffs_used.insert(buffer_name.clone());
         self.flush_count += 1;
         let mut buffer_vec = self.nodes_for_geotiffs.remove(&buffer_name).expect("buffer not found");
-        log::debug!("Handling and flushing buffer with {} buffered nodes for geotiff '{}'", buffer_vec.len(), buffer_name);
+        debug!("Handling and flushing buffer with {} buffered nodes for geotiff '{}'", buffer_vec.len(), buffer_name);
         let geotiff = &mut self.geotiff_manager.load_geotiff(buffer_name.as_str()).expect("could not load geotiff");
         buffer_vec.iter_mut().for_each(|node|
             if self.skip_elevation(node) {
@@ -444,8 +437,8 @@ impl BufferingElevationEnricher {
         match geotiff_name {
             None => {
                 self.ele_lookups_failed += 1;
-                if log::log_enabled!(log::Level::Trace) {
-                    log::warn!("no geotiff found for lon/lat {}/{}", lon, lat);
+                if log_enabled!(log::Level::Trace) {
+                    warn!("no geotiff found for lon/lat {}/{}", lon, lat);
                 }
                 None
             }
@@ -463,8 +456,8 @@ impl BufferingElevationEnricher {
         match result_value {
             None => {
                 self.ele_lookups_failed += 1;
-                if log::log_enabled!(log::Level::Trace) {
-                    log::warn!("no elevation value for node#{}", node.id());
+                if log_enabled!(log::Level::Trace) {
+                    warn!("no elevation value for node#{}", node.id());
                 }
             }
             Some(ele) => {
@@ -490,12 +483,12 @@ impl BufferingElevationEnricher {
         let (buffer_option, node_option) = self.buffer_node(node);
         match buffer_option {
             None => {
-                if log::log_enabled!(log::Level::Trace) {
-                    log::warn!("node#{} was not buffered - no geotiff found for it?", &node_id);
+                if log_enabled!(log::Level::Trace) {
+                    warn!("node#{} was not buffered - no geotiff found for it?", &node_id);
                 }
                 match node_option {
                     None => {
-                        log::error!("buffer_node returned no buffer name and also no node");
+                        error!("buffer_node returned no buffer name and also no node");
                         vec![]
                     }
                     Some(node) => { vec![node] }
@@ -504,7 +497,7 @@ impl BufferingElevationEnricher {
             Some(buffer_name) => {
                 match self.nodes_for_geotiffs.get(&buffer_name) {
                     None => {
-                        log::error!("the map nodes_for_geotiffs contained key {} but no value!", &node_id);
+                        error!("the map nodes_for_geotiffs contained key {} but no value!", &node_id);
                         match node_option {
                             None => vec![],
                             Some(node) => { vec![node] }
@@ -523,7 +516,7 @@ impl BufferingElevationEnricher {
     }
 
     pub(crate) fn handle_way(&mut self, way: &mut Way) -> Vec<Node> {
-        log::trace!("handle_way with WaySplitter called");
+        trace!("handle_way with WaySplitter called");
         if ! self.elevation_way_splitting {
             return vec![];
         }
@@ -541,7 +534,7 @@ impl BufferingElevationEnricher {
             let from_location = self.node_cache.get(&from_node_id);
             let to_location = self.node_cache.get(&to_node_id);
             if from_location.is_none() || to_location.is_none() {
-                log::trace!("{}.handle_way#{}: Cannot split way segment: node_cache does not contain nodes {} and {}", self.name(), way.id(), from_node_id, to_node_id);
+                trace!("{}.handle_way#{}: Cannot split way segment: node_cache does not contain nodes {} and {}", self.name(), way.id(), from_node_id, to_node_id);
                 continue;
             }
             let from_location = from_location.unwrap();
@@ -555,20 +548,20 @@ impl BufferingElevationEnricher {
                 let elevation = self.get_elevation(intermediate_locations[index].lon, intermediate_locations[index].lat);
                 intermediate_locations[index].ele = elevation.unwrap_or(0.0);
             }
-            log::trace!("{}.handle_way#{}: adding {} intermediate nodes for way segment from {} to {}", self.name(), way.id(), intermediate_locations.len(), from_node_id, to_node_id);
+            trace!("{}.handle_way#{}: adding {} intermediate nodes for way segment from {} to {}", self.name(), way.id(), intermediate_locations.len(), from_node_id, to_node_id);
             for index in 1..(intermediate_locations.len()-1) {
                 let location = &intermediate_locations[index];
                 let before_ele = intermediate_locations[index-1].ele();
                 let after_ele = intermediate_locations[index+1].ele();
                 // TODO: what if some elevations are not present
-                log::trace!("{}.handle_way#{}: elevation before={}, current={}, after={}",
+                trace!("{}.handle_way#{}: elevation before={}, current={}, after={}",
                     self.name(), way.id(), before_ele, location.ele(), after_ele);
                 if (location.ele() - (before_ele + after_ele) / 2.0).abs() >= self.elevation_threshold {
                     let node = Node::new(self.next_node_id(), 0, location.get_coordinate(), 0, 0, 0, String::default(), true, vec![
                         Tag::new("ele".to_string(), location.ele().to_string())
                     ]);
 
-                    log::trace!("created intermediate node {}", node.id());
+                    trace!("created intermediate node {}", node.id());
                     references.push(node.id().clone());
                     intermediate_nodes.push(node);
                 }
@@ -588,10 +581,9 @@ impl BufferingElevationEnricher {
         if self.total_buffered_nodes_count > self.total_buffered_nodes_max {
             self.total_buffered_nodes_max_reached_count += 1;
             let buffer_lengths = self.get_buffer_lengths_sorted_desc();
-            // let num_buffers_to_flush = (buffer_lengths.len() as f64 * 0.5) as usize;
             let num_buffers_to_flush = buffer_lengths.len() / 2;
             let buffers_to_flush = self.get_most_filled_buffers(num_buffers_to_flush);
-            log::debug!("maximum number of {} cached nodes reached - flushing the {} most filled buffers", self.total_buffered_nodes_max, num_buffers_to_flush);
+            debug!("maximum number of {} cached nodes reached - flushing the {} most filled buffers", self.total_buffered_nodes_max, num_buffers_to_flush);
             return self.handle_and_flush_buffers(buffers_to_flush);
         }
         vec![]
@@ -622,10 +614,6 @@ impl BufferingElevationEnricher {
         result
     }
 
-
-
-
-
     fn handle_nodes(&mut self, mut nodes: Vec<Node>) -> Vec<Node> {
         let mut result_vec = Vec::new();
         for node in nodes {
@@ -640,8 +628,9 @@ impl BufferingElevationEnricher {
         }
         ways
     }
+
     fn handle_and_flush_nodes(&mut self, elements: Vec<Node> ) -> Vec<Node> {
-        log::debug!("{}: handle_and_flush_nodes called", self.name());//found
+        debug!("{}: handle_and_flush_nodes called", self.name());//found
         let mut result = self.handle_nodes(elements);
 
         let buffers: Vec<String> = self.nodes_for_geotiffs.iter()
@@ -658,7 +647,7 @@ impl Handler for BufferingElevationEnricher {
     fn name(&self) -> String { "BufferingElevationEnricher".to_string() }
 
     fn handle_result(&mut self, result: &mut HandlerResult) {
-        log::trace!("{}.handle_result() called with {} nodes, {} ways, {} relations", self.name(), result.nodes.len(), result.ways.len(), result.relations.len());
+        trace!("{}.handle_result() called with {} nodes, {} ways, {} relations", self.name(), result.nodes.len(), result.ways.len(), result.relations.len());
 
         if result.nodes.len() > 0 {
             result.nodes = self.handle_nodes(result.nodes.clone());
@@ -671,11 +660,10 @@ impl Handler for BufferingElevationEnricher {
         if result.relations.len() > 0 {
             result.relations = self.handle_relations(result.relations.clone());
         }
-
     }
 
     fn flush(&mut self, result: &mut HandlerResult) {
-        log::debug!("{}.flush() called with {} nodes, {} ways, {} relations", self.name(), result.nodes.len(), result.ways.len(), result.relations.len());
+        trace!("{}.flush() called with {} nodes, {} ways, {} relations", self.name(), result.nodes.len(), result.ways.len(), result.relations.len());
 
         result.nodes = self.handle_and_flush_nodes(result.nodes.clone());
         if result.ways.len()>0 {
