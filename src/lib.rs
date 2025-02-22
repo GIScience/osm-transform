@@ -55,7 +55,7 @@ pub fn init(config: &Config) {
 pub fn run(config: &Config) -> HandlerResult {
     let mut stopwatch_total = StopWatch::new();
     stopwatch_total.start();
-
+    //todo log input file name and size (should occur in log)
     let mut result = HandlerResult::default();
     count_elements(config, &mut result);//todo add cli option for this - only really needed for very large files
     run_filter_chain(config, &mut result);
@@ -127,17 +127,17 @@ fn run_processing_chain(config: &Config, result: &mut HandlerResult) {//TODO use
             .with_way_ids(config.print_way_ids.clone())
             .with_relation_ids(config.print_relation_ids.clone()));
 
+    handler_chain = handler_chain.add(ComplexElementsFilter::ors_default());//todo remove when bitvec filters are used
+
+    if config.with_node_filtering {
+        handler_chain = handler_chain.add(NodeIdFilter { });
+    }
+
     if config.remove_metadata {
         handler_chain = handler_chain.add(MetadataRemover::default())
     }
 
-    handler_chain = handler_chain.add(ComplexElementsFilter::ors_default());//todo remove when bitvec filters are used
-
-    if config.with_node_filtering {//todo move up before metadata remover
-        handler_chain = handler_chain.add(NodeIdFilter { });
-    }
-
-    handler_chain = handler_chain.add(ElementCounter::new(AcceptedCount));
+    handler_chain = handler_chain.add(ElementCounter::new(AcceptedCount));//todo needed? let writers count?
 
     let mut stopwatch = StopWatch::new();
     match &config.country_csv {

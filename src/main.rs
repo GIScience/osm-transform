@@ -91,6 +91,8 @@ pub struct Args {
     /// Print statistics. Can be added multiple times to increase verbosity.
     #[arg(short = 'S', long, action = clap::ArgAction::Count)]
     pub stat: u8,
+
+    //todo add custom filter options
 }
 impl Args {
     pub fn to_config(self) -> Config {
