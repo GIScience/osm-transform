@@ -10,6 +10,7 @@ pub(crate) mod skip_ele;
 use std::collections::HashMap;
 
 use bit_vec::BitVec;
+use log::trace;
 use osm_io::osm::model::element::Element;
 use osm_io::osm::model::node::Node;
 use osm_io::osm::model::relation::Relation;
@@ -41,12 +42,12 @@ pub trait Handler {
         self.handle_result(result)
     }
     fn handle_elements(&mut self, nodes: Vec<Node>, ways: Vec<Way>, relations: Vec<Relation>) -> (Vec<Node>, Vec<Way>, Vec<Relation>){
-        log::trace!("Handler.handle_elements() called with {} nodes, {} ways, {} relations", nodes.len(), ways.len(), relations.len());
+        trace!("Handler.handle_elements() called with {} nodes, {} ways, {} relations", nodes.len(), ways.len(), relations.len());
         (self.handle_nodes(nodes), self.handle_ways(ways), self.handle_relations(relations))
     }
 
     fn handle_and_flush_elements(&mut self, nodes: Vec<Node>, ways: Vec<Way>, relations: Vec<Relation>) -> (Vec<Node>, Vec<Way>, Vec<Relation>) {
-        log::trace!("Handler.handle_and_flush_elements() called with {} nodes, {} ways, {} relations", nodes.len(), ways.len(), relations.len());
+        trace!("Handler.handle_and_flush_elements() called with {} nodes, {} ways, {} relations", nodes.len(), ways.len(), relations.len());
         (self.handle_and_flush_nodes(nodes), self.handle_and_flush_ways(ways), self.handle_and_flush_relations(relations))
     }
 
@@ -63,17 +64,17 @@ pub trait Handler {
     }
 
     fn handle_and_flush_nodes(&mut self, elements: Vec<Node>) -> Vec<Node> {
-        log::trace!("Handler.handle_and_flush_nodes() called with {} nodes", elements.len());
+        trace!("Handler.handle_and_flush_nodes() called with {} nodes", elements.len());
         self.handle_nodes(elements)
     }
 
     fn handle_and_flush_ways(&mut self, elements: Vec<Way>) -> Vec<Way> {
-        log::trace!("Handler.handle_and_flush_ways() called with {} ways", elements.len());
+        trace!("Handler.handle_and_flush_ways() called with {} ways", elements.len());
         self.handle_ways(elements)
     }
 
     fn handle_and_flush_relations(&mut self, elements: Vec<Relation>) -> Vec<Relation> {
-        log::trace!("Handler.handle_and_flush_relations() called with {} relations", elements.len());
+        trace!("Handler.handle_and_flush_relations() called with {} relations", elements.len());
         self.handle_relations(elements)
     }
 
@@ -356,6 +357,9 @@ Unsplitted ways: {unsplitted_way_count}
         self.input_node_count = 0;
         self.input_way_count = 0;
         self.input_relation_count = 0;
+        self.clear_non_input_counts();
+    }
+    pub(crate) fn clear_non_input_counts(&mut self){
         self.accepted_node_count = 0;
         self.accepted_way_count = 0;
         self.accepted_relation_count = 0;
@@ -374,6 +378,9 @@ Unsplitted ways: {unsplitted_way_count}
         self.elevation_total_buffered_nodes_max_reached_count = 0;
         self.other.clear();
     }
+    pub(crate) fn input_element_count(&self) -> u64 {
+        self.input_node_count + self.input_way_count + self.input_relation_count
+    }
 }
 
 
@@ -390,9 +397,9 @@ impl HandlerChain {
         self
     }
     pub(crate) fn process(&mut self, element: Element, result: &mut HandlerResult) {
-        log::trace!("######");
-        log::trace!("###### Processing {}", format_element_id(&element));
-        log::trace!("######");
+        trace!("######");
+        trace!("###### Processing {}", format_element_id(&element));
+        trace!("######");
         result.clear_elements();
         match element {
             Element::Node { node } => {
@@ -427,27 +434,27 @@ impl HandlerChain {
     }
 
     fn handle_element(&mut self, mut nodes: Vec<Node>, mut ways: Vec<Way>, mut relations: Vec<Relation>, result: &mut HandlerResult) {
-        log::trace!("HandlerChain.handle_elements called with {} nodes {} ways {} relations", nodes.len(), ways.len(), relations.len());
+        trace!("HandlerChain.handle_elements called with {} nodes {} ways {} relations", nodes.len(), ways.len(), relations.len());
         for processor in &mut self.processors {
             if nodes.len() == 0 && ways.len() == 0 && relations.len() == 0 {
                 break
             }
-            log::trace!("HandlerChain.handle_element calling {} with result {}", processor.name(), result.format_one_line());
+            trace!("HandlerChain.handle_element calling {} with result {}", processor.name(), result.format_one_line());
             // (nodes, ways, relations) = processor.handle_elements(nodes, ways, relations);
             processor.handle_result(result);
         }
     }
 
     pub(crate) fn flush_handlers(&mut self, result: &mut HandlerResult) {
-        log::trace!("######");
-        log::trace!("###### HandlerChain.flush_handlers called with {} nodes {} ways {} relations", result.nodes.len(), result.ways.len(), result.relations.len());
-        log::trace!("######");
+        trace!("######");
+        trace!("###### HandlerChain.flush_handlers called with {} nodes {} ways {} relations", result.nodes.len(), result.ways.len(), result.relations.len());
+        trace!("######");
         for processor in &mut self.processors {
-            log::trace!("HandlerChain.flush_handlers calling {} with result {}", processor.name(), result.format_one_line());
+            trace!("HandlerChain.flush_handlers calling {} with result {}", processor.name(), result.format_one_line());
             // (nodes, ways, relations) = processor.handle_and_flush_elements(nodes, ways, relations);
             processor.flush(result)
         }
-        log::trace!("HandlerChain.flush_handlers all handlers have flushed - clearing elements");
+        trace!("HandlerChain.flush_handlers all handlers have flushed - clearing elements");
         result.clear_elements();
     }
 
