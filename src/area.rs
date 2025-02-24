@@ -206,13 +206,13 @@ impl AreaHandler {
 impl Handler for AreaHandler {
     fn name(&self) -> String { "AreaHandler".to_string() }
 
-    fn handle_result(&mut self, result: &mut HandlerResult) {
+    fn handle(&mut self, result: &mut HandlerResult) {
         result.nodes.iter_mut().for_each(|node| self.handle_node(node));
         result.country_not_found_node_count = self.country_not_found_node_count;
         result.country_found_node_count = self.country_found_node_count;
     }
 
-    fn add_result(&mut self, result: &mut HandlerResult){
+    fn close(&mut self, result: &mut HandlerResult){
         result.other.insert("mapping".to_string(), format!("index:{} area:{} id:{} name:{}",
                                                            &self.mapping.index.len(),
                                                            &self.mapping.area.len(),
@@ -273,7 +273,7 @@ mod tests {
         result.nodes.push(Node::new(3, 1, LonLat::new(6.0, 1.5).c(), 1, 1, 1, "t".to_string(), true, vec![]));
         result.nodes.push(Node::new(4, 1, LonLat::new(1.0, 3.0).c(), 1, 1, 1, "_".to_string(), true, vec![]));
 
-        area_handler.handle_result(&mut result);
+        area_handler.handle(&mut result);
         println!("{} {} {:?}", &result.nodes[0].id(),  &result.nodes[0].user(), &result.nodes[0].tags());
         println!("{} {} {:?}", &result.nodes[1].id(),  &result.nodes[1].user(), &result.nodes[1].tags());
         println!("{} {} {:?}", &result.nodes[2].id(),  &result.nodes[2].user(), &result.nodes[2].tags());
@@ -321,7 +321,7 @@ mod tests {
         result.nodes.push(Node::new(3, 1, LonLat::new(6.6, 2.1).c(), 1, 1, 1, "t".to_string(), true, vec![]));
         result.nodes.push(Node::new(4, 1, LonLat::new(1.6, 3.6).c(), 1, 1, 1, "_".to_string(), true, vec![]));
 
-        area_handler.handle_result(&mut result);
+        area_handler.handle(&mut result);
         println!("{} {} {:?}", &result.nodes[0].id(),  &result.nodes[0].user(), &result.nodes[0].tags());
         println!("{} {} {:?}", &result.nodes[1].id(),  &result.nodes[1].user(), &result.nodes[1].tags());
         println!("{} {} {:?}", &result.nodes[2].id(),  &result.nodes[2].user(), &result.nodes[2].tags());

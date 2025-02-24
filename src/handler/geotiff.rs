@@ -638,7 +638,7 @@ impl BufferingElevationEnricher {
 impl Handler for BufferingElevationEnricher {
     fn name(&self) -> String { "BufferingElevationEnricher".to_string() }
 
-    fn handle_result(&mut self, result: &mut HandlerResult) {
+    fn handle(&mut self, result: &mut HandlerResult) {
         trace!("{}.handle_result() called with {} nodes, {} ways, {} relations", self.name(), result.nodes.len(), result.ways.len(), result.relations.len());
 
         if result.nodes.len() > 0 {
@@ -660,12 +660,9 @@ impl Handler for BufferingElevationEnricher {
                 result.nodes.extend(self.handle_way(way));
             }
         }
-        if result.relations.len()>0 {
-            result.relations = self.handle_relations(result.relations.clone());
-        }
     }
 
-    fn add_result(&mut self, result: &mut HandlerResult) {
+    fn close(&mut self, result: &mut HandlerResult) {
         result.other.insert("node_cache size".to_string(), format!("{}", self.node_cache.len()));
         result.elevation_found_node_count = self.ele_lookups_successful as u64;
         result.elevation_not_found_node_count = self.ele_lookups_failed as u64;

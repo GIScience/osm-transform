@@ -32,7 +32,7 @@ impl SimpleOutputHandler {
 impl Handler for SimpleOutputHandler {
     fn name(&self) -> String { "OutputHandler".to_string() }
 
-    fn handle_result(&mut self, result: &mut HandlerResult) {
+    fn handle(&mut self, result: &mut HandlerResult) {
         result.nodes.iter().for_each(|node| {
             self.writer.write_element( Element::Node { node: node.clone() }).expect("Failed to write node");
         });
@@ -45,7 +45,7 @@ impl Handler for SimpleOutputHandler {
         result.clear_elements();
     }
 
-    fn add_result(&mut self, result: &mut HandlerResult) {
+    fn close(&mut self, result: &mut HandlerResult) {
         self.close();
         result.other.insert("output file".to_string(), format!("{:?}", &self.writer.path()));
     }
@@ -85,7 +85,7 @@ impl Handler for SplittingOutputHandler {
         "SplittingOutputHandler".to_string()
     }
 
-    fn handle_result(&mut self, result: &mut HandlerResult) {
+    fn handle(&mut self, result: &mut HandlerResult) {
         result.nodes.iter().for_each(|node| {
             self.node_writer.write_element( Element::Node { node: node.clone() }).expect("Failed to write node");
         });
@@ -98,7 +98,7 @@ impl Handler for SplittingOutputHandler {
         result.clear_elements();
     }
 
-    fn add_result(&mut self, result: &mut HandlerResult) {
+    fn close(&mut self, result: &mut HandlerResult) {
         self.way_relation_writer.close().expect("Failed to close way_relation_writer");
         self.node_writer.close().expect("Failed to close node writer");
         result.other.insert("output files".to_string(), format!("{:?}, {:?}", &self.way_relation_writer.path() , &self.node_writer.path()));

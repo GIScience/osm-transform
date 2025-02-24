@@ -23,7 +23,7 @@ impl Handler for MetadataRemover {
         "MetadataRemover".to_string()
     }
 
-    fn handle_result(&mut self, result: &mut HandlerResult) {
+    fn handle(&mut self, result: &mut HandlerResult) {
         result.nodes.iter_mut().for_each(|element| self.handle_node(element));
         result.ways.iter_mut().for_each(|element| self.handle_way(element));
         result.relations.iter_mut().for_each(|element| self.handle_relation(element));
@@ -49,7 +49,7 @@ mod test {
             Tag::new("a".to_string(), "x".to_string()),
             Tag::new("b".to_string(), "y".to_string()),
         ]));
-        metadata_remover.handle_result(&mut result);
+        metadata_remover.handle(&mut result);
         let node = &result.nodes[0];
 
         assert_eq!(node.id(), 1);
@@ -75,7 +75,7 @@ mod test {
             Tag::new("a".to_string(), "x".to_string()),
             Tag::new("b".to_string(), "y".to_string()),
         ]));
-        metadata_remover.handle_result(&mut result);
+        metadata_remover.handle(&mut result);
         let way = &result.ways[0];
         assert_eq!(way.id(), 1);
         assert_eq!(way.version(), 0);
@@ -105,7 +105,7 @@ mod test {
             Tag::new("a".to_string(), "x".to_string()),
             Tag::new("b".to_string(), "y".to_string()),
         ]));
-        metadata_remover.handle_result(&mut result);
+        metadata_remover.handle(&mut result);
         let relation = &result.relations[0];
         assert_eq!(relation.id(), 1);
         assert_eq!(relation.version(), 0);

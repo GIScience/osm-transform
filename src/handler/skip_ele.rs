@@ -28,7 +28,7 @@ impl Handler for SkipElevationNodeCollector {
         String::from("SkipElevationNodeCollector")
     }
 
-    fn handle_result(&mut self, result: &mut HandlerResult) {
+    fn handle(&mut self, result: &mut HandlerResult) {
         for way in & result.ways {
             if self.skip_elevation(way) {
                 log::trace!("skipping elevation for way {}", way.id());
@@ -76,7 +76,7 @@ mod test {
         result.ways.push(simple_way(4, vec![6, 7], vec![HIGHWAY, NO_BRIDGE, CUTTING]));
         result.ways.push(simple_way(5, vec![7, 8, 9], vec![HIGHWAY, TUNNEL]));
 
-        collector.handle_result(&mut result);
+        collector.handle(&mut result);
 
         assert!(!result.skip_ele.get(0).unwrap_or(false) );
         assert!(!result.skip_ele.get(1).unwrap_or(false) );
@@ -97,6 +97,6 @@ mod test {
         let mut collector = SkipElevationNodeCollector::new(SkipElevationNodeCollector::DEFAULT_KEYS.to_vec());
         let mut result = HandlerResult::default();
         result.ways.push(simple_way(1, vec![9, 10], vec![TUNNEL]));
-        collector.handle_result(&mut HandlerResult::default());
+        collector.handle(&mut HandlerResult::default());
     }
 }

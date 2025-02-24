@@ -19,7 +19,7 @@ impl ElementCounter {
 impl Handler for ElementCounter {
     fn name(&self) -> String { format!("ElementCounter {}", self.result_type.to_string()) }
 
-    fn handle_result(&mut self, result: &mut HandlerResult) {
+    fn handle(&mut self, result: &mut HandlerResult) {
         log::trace!("{}.handle_result called: counting nodes+={}, ways+={}, relations+={}", self.name(), result.nodes.len(), result.ways.len(), result.relations.len());
         match self.result_type {
             ElementCountResultType::InputCount => {
@@ -180,7 +180,7 @@ impl ElementPrinter {
 }
 impl Handler for ElementPrinter {
     fn name(&self) -> String { format!("ElementPrinter {}", self.prefix) }
-    fn handle_result(&mut self, result: &mut HandlerResult) {
+    fn handle(&mut self, result: &mut HandlerResult) {
         self.handle_nodes(result.nodes.clone());
         self.handle_ways(result.ways.clone());
         self.handle_relations(result.relations.clone());
@@ -190,7 +190,6 @@ impl Handler for ElementPrinter {
 #[cfg(test)]
 mod test {
     use crate::handler::info::ElementPrinter;
-    use crate::handler::Handler;
     use crate::handler::tests::{simple_node};
 
     #[test]

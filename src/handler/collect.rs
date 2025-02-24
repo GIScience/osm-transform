@@ -45,7 +45,7 @@ impl Handler for ReferencedNodeIdCollector {
         "ReferencedNodeIdCollector".to_string()
     }
 
-    fn handle_result(&mut self, result: &mut HandlerResult) {
+    fn handle(&mut self, result: &mut HandlerResult) {
         self.handle_ways_result(result);
         self.handle_relations_result(result);
     }
@@ -61,7 +61,7 @@ mod test {
         let mut collector = TestOnlyIdCollector::new(10);
         let mut result = HandlerResult::default();
         result.nodes.push(simple_node(2, vec![]));
-        collector.handle_result(&mut result);
+        collector.handle(&mut result);
         assert_eq!(false, result.node_ids.get(0).unwrap_or(false));
         assert_eq!(false, result.node_ids.get(1).unwrap_or(false));
         assert_eq!(true, result.node_ids.get(2).unwrap_or(false));
@@ -72,14 +72,14 @@ mod test {
         let mut collector = TestOnlyIdCollector::new(10);
         let mut result = HandlerResult::default();
         result.ways.push(simple_way(12, vec![], vec![]));
-        collector.handle_result(&mut result);
+        collector.handle(&mut result);
     }
     #[test]
     fn node_id_collector_out_of_bounds_real(){
         let mut collector = TestOnlyIdCollector::new(HIGHEST_NODE_ID as usize);
         let mut result = HandlerResult::default();
         result.nodes.push(simple_node(1, vec![]));
-        collector.handle_result(&mut result);
+        collector.handle(&mut result);
         assert_eq!(false, result.node_ids.get(0).unwrap_or(false));
         assert_eq!(true, result.node_ids.get(1).unwrap_or(false));
         assert_eq!(false, result.node_ids.get(2).unwrap_or(false));
@@ -87,7 +87,7 @@ mod test {
 
         result.clear_elements();
         result.nodes.push(simple_node(11414456780, vec![]));
-        collector.handle_result(&mut result);
+        collector.handle(&mut result);
         assert_eq!(true, result.node_ids.get(11414456780).unwrap_or(false));
     }
 

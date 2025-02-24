@@ -36,13 +36,13 @@ pub fn into_vec_relation_element(relation: Relation) -> Vec<Element> { vec![into
 pub trait Handler {
 
     fn name(&self) -> String;
-    fn handle_result(&mut self, result: &mut HandlerResult){}
+    fn handle(&mut self, _result: &mut HandlerResult){}
 
     fn flush(&mut self, result: &mut HandlerResult)  {
-        self.handle_result(result)
+        self.handle(result)
     }
 
-    fn add_result(&mut self, result: &mut HandlerResult) {}
+    fn close(&mut self, _result: &mut HandlerResult) {}
 }
 
 pub(crate) struct OsmElementTypeSelection {
@@ -59,37 +59,41 @@ impl OsmElementTypeSelection {
     pub(crate) fn none() -> Self { Self { node: false, way: false, relation: false } }
 }
 
-
 #[derive(Debug)]
 pub struct HandlerResult {
 
+    ///Elements to handle
     pub nodes: Vec<Node>,
     pub ways: Vec<Way>,
     pub relations: Vec<Relation>,
 
+    /// Intermediate filter results created by the handlers in the first pass
+    /// and consumed by filters in the second pass.
     pub node_ids: BitVec, //todo rename to accept_node_ids
     //todo add: pub accept_way_ids: BitVec,
     //todo add: pub accept_relation_ids: BitVec,
     pub skip_ele: BitVec, //todo rename to nodes_without_elevation_ids
     
-    // InputCount,
+    /// InputCount
     pub input_node_count: u64,
     pub input_way_count: u64,
     pub input_relation_count: u64,
 
-    // AcceptedCount,
+    /// AcceptedCount
     pub accepted_node_count: u64,      //Referenced by accepted ways or relations
     pub accepted_way_count: u64,       //Not filtered by tags
     pub accepted_relation_count: u64,  //Not filtered by tags
 
-    // OutputCount,
+    /// OutputCount
     pub output_node_count: u64,
     pub output_way_count: u64,
     pub output_relation_count: u64,
 
+    /// Country mapping statistics
     pub country_found_node_count: u64,
     pub country_not_found_node_count: u64,
 
+    /// Elevation enrichment statistics
     pub elevation_found_node_count: u64,
     pub elevation_not_found_node_count: u64,
     pub elevation_not_relevant_node_count: u64,
@@ -99,6 +103,7 @@ pub struct HandlerResult {
     pub elevation_tiff_count_total: u64,
     pub elevation_tiff_count_used: u64,
 
+    /// Other statistics
     pub other: HashMap<String, String>,
 }
 impl HandlerResult {
@@ -410,7 +415,7 @@ impl HandlerChain {
             }
             trace!("HandlerChain.handle_element calling {} with result {}", processor.name(), result.format_one_line());
             // (nodes, ways, relations) = processor.handle_elements(nodes, ways, relations);
-            processor.handle_result(result);
+            processor.handle(result);
         }
     }
 
@@ -429,7 +434,7 @@ impl HandlerChain {
 
     pub(crate) fn collect_result(&mut self, result: &mut HandlerResult) {
         for processor in &mut self.processors {
-            processor.add_result(result);
+            processor.close(result);
         }
     }
 }
@@ -536,7 +541,7 @@ pub(crate) mod tests {
     impl Handler for TestOnlyElementModifier {
         fn name(&self) -> String { "TestOnlyElementModifier".to_string() }
 
-        fn handle_result(&mut self, result: &mut HandlerResult) {
+        fn handle(&mut self, result: &mut HandlerResult) {
             result.nodes.iter_mut().for_each(|node| self.handle_node(node));
         }
 
@@ -548,7 +553,7 @@ pub(crate) mod tests {
     impl Handler for TestOnlyElementReplacer {
         fn name(&self) -> String { "TestOnlyElementReplacer".to_string() }
 
-        fn handle_result(&mut self, result: &mut HandlerResult) {
+        fn handle(&mut self, result: &mut HandlerResult) {
             for index in 0..result.nodes.len() {
                 if result.nodes[index].id() == 6 {
                     result.nodes[index] = simple_node(66, vec![("who", "dimpfelmoser")]);
@@ -563,7 +568,7 @@ pub(crate) mod tests {
     impl Handler for TestOnlyElementFilter {
         fn name(&self) -> String { "TestOnlyElementFilter".to_string() }
 
-        fn handle_result(&mut self, result: &mut HandlerResult) {
+        fn handle(&mut self, result: &mut HandlerResult) {
             result.nodes.retain(|node| node.id() % 2 != 0 );
         }
     }
@@ -575,7 +580,7 @@ pub(crate) mod tests {
     impl Handler for TestOnlyElementAdder {
         fn name(&self) -> String { "TestOnlyElementAdder".to_string() }
 
-        fn handle_result(&mut self, result: &mut HandlerResult) {
+        fn handle(&mut self, result: &mut HandlerResult) {
             let mut new_nodes = vec![];
             result.nodes.iter().for_each(|node| new_nodes.push(copy_node_with_new_id(node, node.id().add(100))));
             result.nodes.extend(new_nodes);
@@ -641,7 +646,7 @@ pub(crate) mod tests {
         // fn struct_name() -> &'static str { "TestOnlyElementBuffer" }
         fn name(&self) -> String { "TestOnlyElementBuffer".to_string() }
 
-        fn handle_result(&mut self, result: &mut HandlerResult) {
+        fn handle(&mut self, result: &mut HandlerResult) {
             self.handle_nodes(result);
             self.handle_ways(result);
             self.handle_relations(result);
@@ -670,7 +675,7 @@ pub(crate) mod tests {
     impl Handler for TestOnlyIdCollector {
         fn name(&self) -> String { "TestOnlyIdCollector".to_string() }
 
-        fn handle_result(&mut self, result: &mut HandlerResult) {
+        fn handle(&mut self, result: &mut HandlerResult) {
             result.nodes.iter().for_each(|node| result.node_ids.set(node.id() as usize, true));
 
             result.ways.iter().for_each(|way| self.way_ids.set(way.id() as usize, true));
@@ -695,13 +700,13 @@ pub(crate) mod tests {
     impl Handler for TestOnlyOrderRecorder {
         fn name(&self) -> String { format!("TestOnlyOrderRecorder {}", self.result_key) }
 
-        fn handle_result(&mut self, result: &mut HandlerResult) {
+        fn handle(&mut self, result: &mut HandlerResult) {
             result.nodes.iter().for_each(|node| self.received_ids.push(format!("node#{}", node.id().to_string())));
             result.ways.iter().for_each(|node| self.received_ids.push(format!("way#{}", node.id().to_string())));
             result.relations.iter().for_each(|node| self.received_ids.push(format!("relation#{}", node.id().to_string())));
         }
 
-        fn add_result(&mut self, result: &mut HandlerResult) {
+        fn close(&mut self, result: &mut HandlerResult) {
             result.other.insert(format!("{}", self.name()), self.received_ids.join(", "));
         }
     }
@@ -734,7 +739,7 @@ pub(crate) mod tests {
     impl Handler for ElementEvaluator {
         fn name(&self) -> String { format!("ElementEvaluator#{}", self.id.clone()) }
 
-        fn handle_result(&mut self, result: &mut HandlerResult) {
+        fn handle(&mut self, result: &mut HandlerResult) {
             result.nodes.iter().for_each(|node| {
                 self.node_results.insert(node.id(), (self.node_evaluator)(node));
             });
@@ -746,7 +751,7 @@ pub(crate) mod tests {
             });
         }
 
-        fn add_result(&mut self, result: &mut HandlerResult) {
+        fn close(&mut self, result: &mut HandlerResult) {
             result.other.insert(format!("{} node results", self.name()), self.node_results.iter().map(|(k, v)| format!("{}:{}", k, v)).collect::<Vec<String>>().join(", "));
             result.other.insert(format!("{} way results", self.name()), self.way_results.iter().map(|(k, v)| format!("{}:{}", k, v)).collect::<Vec<String>>().join(", "));
             result.other.insert(format!("{} relation results", self.name()), self.relation_results.iter().map(|(k, v)| format!("{}:{}", k, v)).collect::<Vec<String>>().join(", "));
