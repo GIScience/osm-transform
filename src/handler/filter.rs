@@ -88,9 +88,9 @@ impl Handler for TagKeyBasedOsmElementsFilter {
     fn name(&self) -> String { "TagKeyBasedOsmElementsFilter".to_string() }
 
     fn handle_result(&mut self, result: &mut HandlerResult) {
-        result.nodes.retain(|node| self.accept_by_tags(node.tags()));
-        result.ways.retain(|way| self.accept_by_tags(way.tags()));
-        result.relations.retain(|relation| self.accept_by_tags(relation.tags()));
+        if self.handle_types.node { result.nodes.retain(|node| self.accept_by_tags(node.tags())); }
+        if self.handle_types.way { result.ways.retain(|way| self.accept_by_tags(way.tags())); }
+        if self.handle_types.relation { result.relations.retain(|relation| self.accept_by_tags(relation.tags())); }
     }
 }
 
