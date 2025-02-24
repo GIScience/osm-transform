@@ -57,7 +57,7 @@ pub fn run(config: &Config) -> HandlerResult {
     stopwatch_total.start();
     //todo log input file name and size (should occur in log)
     let mut result = HandlerResult::default();
-    count_elements(config, &mut result);//todo add cli option for this - only really needed for very large files
+    // count_elements(config, &mut result);//todo add cli option for this - only really needed for very large files
     run_filter_chain(config, &mut result);
     run_processing_chain(config, &mut result);
 

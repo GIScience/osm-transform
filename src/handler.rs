@@ -275,16 +275,20 @@ other={other}"#)
 Summary:
 ========
 
+Processing of file TODO (TODO bytes) completed in TODO seconds.
+
 Element counts at specific processing stages:
 ---------------------------------------------
 
          |            nodes            |            ways             |          relations
-         |                             |                             |                      
+         |                             |                             |
          |         diff |        total |         diff |        total |         diff |        total
 ---------+--------------+--------------+--------------+--------------+--------------+-------------
     read |{i_node_ct:+13} |{i_node_ct:>13} |{i_way_cnt:+13} |{i_way_cnt:>13} |{i_rel_cnt:+13} |{i_rel_cnt:>13}
+TODO add custom filter counts
 accepted |{filt_node:+13} |{a_node_ct:>13} |{filt_ways:+13} |{a_way_cnt:>13} |{filt_rels:+13} |{a_rel_cnt:>13}
  written |{addd_node:+13} |{o_node_ct:>13} |{addd_ways:+13} |{o_way_cnt:>13} |{addd_rels:+13} |{o_rel_cnt:>13}
+
  ");
         if config.statistics_level == 1 {
             return formatted_statistics
@@ -296,9 +300,14 @@ accepted |{filt_node:+13} |{a_node_ct:>13} |{filt_ways:+13} |{a_way_cnt:>13} |{f
 
 Country enrichment:
 -------------------
-Country detected for {country_found_node_count} nodes
-Country not found for {country_not_found_node_count} nodes
-Country detections total: {country_detections}
+Country detected for      {country_found_node_count:>13} nodes (TODO% of all accepted nodes)
+>1 country detected for   TODO nodes
+Country not found for     {country_not_found_node_count:>13} nodes
+Country detections total: {country_detections:>13}
+TODO: nodes per country (ordered by node count, ¹ percentage of all accepted nodes):
+         1234567 (0.12%¹) Malta
+         1234567 (0.12%¹) Malta
+         1234567 (0.12%¹) Malta
 ").as_str());
             }
             None => {}
@@ -309,18 +318,24 @@ Country detections total: {country_detections}
 
 Elevation enrichment:
 ---------------------
-Elevation detected for {elevation_found_node_count} nodes
-Elevation not found for {elevation_not_found_node_count} nodes
-Elevation not relevant for {elevation_not_relevant_node_count} nodes (tunnels, bridges, ...)
-Elevation detections total: {elevation_detections}
+Elevation detected for      {elevation_found_node_count:>13} nodes
+Elevation not found for     {elevation_not_found_node_count:>13} nodes
+Elevation not relevant for  {elevation_not_relevant_node_count:>13} nodes (tunnels, bridges, ...)
+Elevation detections total: {elevation_detections:>13}
 ").as_str());
 
             if config.statistics_level > 3 {
                 formatted_statistics.push_str(format!("
-Loaded elevation tiff files: {elevation_tiff_count_total}
-Used elevation tiff files: {elevation_tiff_count_used}
-Elevation buffers flush count: {elevation_flush_count}
-Elevation buffers reached total max count: {elevation_total_buffered_nodes_max_reached_count}
+Loaded elevation tiff files:      {elevation_tiff_count_total:>5}
+Used elevation tiff files:        {elevation_tiff_count_used:>5}
+Elevation buffers flush count:    {elevation_flush_count:>5}
+TODO: nodes per tiff file (ordered by node count, ¹ percentage of all accepted nodes):
+         1234567 (23.14%¹) srtm_32_03.tif
+         1234567 (23.14%¹) srtm_32_03.tif
+         1234567 (23.14%¹) srtm_32_03.tif
+Total max buffered nodes reached: {elevation_total_buffered_nodes_max_reached_count:>13} times
+
+
 ").as_str())
             }
         if config.elevation_way_splitting {
@@ -328,8 +343,8 @@ Elevation buffers reached total max count: {elevation_total_buffered_nodes_max_r
 
 Elevation way splitting:
 ------------------------
-Added {addd_node} nodes to {splitted_way_count} ways
-Unsplitted ways: {unsplitted_way_count}
+Added {addd_node} nodes to {splitted_way_count:>13} ways (TODO% of all accepted ways)
+Unsplitted ways:           {unsplitted_way_count:>13} (TODO% of all accepted ways)
 ").as_str());
         }
 
