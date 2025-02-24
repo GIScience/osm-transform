@@ -19,23 +19,23 @@ impl ElementCounter {
 impl Handler for ElementCounter {
     fn name(&self) -> String { format!("ElementCounter {}", self.result_type.to_string()) }
 
-    fn handle(&mut self, result: &mut HandlerData) {
-        log::trace!("{}.handle_result called: counting nodes+={}, ways+={}, relations+={}", self.name(), result.nodes.len(), result.ways.len(), result.relations.len());
+    fn handle(&mut self, data: &mut HandlerData) {
+        log::trace!("{}.handle called: counting nodes+={}, ways+={}, relations+={}", self.name(), data.nodes.len(), data.ways.len(), data.relations.len());
         match self.result_type {
             ElementCountResultType::InputCount => {
-                result.input_node_count += result.nodes.len() as u64;
-                result.input_way_count += result.ways.len() as u64;
-                result.input_relation_count += result.relations.len() as u64;
+                data.input_node_count += data.nodes.len() as u64;
+                data.input_way_count += data.ways.len() as u64;
+                data.input_relation_count += data.relations.len() as u64;
             }
             ElementCountResultType::AcceptedCount => {
-                result.accepted_node_count += result.nodes.len() as u64;
-                result.accepted_way_count += result.ways.len() as u64;
-                result.accepted_relation_count += result.relations.len() as u64;
+                data.accepted_node_count += data.nodes.len() as u64;
+                data.accepted_way_count += data.ways.len() as u64;
+                data.accepted_relation_count += data.relations.len() as u64;
             }
             ElementCountResultType::OutputCount => {
-                result.output_node_count += result.nodes.len() as u64;
-                result.output_way_count += result.ways.len() as u64;
-                result.output_relation_count += result.relations.len() as u64;
+                data.output_node_count += data.nodes.len() as u64;
+                data.output_way_count += data.ways.len() as u64;
+                data.output_relation_count += data.relations.len() as u64;
             }
         }
     }
@@ -180,10 +180,10 @@ impl ElementPrinter {
 }
 impl Handler for ElementPrinter {
     fn name(&self) -> String { format!("ElementPrinter {}", self.prefix) }
-    fn handle(&mut self, result: &mut HandlerData) {
-        self.handle_nodes(result.nodes.clone());
-        self.handle_ways(result.ways.clone());
-        self.handle_relations(result.relations.clone());
+    fn handle(&mut self, data: &mut HandlerData) {
+        self.handle_nodes(data.nodes.clone());
+        self.handle_ways(data.ways.clone());
+        self.handle_relations(data.relations.clone());
     }
 }
 

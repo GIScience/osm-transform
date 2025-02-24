@@ -23,10 +23,10 @@ impl Handler for MetadataRemover {
         "MetadataRemover".to_string()
     }
 
-    fn handle(&mut self, result: &mut HandlerData) {
-        result.nodes.iter_mut().for_each(|element| self.handle_node(element));
-        result.ways.iter_mut().for_each(|element| self.handle_way(element));
-        result.relations.iter_mut().for_each(|element| self.handle_relation(element));
+    fn handle(&mut self, data: &mut HandlerData) {
+        data.nodes.iter_mut().for_each(|element| self.handle_node(element));
+        data.ways.iter_mut().for_each(|element| self.handle_way(element));
+        data.relations.iter_mut().for_each(|element| self.handle_relation(element));
     }
 }
 
@@ -44,13 +44,13 @@ mod test {
     #[test]
     fn metadata_remover_node() {
         let mut metadata_remover = MetadataRemover::default();
-        let mut result = HandlerData::default();
-        result.nodes.push(Node::new(1, 1, Coordinate::new(1.0f64, 1.1f64), 1, 1, 1, "a".to_string(), true,vec![
+        let mut data = HandlerData::default();
+        data.nodes.push(Node::new(1, 1, Coordinate::new(1.0f64, 1.1f64), 1, 1, 1, "a".to_string(), true, vec![
             Tag::new("a".to_string(), "x".to_string()),
             Tag::new("b".to_string(), "y".to_string()),
         ]));
-        metadata_remover.handle(&mut result);
-        let node = &result.nodes[0];
+        metadata_remover.handle(&mut data);
+        let node = &data.nodes[0];
 
         assert_eq!(node.id(), 1);
         assert_eq!(node.version(), 0);
@@ -70,13 +70,13 @@ mod test {
     #[test]
     fn metadata_remover_way() {
         let mut metadata_remover = MetadataRemover::default();
-        let mut result = HandlerData::default();
-        result.ways.push(Way::new(1, 1, 1, 1, 1, "user".to_string(), true, vec![4, 6], vec![
+        let mut data = HandlerData::default();
+        data.ways.push(Way::new(1, 1, 1, 1, 1, "user".to_string(), true, vec![4, 6], vec![
             Tag::new("a".to_string(), "x".to_string()),
             Tag::new("b".to_string(), "y".to_string()),
         ]));
-        metadata_remover.handle(&mut result);
-        let way = &result.ways[0];
+        metadata_remover.handle(&mut data);
+        let way = &data.ways[0];
         assert_eq!(way.id(), 1);
         assert_eq!(way.version(), 0);
         assert_eq!(way.timestamp(), 0);
@@ -95,8 +95,8 @@ mod test {
     #[test]
     fn metadata_remover_relation() {
         let mut metadata_remover = MetadataRemover::default();
-        let mut result = HandlerData::default();
-        result.relations.push(Relation::new(1, 1, 1, 1, 1, "user".to_string(), true, vec![
+        let mut data = HandlerData::default();
+        data.relations.push(Relation::new(1, 1, 1, 1, 1, "user".to_string(), true, vec![
             Member::Node { member: MemberData::new(5, "a".to_string()) },
             Member::Node { member: MemberData::new(6, "b".to_string()) },
             Member::Way { member: MemberData::new(10, "b".to_string()) },
@@ -105,8 +105,8 @@ mod test {
             Tag::new("a".to_string(), "x".to_string()),
             Tag::new("b".to_string(), "y".to_string()),
         ]));
-        metadata_remover.handle(&mut result);
-        let relation = &result.relations[0];
+        metadata_remover.handle(&mut data);
+        let relation = &data.relations[0];
         assert_eq!(relation.id(), 1);
         assert_eq!(relation.version(), 0);
         assert_eq!(relation.timestamp(), 0);

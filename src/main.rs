@@ -10,13 +10,13 @@ fn main() {
     let args = Args::parse();
     let config = args.to_config();
     init(&config);
-    let handler_result = run(&config);
-    print_statistics(&config, handler_result);
+    let handler_data = run(&config);
+    print_statistics(&config, handler_data);
 }
 
-fn print_statistics(config: &Config, handler_result: HandlerData) {
+fn print_statistics(config: &Config, handler_data: HandlerData) {
     if config.statistics_level > 0 {
-        println!("{}", handler_result.statistics(&config));
+        println!("{}", handler_data.statistics(&config));
     }
 }
 

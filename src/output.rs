@@ -32,22 +32,22 @@ impl SimpleOutputHandler {
 impl Handler for SimpleOutputHandler {
     fn name(&self) -> String { "OutputHandler".to_string() }
 
-    fn handle(&mut self, result: &mut HandlerData) {
-        result.nodes.iter().for_each(|node| {
+    fn handle(&mut self, data: &mut HandlerData) {
+        data.nodes.iter().for_each(|node| {
             self.writer.write_element( Element::Node { node: node.clone() }).expect("Failed to write node");
         });
-        result.ways.iter().for_each(|way| {
+        data.ways.iter().for_each(|way| {
             self.writer.write_element( Element::Way { way: way.clone() }).expect("Failed to write way");
         });
-        result.relations.iter().for_each(|relation| {
+        data.relations.iter().for_each(|relation| {
             self.writer.write_element( Element::Relation { relation: relation.clone() }).expect("Failed to write relation");
         });
-        result.clear_elements();
+        data.clear_elements();
     }
 
-    fn close(&mut self, result: &mut HandlerData) {
+    fn close(&mut self, data: &mut HandlerData) {
         self.close();
-        result.other.insert("output file".to_string(), format!("{:?}", &self.writer.path()));
+        data.other.insert("output file".to_string(), format!("{:?}", &self.writer.path()));
     }
 }
 
@@ -85,23 +85,23 @@ impl Handler for SplittingOutputHandler {
         "SplittingOutputHandler".to_string()
     }
 
-    fn handle(&mut self, result: &mut HandlerData) {
-        result.nodes.iter().for_each(|node| {
+    fn handle(&mut self, data: &mut HandlerData) {
+        data.nodes.iter().for_each(|node| {
             self.node_writer.write_element( Element::Node { node: node.clone() }).expect("Failed to write node");
         });
-        result.ways.iter().for_each(|way| {
+        data.ways.iter().for_each(|way| {
             self.way_relation_writer.write_element( Element::Way { way: way.clone() }).expect("Failed to write way");
         });
-        result.relations.iter().for_each(|relation| {
+        data.relations.iter().for_each(|relation| {
             self.way_relation_writer.write_element( Element::Relation { relation: relation.clone() }).expect("Failed to write relation");
         });
-        result.clear_elements();
+        data.clear_elements();
     }
 
-    fn close(&mut self, result: &mut HandlerData) {
+    fn close(&mut self, data: &mut HandlerData) {
         self.way_relation_writer.close().expect("Failed to close way_relation_writer");
         self.node_writer.close().expect("Failed to close node writer");
-        result.other.insert("output files".to_string(), format!("{:?}, {:?}", &self.way_relation_writer.path() , &self.node_writer.path()));
+        data.other.insert("output files".to_string(), format!("{:?}, {:?}", &self.way_relation_writer.path(), &self.node_writer.path()));
         log::debug!("Reading the newly generated file {:?} and appending all elements to {:?}...", &self.way_relation_writer.path(), &self.node_writer.path());
         log::info!("Merging output to {:?}...", &self.node_writer.path().as_os_str());
         let mut stopwatch = StopWatch::new();

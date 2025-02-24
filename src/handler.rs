@@ -36,13 +36,13 @@ pub fn into_vec_relation_element(relation: Relation) -> Vec<Element> { vec![into
 pub trait Handler {
 
     fn name(&self) -> String;
-    fn handle(&mut self, _result: &mut HandlerData){}
+    fn handle(&mut self, _data: &mut HandlerData){}
 
-    fn flush(&mut self, result: &mut HandlerData)  {
-        self.handle(result)
+    fn flush(&mut self, data: &mut HandlerData)  {
+        self.handle(data)
     }
 
-    fn close(&mut self, _result: &mut HandlerData) {}
+    fn close(&mut self, _data: &mut HandlerData) {}
 }
 
 pub(crate) struct OsmElementTypeSelection {
@@ -143,9 +143,9 @@ impl HandlerData {
         }
     }
     pub(crate) fn with_nodes(&self, nodes: Vec<Node>) -> Self {
-        let mut result = Self::default();
-        result.nodes = nodes;
-        result
+        let mut handler_data = Self::default();
+        handler_data.nodes = nodes;
+        handler_data
     }
 
     pub(crate) fn format_multi_line(&self) -> String {
@@ -370,71 +370,70 @@ impl HandlerChain {
         self.processors.push(Box::new(processor));
         self
     }
-    pub(crate) fn process(&mut self, element: Element, result: &mut HandlerData) {
+    pub(crate) fn process(&mut self, element: Element, data: &mut HandlerData) {
         trace!("######");
         trace!("###### Processing {}", format_element_id(&element));
         trace!("######");
-        result.clear_elements();
+        data.clear_elements();
         match element {
             Element::Node { node } => {
                 if !self.first_node_received {
                     log::info!("Reading nodes...");
                     self.first_node_received = true;
                 }
-                result.nodes.push(node.clone());
-                self.handle_element(vec![node], vec![], vec![], result);
+                data.nodes.push(node.clone());
+                self.handle_element(vec![node], vec![], vec![], data);
             },
             Element::Way { way } => {
                 if !self.flushed_nodes {
-                    self.flush_handlers(result);
+                    self.flush_handlers(data);
                     self.flushed_nodes = true;
                     log::info!("Reading ways...");
                 }
-                result.ways.push(way.clone());
-                self.handle_element(vec![], vec![way], vec![], result)
+                data.ways.push(way.clone());
+                self.handle_element(vec![], vec![way], vec![], data)
             },
             Element::Relation { relation } => {
                 if !self.flushed_ways {
-                    self.flush_handlers(result);
+                    self.flush_handlers(data);
                     self.flushed_ways = true;
                     log::info!("Reading relations...");
                 }
-                result.relations.push(relation.clone());
-                self.handle_element(vec![], vec![], vec![relation], result)
+                data.relations.push(relation.clone());
+                self.handle_element(vec![], vec![], vec![relation], data)
             },
             _ => (),
         }
-        result.clear_elements();
+        data.clear_elements();
     }
 
-    fn handle_element(&mut self, nodes: Vec<Node>, ways: Vec<Way>, relations: Vec<Relation>, result: &mut HandlerData) {
+    fn handle_element(&mut self, nodes: Vec<Node>, ways: Vec<Way>, relations: Vec<Relation>, data: &mut HandlerData) {
         trace!("HandlerChain.handle_elements called with {} nodes {} ways {} relations", nodes.len(), ways.len(), relations.len());
         for processor in &mut self.processors {
             if nodes.len() == 0 && ways.len() == 0 && relations.len() == 0 {
                 break
             }
-            trace!("HandlerChain.handle_element calling {} with result {}", processor.name(), result.format_one_line());
-            // (nodes, ways, relations) = processor.handle_elements(nodes, ways, relations);
-            processor.handle(result);
+            trace!("HandlerChain.handle_element calling {} with data {}", processor.name(), data.format_one_line());
+            processor.handle(data);
         }
     }
 
-    pub(crate) fn flush_handlers(&mut self, result: &mut HandlerData) {
+    pub(crate) fn flush_handlers(&mut self, data: &mut HandlerData) {
         trace!("######");
-        trace!("###### HandlerChain.flush_handlers called with {} nodes {} ways {} relations", result.nodes.len(), result.ways.len(), result.relations.len());
+        trace!("###### HandlerChain.flush_handlers called with {} nodes {} ways {} relations", data.nodes.len(), data.ways.len(), data.relations.len());
         trace!("######");
         for processor in &mut self.processors {
-            trace!("HandlerChain.flush_handlers calling {} with result {}", processor.name(), result.format_one_line());
+            trace!("HandlerChain.flush_handlers calling {} with data {}", processor.name(), data.format_one_line());
             // (nodes, ways, relations) = processor.handle_and_flush_elements(nodes, ways, relations);
-            processor.flush(result)
+            processor.flush(data)
         }
         trace!("HandlerChain.flush_handlers all handlers have flushed - clearing elements");
-        result.clear_elements();
+        data.clear_elements();
     }
 
-    pub(crate) fn collect_result(&mut self, result: &mut HandlerData) {
+    pub(crate) fn close_handlers(&mut self, data: &mut HandlerData) {
         for processor in &mut self.processors {
-            processor.close(result);
+            processor.close(data);
         }
     }
 }
@@ -541,8 +540,8 @@ pub(crate) mod tests {
     impl Handler for TestOnlyElementModifier {
         fn name(&self) -> String { "TestOnlyElementModifier".to_string() }
 
-        fn handle(&mut self, result: &mut HandlerData) {
-            result.nodes.iter_mut().for_each(|node| self.handle_node(node));
+        fn handle(&mut self, data: &mut HandlerData) {
+            data.nodes.iter_mut().for_each(|node| self.handle_node(node));
         }
 
     }
@@ -553,10 +552,10 @@ pub(crate) mod tests {
     impl Handler for TestOnlyElementReplacer {
         fn name(&self) -> String { "TestOnlyElementReplacer".to_string() }
 
-        fn handle(&mut self, result: &mut HandlerData) {
-            for index in 0..result.nodes.len() {
-                if result.nodes[index].id() == 6 {
-                    result.nodes[index] = simple_node(66, vec![("who", "dimpfelmoser")]);
+        fn handle(&mut self, data: &mut HandlerData) {
+            for index in 0..data.nodes.len() {
+                if data.nodes[index].id() == 6 {
+                    data.nodes[index] = simple_node(66, vec![("who", "dimpfelmoser")]);
                 }
             }
         }
@@ -568,8 +567,8 @@ pub(crate) mod tests {
     impl Handler for TestOnlyElementFilter {
         fn name(&self) -> String { "TestOnlyElementFilter".to_string() }
 
-        fn handle(&mut self, result: &mut HandlerData) {
-            result.nodes.retain(|node| node.id() % 2 != 0 );
+        fn handle(&mut self, data: &mut HandlerData) {
+            data.nodes.retain(|node| node.id() % 2 != 0 );
         }
     }
 
@@ -580,10 +579,10 @@ pub(crate) mod tests {
     impl Handler for TestOnlyElementAdder {
         fn name(&self) -> String { "TestOnlyElementAdder".to_string() }
 
-        fn handle(&mut self, result: &mut HandlerData) {
+        fn handle(&mut self, data: &mut HandlerData) {
             let mut new_nodes = vec![];
-            result.nodes.iter().for_each(|node| new_nodes.push(copy_node_with_new_id(node, node.id().add(100))));
-            result.nodes.extend(new_nodes);
+            data.nodes.iter().for_each(|node| new_nodes.push(copy_node_with_new_id(node, node.id().add(100))));
+            data.nodes.extend(new_nodes);
         }
     }
 
@@ -600,45 +599,45 @@ pub(crate) mod tests {
             vec![node, node_clone]
         }
 
-        fn handle_nodes(&mut self, result: &mut HandlerData) {
-            self.nodes_cache.append(&mut result.nodes);
-            result.nodes.clear();
+        fn handle_nodes(&mut self, data: &mut HandlerData) {
+            self.nodes_cache.append(&mut data.nodes);
+            data.nodes.clear();
             if self.nodes_cache.len() >= 3 {
-                self.handle_and_flush_nodes(result);
+                self.handle_and_flush_nodes(data);
             }
         }
 
-        fn handle_ways(&mut self, result: &mut HandlerData) {
-            self.ways_cache.append(&mut result.ways);
-            result.ways.clear();
+        fn handle_ways(&mut self, data: &mut HandlerData) {
+            self.ways_cache.append(&mut data.ways);
+            data.ways.clear();
             if self.ways_cache.len() >= 3 {
-                self.flush_ways(result);
+                self.flush_ways(data);
             }
         }
 
-        fn flush_ways(&mut self, result: &mut HandlerData) {
-            result.ways.append(&mut self.ways_cache);
+        fn flush_ways(&mut self, data: &mut HandlerData) {
+            data.ways.append(&mut self.ways_cache);
             self.ways_cache.clear();
         }
 
 
-        fn handle_relations(&mut self, result: &mut HandlerData) {
-            self.relations_cache.append(&mut result.relations);
-            result.relations.clear();
+        fn handle_relations(&mut self, data: &mut HandlerData) {
+            self.relations_cache.append(&mut data.relations);
+            data.relations.clear();
             if self.relations_cache.len() >= 3 {
-                self.flush_relations(result);
+                self.flush_relations(data);
             }
         }
 
-        fn flush_relations(&mut self, result: &mut HandlerData) {
-            result.relations.append(&mut self.relations_cache);
+        fn flush_relations(&mut self, data: &mut HandlerData) {
+            data.relations.append(&mut self.relations_cache);
             self.relations_cache.clear();
         }
 
-        fn handle_and_flush_nodes(&mut self, result: &mut HandlerData) {
+        fn handle_and_flush_nodes(&mut self, data: &mut HandlerData) {
             let mut result_vec = Vec::new();
             self.nodes_cache.iter().for_each(|node| result_vec.extend(self.handle_node(node.clone())));
-            result.nodes = result_vec;
+            data.nodes = result_vec;
             self.nodes_cache.clear();
         }
     }
@@ -646,15 +645,15 @@ pub(crate) mod tests {
         // fn struct_name() -> &'static str { "TestOnlyElementBuffer" }
         fn name(&self) -> String { "TestOnlyElementBuffer".to_string() }
 
-        fn handle(&mut self, result: &mut HandlerData) {
-            self.handle_nodes(result);
-            self.handle_ways(result);
-            self.handle_relations(result);
+        fn handle(&mut self, data: &mut HandlerData) {
+            self.handle_nodes(data);
+            self.handle_ways(data);
+            self.handle_relations(data);
         }
-        fn flush(&mut self, result: &mut HandlerData)  {
-            self.handle_and_flush_nodes(result);
-            self.flush_ways(result);
-            self.flush_relations(result);
+        fn flush(&mut self, data: &mut HandlerData)  {
+            self.handle_and_flush_nodes(data);
+            self.flush_ways(data);
+            self.flush_relations(data);
         }
 
     }
@@ -675,11 +674,11 @@ pub(crate) mod tests {
     impl Handler for TestOnlyIdCollector {
         fn name(&self) -> String { "TestOnlyIdCollector".to_string() }
 
-        fn handle(&mut self, result: &mut HandlerData) {
-            result.nodes.iter().for_each(|node| result.node_ids.set(node.id() as usize, true));
+        fn handle(&mut self, data: &mut HandlerData) {
+            data.nodes.iter().for_each(|node| data.node_ids.set(node.id() as usize, true));
 
-            result.ways.iter().for_each(|way| self.way_ids.set(way.id() as usize, true));
-            result.relations.iter().for_each(|relation| self.relation_ids.set(relation.id() as usize, true));
+            data.ways.iter().for_each(|way| self.way_ids.set(way.id() as usize, true));
+            data.relations.iter().for_each(|relation| self.relation_ids.set(relation.id() as usize, true));
         }
     }
 
@@ -700,14 +699,14 @@ pub(crate) mod tests {
     impl Handler for TestOnlyOrderRecorder {
         fn name(&self) -> String { format!("TestOnlyOrderRecorder {}", self.result_key) }
 
-        fn handle(&mut self, result: &mut HandlerData) {
-            result.nodes.iter().for_each(|node| self.received_ids.push(format!("node#{}", node.id().to_string())));
-            result.ways.iter().for_each(|node| self.received_ids.push(format!("way#{}", node.id().to_string())));
-            result.relations.iter().for_each(|node| self.received_ids.push(format!("relation#{}", node.id().to_string())));
+        fn handle(&mut self, data: &mut HandlerData) {
+            data.nodes.iter().for_each(|node| self.received_ids.push(format!("node#{}", node.id().to_string())));
+            data.ways.iter().for_each(|node| self.received_ids.push(format!("way#{}", node.id().to_string())));
+            data.relations.iter().for_each(|node| self.received_ids.push(format!("relation#{}", node.id().to_string())));
         }
 
-        fn close(&mut self, result: &mut HandlerData) {
-            result.other.insert(format!("{}", self.name()), self.received_ids.join(", "));
+        fn close(&mut self, data: &mut HandlerData) {
+            data.other.insert(format!("{}", self.name()), self.received_ids.join(", "));
         }
     }
 
@@ -739,31 +738,31 @@ pub(crate) mod tests {
     impl Handler for ElementEvaluator {
         fn name(&self) -> String { format!("ElementEvaluator#{}", self.id.clone()) }
 
-        fn handle(&mut self, result: &mut HandlerData) {
-            result.nodes.iter().for_each(|node| {
+        fn handle(&mut self, data: &mut HandlerData) {
+            data.nodes.iter().for_each(|node| {
                 self.node_results.insert(node.id(), (self.node_evaluator)(node));
             });
-            result.ways.iter().for_each(|way| {
+            data.ways.iter().for_each(|way| {
                 self.way_results.insert(way.id(), (self.way_evaluator)(way));
             });
-            result.relations.iter().for_each(|relation| {
+            data.relations.iter().for_each(|relation| {
                 self.relation_results.insert(relation.id(), (self.relation_evaluator)(relation));
             });
         }
 
-        fn close(&mut self, result: &mut HandlerData) {
-            result.other.insert(format!("{} node results", self.name()), self.node_results.iter().map(|(k, v)| format!("{}:{}", k, v)).collect::<Vec<String>>().join(", "));
-            result.other.insert(format!("{} way results", self.name()), self.way_results.iter().map(|(k, v)| format!("{}:{}", k, v)).collect::<Vec<String>>().join(", "));
-            result.other.insert(format!("{} relation results", self.name()), self.relation_results.iter().map(|(k, v)| format!("{}:{}", k, v)).collect::<Vec<String>>().join(", "));
+        fn close(&mut self, data: &mut HandlerData) {
+            data.other.insert(format!("{} node results", self.name()), self.node_results.iter().map(|(k, v)| format!("{}:{}", k, v)).collect::<Vec<String>>().join(", "));
+            data.other.insert(format!("{} way results", self.name()), self.way_results.iter().map(|(k, v)| format!("{}:{}", k, v)).collect::<Vec<String>>().join(", "));
+            data.other.insert(format!("{} relation results", self.name()), self.relation_results.iter().map(|(k, v)| format!("{}:{}", k, v)).collect::<Vec<String>>().join(", "));
 
             self.node_results.iter().for_each(|(k, v)| {
-                result.other.insert(format!("{}:node#{}", self.name(), k), v.clone());
+                data.other.insert(format!("{}:node#{}", self.name(), k), v.clone());
             });
             self.way_results.iter().for_each(|(k, v)| {
-                result.other.insert(format!("{}:way#{}", self.name(), k), v.clone());
+                data.other.insert(format!("{}:way#{}", self.name(), k), v.clone());
             });
             self.relation_results.iter().for_each(|(k, v)| {
-                result.other.insert(format!("{}:relation#{}", self.name(), k), v.clone());
+                data.other.insert(format!("{}:relation#{}", self.name(), k), v.clone());
             });
         }
     }
@@ -771,7 +770,7 @@ pub(crate) mod tests {
     #[test]
     /// Assert that it is possible to run a chain of processors.
     fn test_chain() {
-        let mut result = HandlerData::default();
+        let mut data = HandlerData::default();
         let mut processor_chain = HandlerChain::default()
             .add(ElementCounter::new(ElementCountResultType::InputCount))
             .add(TestOnlyOrderRecorder::new("initial"))
@@ -782,23 +781,23 @@ pub(crate) mod tests {
             .add(TestOnlyOrderRecorder::new("final"))
             .add(ElementCounter::new(ElementCountResultType::OutputCount))
             ;
-        processor_chain.process(simple_node_element(1, vec![("who", "kasper")]), &mut result);
-        processor_chain.process(simple_node_element(2, vec![("who", "seppl")]), &mut result);
-        processor_chain.process(simple_node_element(6, vec![("who", "hotzenplotz")]), &mut result);
-        processor_chain.process(simple_node_element(8, vec![("who", "großmutter")]), &mut result);
-        processor_chain.flush_handlers(&mut result);
-        processor_chain.collect_result(&mut result);
+        processor_chain.process(simple_node_element(1, vec![("who", "kasper")]), &mut data);
+        processor_chain.process(simple_node_element(2, vec![("who", "seppl")]), &mut data);
+        processor_chain.process(simple_node_element(6, vec![("who", "hotzenplotz")]), &mut data);
+        processor_chain.process(simple_node_element(8, vec![("who", "großmutter")]), &mut data);
+        processor_chain.flush_handlers(&mut data);
+        processor_chain.close_handlers(&mut data);
 
-        assert_element_counts(&result, 4, 4,
+        assert_element_counts(&data, 4, 4,
                               0, 0,
                               0, 0);
-        assert_eq!(&result.other.get("TestOnlyOrderRecorder initial").unwrap().clone(), "node#1, node#2, node#6, node#8");
-        assert_eq!(&result.other.get("TestOnlyOrderRecorder final").unwrap().clone(), "node#1, node#2, node#6, node#8");
-        assert!(&result.node_ids.get(1).unwrap());
-        assert!(&result.node_ids.get(2).unwrap());
-        assert!(&result.node_ids.get(6).unwrap());
-        assert!(&result.node_ids.get(8).unwrap());
-        assert!( ! &result.node_ids.get(3).unwrap());
+        assert_eq!(&data.other.get("TestOnlyOrderRecorder initial").unwrap().clone(), "node#1, node#2, node#6, node#8");
+        assert_eq!(&data.other.get("TestOnlyOrderRecorder final").unwrap().clone(), "node#1, node#2, node#6, node#8");
+        assert!(&data.node_ids.get(1).unwrap());
+        assert!(&data.node_ids.get(2).unwrap());
+        assert!(&data.node_ids.get(6).unwrap());
+        assert!(&data.node_ids.get(8).unwrap());
+        assert!( ! &data.node_ids.get(3).unwrap());
     }
 
     #[test]
@@ -811,7 +810,7 @@ pub(crate) mod tests {
     /// The test uses TestOnlyElementBufferingDuplicatingEditingProcessor for this.
     fn test_chain_with_buffer() {
         let _ = SimpleLogger::new().init();
-        let mut result = HandlerData::default();
+        let mut data = HandlerData::default();
         let mut processor_chain = HandlerChain::default()
             .add(ElementCounter::new(ElementCountResultType::InputCount))
             .add(TestOnlyOrderRecorder::new("initial"))
@@ -823,21 +822,21 @@ pub(crate) mod tests {
             .add(ElementCounter::new(ElementCountResultType::OutputCount))
             ;
 
-        processor_chain.process(simple_node_element(1, vec![("who", "kasper")]), &mut result);
-        processor_chain.process(simple_node_element(2, vec![("who", "seppl")]), &mut result);
-        processor_chain.process(simple_node_element(6, vec![("who", "hotzenplotz")]), &mut result);
-        processor_chain.process(simple_node_element(8, vec![("who", "großmutter")]), &mut result);
-        processor_chain.process(simple_way_element(23, vec![1, 2, 8, 6], vec![("who", "kasper")]), &mut result);
-        processor_chain.process(simple_relation_element(66, vec![(MemberType::Way, 23, "kasper&seppl brign großmutter to hotzenplotz")], vec![("who", "großmutter")]), &mut result);
-        processor_chain.flush_handlers(&mut result);
-        println!("result nach flush: \n{}", result.format_multi_line());
-        processor_chain.collect_result(&mut result);
+        processor_chain.process(simple_node_element(1, vec![("who", "kasper")]), &mut data);
+        processor_chain.process(simple_node_element(2, vec![("who", "seppl")]), &mut data);
+        processor_chain.process(simple_node_element(6, vec![("who", "hotzenplotz")]), &mut data);
+        processor_chain.process(simple_node_element(8, vec![("who", "großmutter")]), &mut data);
+        processor_chain.process(simple_way_element(23, vec![1, 2, 8, 6], vec![("who", "kasper")]), &mut data);
+        processor_chain.process(simple_relation_element(66, vec![(MemberType::Way, 23, "kasper&seppl brign großmutter to hotzenplotz")], vec![("who", "großmutter")]), &mut data);
+        processor_chain.flush_handlers(&mut data);
+        println!("result after flush: \n{}", data.format_multi_line());
+        processor_chain.close_handlers(&mut data);
 
-        assert_element_counts(&result, 4, 8,
+        assert_element_counts(&data, 4, 8,
                               1, 1,
                               1, 1);
-        assert_eq!(&result.other.get("TestOnlyOrderRecorder initial").unwrap().clone(), "node#1, node#2, node#6, node#8, way#23, relation#66");
-        assert_eq!(&result.other.get("TestOnlyOrderRecorder final").unwrap().clone(), "node#1, node#101, node#2, node#102, node#6, node#106, node#8, node#108, way#23, relation#66");
+        assert_eq!(&data.other.get("TestOnlyOrderRecorder initial").unwrap().clone(), "node#1, node#2, node#6, node#8, way#23, relation#66");
+        assert_eq!(&data.other.get("TestOnlyOrderRecorder final").unwrap().clone(), "node#1, node#101, node#2, node#102, node#6, node#106, node#8, node#108, way#23, relation#66");
     }
 
     #[test]
@@ -847,7 +846,7 @@ pub(crate) mod tests {
     /// The test uses TestOnlyElementAdder for this.
     fn test_chain_with_element_adder() {
         let _ = SimpleLogger::new().init();
-        let mut result = HandlerData::default();
+        let mut data = HandlerData::default();
         let mut processor_chain = HandlerChain::default()
             .add(ElementCounter::new(ElementCountResultType::InputCount))
             .add(TestOnlyOrderRecorder::new("initial"))
@@ -859,19 +858,19 @@ pub(crate) mod tests {
             .add(ElementCounter::new(ElementCountResultType::OutputCount))
             ;
 
-        processor_chain.process(simple_way_element(23, vec![1, 2, 8, 6], vec![("who", "kasper")]), &mut result);
-        processor_chain.process(simple_node_element(1, vec![("who", "kasper")]), &mut result);
-        processor_chain.process(simple_node_element(2, vec![("who", "seppl")]), &mut result);
-        processor_chain.process(simple_node_element(6, vec![("who", "hotzenplotz")]), &mut result);
-        processor_chain.process(simple_node_element(8, vec![("who", "großmutter")]), &mut result);
-        processor_chain.flush_handlers(&mut result);
-        processor_chain.collect_result(&mut result);
+        processor_chain.process(simple_way_element(23, vec![1, 2, 8, 6], vec![("who", "kasper")]), &mut data);
+        processor_chain.process(simple_node_element(1, vec![("who", "kasper")]), &mut data);
+        processor_chain.process(simple_node_element(2, vec![("who", "seppl")]), &mut data);
+        processor_chain.process(simple_node_element(6, vec![("who", "hotzenplotz")]), &mut data);
+        processor_chain.process(simple_node_element(8, vec![("who", "großmutter")]), &mut data);
+        processor_chain.flush_handlers(&mut data);
+        processor_chain.close_handlers(&mut data);
 
-        assert_element_counts(&result, 4, 8,
+        assert_element_counts(&data, 4, 8,
                               0, 0,
                               1, 1);
-        assert_eq!(&result.other.get("TestOnlyOrderRecorder initial").unwrap().clone(), "way#23, node#1, node#2, node#6, node#8");
-        assert_eq!(&result.other.get("TestOnlyOrderRecorder final").unwrap().clone(), "way#23, node#1, node#101, node#2, node#102, node#6, node#106, node#8, node#108");
+        assert_eq!(&data.other.get("TestOnlyOrderRecorder initial").unwrap().clone(), "way#23, node#1, node#2, node#6, node#8");
+        assert_eq!(&data.other.get("TestOnlyOrderRecorder final").unwrap().clone(), "way#23, node#1, node#101, node#2, node#102, node#6, node#106, node#8, node#108");
     }
 
     #[test]
@@ -879,7 +878,7 @@ pub(crate) mod tests {
     /// The test uses TestOnlyElementFilter for this, which filters nodes with an even id.
     fn test_chain_with_element_filter() {
         let _ = SimpleLogger::new().init();
-        let mut result = HandlerData::default();
+        let mut data = HandlerData::default();
         let mut processor_chain = HandlerChain::default()
             .add(ElementCounter::new(ElementCountResultType::InputCount))
             .add(TestOnlyOrderRecorder::new("initial"))
@@ -891,18 +890,18 @@ pub(crate) mod tests {
             .add(ElementCounter::new(ElementCountResultType::OutputCount))
             ;
 
-        processor_chain.process(simple_node_element(1, vec![("who", "kasper")]), &mut result);
-        processor_chain.process(simple_node_element(2, vec![("who", "seppl")]), &mut result);
-        processor_chain.process(simple_node_element(6, vec![("who", "hotzenplotz")]), &mut result);
-        processor_chain.process(simple_node_element(8, vec![("who", "großmutter")]), &mut result);
-        processor_chain.flush_handlers(&mut result);
-        processor_chain.collect_result(&mut result);
+        processor_chain.process(simple_node_element(1, vec![("who", "kasper")]), &mut data);
+        processor_chain.process(simple_node_element(2, vec![("who", "seppl")]), &mut data);
+        processor_chain.process(simple_node_element(6, vec![("who", "hotzenplotz")]), &mut data);
+        processor_chain.process(simple_node_element(8, vec![("who", "großmutter")]), &mut data);
+        processor_chain.flush_handlers(&mut data);
+        processor_chain.close_handlers(&mut data);
 
-        assert_element_counts(&result, 4, 1,
+        assert_element_counts(&data, 4, 1,
                               0, 0,
                               0, 0);
-        assert_eq!(&result.other.get("TestOnlyOrderRecorder initial").unwrap().clone(), "node#1, node#2, node#6, node#8");
-        assert_eq!(&result.other.get("TestOnlyOrderRecorder final").unwrap().clone(), "node#1");
+        assert_eq!(&data.other.get("TestOnlyOrderRecorder initial").unwrap().clone(), "node#1, node#2, node#6, node#8");
+        assert_eq!(&data.other.get("TestOnlyOrderRecorder final").unwrap().clone(), "node#1");
     }
 
     #[test]
@@ -911,7 +910,7 @@ pub(crate) mod tests {
     /// The test uses TestOnlyElementReplacer for this, which replaces node#6 with a new instance.
     fn test_chain_with_element_replacer() {
         let _ = SimpleLogger::new().init();
-        let mut result = HandlerData::default();
+        let mut data = HandlerData::default();
         let mut processor_chain = HandlerChain::default()
             .add(ElementCounter::new(ElementCountResultType::InputCount))
             .add(TestOnlyOrderRecorder::new("initial"))
@@ -923,28 +922,28 @@ pub(crate) mod tests {
             .add(ElementCounter::new(ElementCountResultType::OutputCount))
             ;
 
-        processor_chain.process(simple_node_element(1, vec![("who", "kasper")]), &mut result);
-        processor_chain.process(simple_node_element(2, vec![("who", "seppl")]), &mut result);
-        processor_chain.process(simple_node_element(6, vec![("who", "hotzenplotz")]), &mut result);
-        processor_chain.process(simple_node_element(8, vec![("who", "großmutter")]), &mut result);
-        processor_chain.flush_handlers(&mut result);
-        processor_chain.collect_result(&mut result);
+        processor_chain.process(simple_node_element(1, vec![("who", "kasper")]), &mut data);
+        processor_chain.process(simple_node_element(2, vec![("who", "seppl")]), &mut data);
+        processor_chain.process(simple_node_element(6, vec![("who", "hotzenplotz")]), &mut data);
+        processor_chain.process(simple_node_element(8, vec![("who", "großmutter")]), &mut data);
+        processor_chain.flush_handlers(&mut data);
+        processor_chain.close_handlers(&mut data);
 
-        assert_element_counts(&result,
+        assert_element_counts(&data,
                               4, 4,
                               0, 0,
                               0, 0);
-        assert_eq!(&result.other.get("TestOnlyOrderRecorder initial").unwrap().clone(), "node#1, node#2, node#6, node#8");
-        assert_eq!(&result.other.get("TestOnlyOrderRecorder final").unwrap().clone(), "node#1, node#2, node#66, node#8");
+        assert_eq!(&data.other.get("TestOnlyOrderRecorder initial").unwrap().clone(), "node#1, node#2, node#6, node#8");
+        assert_eq!(&data.other.get("TestOnlyOrderRecorder final").unwrap().clone(), "node#1, node#2, node#66, node#8");
     }
 
-    fn assert_element_counts(result: &HandlerData, input_node_count: u64, output_node_count: u64, input_relation_count: u64, output_relation_count: u64, input_way_count: u64, output_way_count: u64) {
-        assert_eq!(&result.input_node_count, &input_node_count);
-        assert_eq!(&result.output_node_count, &output_node_count);
-        assert_eq!(&result.input_relation_count, &input_relation_count);
-        assert_eq!(&result.output_relation_count, &output_relation_count);
-        assert_eq!(&result.input_way_count, &input_way_count);
-        assert_eq!(&result.output_way_count, &output_way_count);
+    fn assert_element_counts(data: &HandlerData, input_node_count: u64, output_node_count: u64, input_relation_count: u64, output_relation_count: u64, input_way_count: u64, output_way_count: u64) {
+        assert_eq!(&data.input_node_count, &input_node_count);
+        assert_eq!(&data.output_node_count, &output_node_count);
+        assert_eq!(&data.input_relation_count, &input_relation_count);
+        assert_eq!(&data.output_relation_count, &output_relation_count);
+        assert_eq!(&data.input_way_count, &input_way_count);
+        assert_eq!(&data.output_way_count, &output_way_count);
     }
     #[test]
     /// Assert that it is possible to run the chain and let processors modify received instances,
@@ -956,7 +955,7 @@ pub(crate) mod tests {
     /// which is not explicitly asserted.
     fn test_chain_with_element_modifier() {
         let _ = SimpleLogger::new().init();
-        let mut result = HandlerData::default();
+        let mut data = HandlerData::default();
         let mut processor_chain = HandlerChain::default()
             .add(ElementCounter::new(ElementCountResultType::InputCount))
             .add(TestOnlyOrderRecorder::new("initial"))
@@ -969,26 +968,26 @@ pub(crate) mod tests {
             .add(ElementCounter::new(ElementCountResultType::OutputCount))
             ;
 
-        processor_chain.process(simple_node_element(1, vec![("who", "kasper")]), &mut result);
-        processor_chain.process(simple_node_element(2, vec![("who", "seppl")]), &mut result);
-        processor_chain.process(simple_node_element(6, vec![("who", "hotzenplotz")]), &mut result);
-        processor_chain.process(simple_node_element(8, vec![("who", "großmutter")]), &mut result);
-        processor_chain.flush_handlers(&mut result);
-        processor_chain.collect_result(&mut result);
+        processor_chain.process(simple_node_element(1, vec![("who", "kasper")]), &mut data);
+        processor_chain.process(simple_node_element(2, vec![("who", "seppl")]), &mut data);
+        processor_chain.process(simple_node_element(6, vec![("who", "hotzenplotz")]), &mut data);
+        processor_chain.process(simple_node_element(8, vec![("who", "großmutter")]), &mut data);
+        processor_chain.flush_handlers(&mut data);
+        processor_chain.close_handlers(&mut data);
 
-        assert_element_counts(&result, 4,
+        assert_element_counts(&data, 4,
                               //kasper with odd id was not modified and later filtered:
                               3,
                               0, 0,
                               0, 0);
-        assert_eq!(&result.other.get("TestOnlyOrderRecorder initial").unwrap().clone(), "node#1, node#2, node#6, node#8");
-        assert_eq!(&result.other.get("TestOnlyOrderRecorder final").unwrap().clone(), "node#2, node#6, node#8");
+        assert_eq!(&data.other.get("TestOnlyOrderRecorder initial").unwrap().clone(), "node#1, node#2, node#6, node#8");
+        assert_eq!(&data.other.get("TestOnlyOrderRecorder final").unwrap().clone(), "node#2, node#6, node#8");
     }
 
     #[test]
     fn handler_chain() {
         let _ = SimpleLogger::new().init();
-        let mut result = HandlerData::default();
+        let mut data = HandlerData::default();
         let chain = HandlerChain::default()
             .add(ElementCounter::new(ElementCountResultType::InputCount))
             .add(TagValueBasedOsmElementsFilter::new(
@@ -1004,21 +1003,21 @@ pub(crate) mod tests {
             .add(ElementCounter::new(ElementCountResultType::OutputCount))
             .add(TestOnlyIdCollector::new(100));
 
-        handle_test_nodes_and_verify_result(chain, &mut result);
+        handle_test_nodes_and_verify_result(chain, &mut data);
     }
 
     #[test]
     fn handler_chain_with_node_id_filter() {
         let _ = SimpleLogger::new().init();
-        let mut result = HandlerData::default();
-        result.node_ids.set(1usize, true);
-        result.node_ids.set(2usize, true);
+        let mut data = HandlerData::default();
+        data.node_ids.set(1usize, true);
+        data.node_ids.set(2usize, true);
         let chain = HandlerChain::default()
             .add(ElementCounter::new(ElementCountResultType::InputCount))
             .add(NodeIdFilter {})
             .add(ElementCounter::new(ElementCountResultType::OutputCount));
 
-        handle_test_nodes_and_verify_result(chain, &mut result);
+        handle_test_nodes_and_verify_result(chain, &mut data);
     }
 
 
@@ -1026,7 +1025,7 @@ pub(crate) mod tests {
     fn handler_chains_with_node_id_collector_and_filter() {
         let _ = SimpleLogger::new().init();
 
-        let mut result = HandlerData::default();
+        let mut data = HandlerData::default();
         let mut chain1 = HandlerChain::default()
             .add(ReferencedNodeIdCollector::default());
 
@@ -1035,34 +1034,34 @@ pub(crate) mod tests {
             .add(NodeIdFilter {})
             .add(ElementCounter::new(ElementCountResultType::OutputCount));
 
-        chain1.process(simple_way_element(23, vec![1, 2], vec![("who", "kasper")]), &mut result);
+        chain1.process(simple_way_element(23, vec![1, 2], vec![("who", "kasper")]), &mut data);
 
-        handle_test_nodes_and_verify_result(chain2, &mut result);
+        handle_test_nodes_and_verify_result(chain2, &mut data);
     }
 
-    fn handle_test_nodes_and_verify_result(mut handler_chain: HandlerChain, result: &mut HandlerData) {
-        handler_chain.process(simple_node_element(1, vec![(existing_tag().as_str(), "kasper")]), result);
-        handler_chain.process(simple_node_element(2, vec![(existing_tag().as_str(), "seppl")]), result);
-        handler_chain.process(simple_node_element(3, vec![(existing_tag().as_str(), "hotzenplotz")]), result);
-        handler_chain.process(simple_node_element(4, vec![(existing_tag().as_str(), "großmutter")]), result);
+    fn handle_test_nodes_and_verify_result(mut handler_chain: HandlerChain, data: &mut HandlerData) {
+        handler_chain.process(simple_node_element(1, vec![(existing_tag().as_str(), "kasper")]), data);
+        handler_chain.process(simple_node_element(2, vec![(existing_tag().as_str(), "seppl")]), data);
+        handler_chain.process(simple_node_element(3, vec![(existing_tag().as_str(), "hotzenplotz")]), data);
+        handler_chain.process(simple_node_element(4, vec![(existing_tag().as_str(), "großmutter")]), data);
 
-        handler_chain.flush_handlers(result);
-        handler_chain.collect_result(result);
-        assert_element_counts(&result,
+        handler_chain.flush_handlers(data);
+        handler_chain.close_handlers(data);
+        assert_element_counts(&data,
                               4, 2,
                               0, 0,
                               0, 0);
-        assert_eq!(result.node_ids[0], false);
-        assert_eq!(result.node_ids[1], true);
-        assert_eq!(result.node_ids[2], true);
-        assert_eq!(result.node_ids[3], false);
-        assert_eq!(result.node_ids[4], false);
+        assert_eq!(data.node_ids[0], false);
+        assert_eq!(data.node_ids[1], true);
+        assert_eq!(data.node_ids[2], true);
+        assert_eq!(data.node_ids[3], false);
+        assert_eq!(data.node_ids[4], false);
     }
 
     #[test]
     fn handler_chain_with_buffering_elevation_enricher_adds_new_nodes_with_elevation() {
         let _ = SimpleLogger::new().init();
-        let mut result = HandlerData::default();
+        let mut data = HandlerData::default();
         let mut node_ids = BitVec::from_elem(10usize, false);
         node_ids.set(1usize, true);
         node_ids.set(2usize, true);
@@ -1090,67 +1089,67 @@ pub(crate) mod tests {
                                        Box::new(|way| way.refs().iter().map(|id| id.to_string()).collect::<Vec<String>>().join(",")),
                                        Box::new(|_| "".to_string())));
 
-        handler_chain.process(as_node_element(node_without_ele_from_location(101, location_with_elevation_hd_philosophers_way_start(), vec![])), &mut result);
-        handler_chain.process(as_node_element(node_without_ele_from_location(102, location_with_elevation_hd_philosophers_way_end(), vec![])), &mut result);
-        handler_chain.process(as_way_element(simple_way(201, vec![101, 102], vec![])), &mut result);
-        handler_chain.flush_handlers(&mut result);
-        handler_chain.collect_result(&mut result);
+        handler_chain.process(as_node_element(node_without_ele_from_location(101, location_with_elevation_hd_philosophers_way_start(), vec![])), &mut data);
+        handler_chain.process(as_node_element(node_without_ele_from_location(102, location_with_elevation_hd_philosophers_way_end(), vec![])), &mut data);
+        handler_chain.process(as_way_element(simple_way(201, vec![101, 102], vec![])), &mut data);
+        handler_chain.flush_handlers(&mut data);
+        handler_chain.close_handlers(&mut data);
 
-        // dbg!(&result); // This causes the test to run eternally...?!
+        // dbg!(&data); // This causes the test to run eternally...?!
 
-        assert_element_counts(&result, 2, 3,
+        assert_element_counts(&data, 2, 3,
                               0, 0,
                               1, 1);
-        assert_eq!(&result.other.get("TestOnlyOrderRecorder initial").unwrap().clone(), "node#101, node#102, way#201");
-        assert_eq!(&result.other.get("TestOnlyOrderRecorder final").unwrap().clone(), format!("node#101, node#102, node#{}, way#201", HIGHEST_NODE_ID+1).as_str());
-        assert_eq!(&result.other.get("ElementEvaluator#elevation node results").unwrap().clone(), format!("101:true, 102:true, {}:true", HIGHEST_NODE_ID+1).as_str() );
-        assert_eq!(&result.other.get("ElementEvaluator#way_refs:way#201").unwrap().clone(), format!("101,{},102",HIGHEST_NODE_ID+1).as_str());
+        assert_eq!(&data.other.get("TestOnlyOrderRecorder initial").unwrap().clone(), "node#101, node#102, way#201");
+        assert_eq!(&data.other.get("TestOnlyOrderRecorder final").unwrap().clone(), format!("node#101, node#102, node#{}, way#201", HIGHEST_NODE_ID+1).as_str());
+        assert_eq!(&data.other.get("ElementEvaluator#elevation node results").unwrap().clone(), format!("101:true, 102:true, {}:true", HIGHEST_NODE_ID+1).as_str() );
+        assert_eq!(&data.other.get("ElementEvaluator#way_refs:way#201").unwrap().clone(), format!("101,{},102", HIGHEST_NODE_ID+1).as_str());
     }
 
-    fn add_to_result(result: &mut HandlerData, elements: Vec<(MemberType, i64)>) {
+    fn add_to_result(data: &mut HandlerData, elements: Vec<(MemberType, i64)>) {
         for (member_type, id) in elements {
             match member_type {
-                MemberType::Node => result.nodes.push(simple_node(id, vec![])),
-                MemberType::Way => result.ways.push(simple_way(id, vec![], vec![])),
-                MemberType::Relation => result.relations.push(simple_relation(id, vec![], vec![])),
+                MemberType::Node => data.nodes.push(simple_node(id, vec![])),
+                MemberType::Way => data.ways.push(simple_way(id, vec![], vec![])),
+                MemberType::Relation => data.relations.push(simple_relation(id, vec![], vec![])),
             }
         }
     }
-    fn process_elements_one_by_one(handler_chain: &mut HandlerChain, result: &mut HandlerData, elements: Vec<(MemberType, i64)>) {
+    fn process_elements_one_by_one(handler_chain: &mut HandlerChain, data: &mut HandlerData, elements: Vec<(MemberType, i64)>) {
         for (member_type, id) in elements {
             match member_type {
-                MemberType::Node => handler_chain.process(simple_node_element(id, vec![]), result),
-                MemberType::Way => handler_chain.process(simple_way_element(id, vec![], vec![]), result),
-                MemberType::Relation => handler_chain.process(simple_relation_element(id, vec![], vec![]), result),
+                MemberType::Node => handler_chain.process(simple_node_element(id, vec![]), data),
+                MemberType::Way => handler_chain.process(simple_way_element(id, vec![], vec![]), data),
+                MemberType::Relation => handler_chain.process(simple_relation_element(id, vec![], vec![]), data),
             }
         }
-        handler_chain.flush_handlers(result);
-        handler_chain.collect_result(result);
+        handler_chain.flush_handlers(data);
+        handler_chain.close_handlers(data);
     }
-    fn flush_elements_one_by_one(handler_chain: &mut HandlerChain, result: &mut HandlerData, elements: Vec<(MemberType, i64)>) {
+    fn flush_elements_one_by_one(handler_chain: &mut HandlerChain, data: &mut HandlerData, elements: Vec<(MemberType, i64)>) {
         for (member_type, id) in elements {
             match member_type {
                 MemberType::Node => {
-                    result.nodes.push(simple_node(id, vec![]));
-                    handler_chain.flush_handlers(result); },
+                    data.nodes.push(simple_node(id, vec![]));
+                    handler_chain.flush_handlers(data); },
                 MemberType::Way => {
-                    result.ways.push(simple_way(id, vec![], vec![]));
-                    handler_chain.flush_handlers(result);
+                    data.ways.push(simple_way(id, vec![], vec![]));
+                    handler_chain.flush_handlers(data);
                 },
                 MemberType::Relation => {
-                    result.relations.push(simple_relation(id, vec![], vec![]));
-                    handler_chain.flush_handlers(result);
+                    data.relations.push(simple_relation(id, vec![], vec![]));
+                    handler_chain.flush_handlers(data);
                 },
             }
         }
 
-        handler_chain.collect_result(result);
+        handler_chain.close_handlers(data);
     }
 
-    fn flush_elements_in_one_call(handler_chain: &mut HandlerChain, result: &mut HandlerData, elements: Vec<(MemberType, i64)>) {
-        add_to_result(result, elements);
-        handler_chain.flush_handlers(result);
-        handler_chain.collect_result(result);
+    fn flush_elements_in_one_call(handler_chain: &mut HandlerChain, data: &mut HandlerData, elements: Vec<(MemberType, i64)>) {
+        add_to_result(data, elements);
+        handler_chain.flush_handlers(data);
+        handler_chain.close_handlers(data);
     }
 
     #[test]
@@ -1158,151 +1157,151 @@ pub(crate) mod tests {
         let _ = SimpleLogger::new().init();
         let handle_type = OsmElementTypeSelection::node_only();
 
-        let mut result = HandlerData::default();
+        let mut data = HandlerData::default();
         let mut handler_chain = HandlerChain::default()
             .add(TestOnlyOrderRecorder::new("initial"))
             .add(AllElementsFilter{handle_types: handle_type})
             .add(TestOnlyOrderRecorder::new("final"));
 
-        process_elements_one_by_one(&mut handler_chain, &mut result, vec![
+        process_elements_one_by_one(&mut handler_chain, &mut data, vec![
             (MemberType::Node, 1), (MemberType::Way, 11), (MemberType::Relation, 21),
             (MemberType::Node, 2), (MemberType::Way, 12), (MemberType::Relation, 22),
             (MemberType::Node, 3), (MemberType::Way, 13), (MemberType::Relation, 23),
         ]);
 
-        assert_eq!("node#1, way#11, relation#21, node#2, way#12, relation#22, node#3, way#13, relation#23", &result.other.get("TestOnlyOrderRecorder initial").unwrap().clone());
-        assert_eq!("way#11, relation#21, way#12, relation#22, way#13, relation#23", &result.other.get("TestOnlyOrderRecorder final").unwrap().clone());
+        assert_eq!("node#1, way#11, relation#21, node#2, way#12, relation#22, node#3, way#13, relation#23", &data.other.get("TestOnlyOrderRecorder initial").unwrap().clone());
+        assert_eq!("way#11, relation#21, way#12, relation#22, way#13, relation#23", &data.other.get("TestOnlyOrderRecorder final").unwrap().clone());
     }
     #[test]
     fn test_handler_chain_with_all_elements_filter_way_only() {
         let _ = SimpleLogger::new().init();
         let handle_type = OsmElementTypeSelection::way_only();
 
-        let mut result = HandlerData::default();
+        let mut data = HandlerData::default();
         let mut handler_chain = HandlerChain::default()
             .add(TestOnlyOrderRecorder::new("initial"))
             .add(AllElementsFilter{handle_types: handle_type})
             .add(TestOnlyOrderRecorder::new("final"));
 
-        process_elements_one_by_one(&mut handler_chain, &mut result, vec![
+        process_elements_one_by_one(&mut handler_chain, &mut data, vec![
             (MemberType::Node, 1), (MemberType::Way, 11), (MemberType::Relation, 21),
             (MemberType::Node, 2), (MemberType::Way, 12), (MemberType::Relation, 22),
             (MemberType::Node, 3), (MemberType::Way, 13), (MemberType::Relation, 23),
         ]);
 
-        assert_eq!("node#1, way#11, relation#21, node#2, way#12, relation#22, node#3, way#13, relation#23", &result.other.get("TestOnlyOrderRecorder initial").unwrap().clone());
-        assert_eq!("node#1, relation#21, node#2, relation#22, node#3, relation#23", &result.other.get("TestOnlyOrderRecorder final").unwrap().clone());
+        assert_eq!("node#1, way#11, relation#21, node#2, way#12, relation#22, node#3, way#13, relation#23", &data.other.get("TestOnlyOrderRecorder initial").unwrap().clone());
+        assert_eq!("node#1, relation#21, node#2, relation#22, node#3, relation#23", &data.other.get("TestOnlyOrderRecorder final").unwrap().clone());
     }
     #[test]
     fn test_handler_chain_process_elements_with_all_elements_filter_all() {
         let _ = SimpleLogger::new().init();
         let handle_type = OsmElementTypeSelection::all();
 
-        let mut result = HandlerData::default();
+        let mut data = HandlerData::default();
         let mut handler_chain = HandlerChain::default()
             .add(TestOnlyOrderRecorder::new("initial"))
             .add(AllElementsFilter{handle_types: handle_type})
             .add(TestOnlyOrderRecorder::new("final"));
 
-        process_elements_one_by_one(&mut handler_chain, &mut result, vec![
+        process_elements_one_by_one(&mut handler_chain, &mut data, vec![
             (MemberType::Node, 1), (MemberType::Way, 11), (MemberType::Relation, 21),
             (MemberType::Node, 2), (MemberType::Way, 12), (MemberType::Relation, 22),
             (MemberType::Node, 3), (MemberType::Way, 13), (MemberType::Relation, 23),
         ]);
 
-        assert_eq!("node#1, way#11, relation#21, node#2, way#12, relation#22, node#3, way#13, relation#23", &result.other.get("TestOnlyOrderRecorder initial").unwrap().clone());
-        assert_eq!("", &result.other.get("TestOnlyOrderRecorder final").unwrap().clone());
+        assert_eq!("node#1, way#11, relation#21, node#2, way#12, relation#22, node#3, way#13, relation#23", &data.other.get("TestOnlyOrderRecorder initial").unwrap().clone());
+        assert_eq!("", &data.other.get("TestOnlyOrderRecorder final").unwrap().clone());
     }
     #[test]
     fn test_handler_chain_flush_one_by_one_with_all_elements_filter_all() {
         let _ = SimpleLogger::new().init();
         let handle_type = OsmElementTypeSelection::all();
 
-        let mut result = HandlerData::default();
+        let mut data = HandlerData::default();
         let mut handler_chain = HandlerChain::default()
             .add(TestOnlyOrderRecorder::new("initial"))
             .add(AllElementsFilter{handle_types: handle_type})
             .add(TestOnlyOrderRecorder::new("final"));
 
-        flush_elements_one_by_one(&mut handler_chain, &mut result, vec![
+        flush_elements_one_by_one(&mut handler_chain, &mut data, vec![
             (MemberType::Node, 1), (MemberType::Way, 11), (MemberType::Relation, 21),
             (MemberType::Node, 2), (MemberType::Way, 12), (MemberType::Relation, 22),
             (MemberType::Node, 3), (MemberType::Way, 13), (MemberType::Relation, 23),
         ]);
 
-        assert_eq!("node#1, way#11, relation#21, node#2, way#12, relation#22, node#3, way#13, relation#23", &result.other.get("TestOnlyOrderRecorder initial").unwrap().clone());
-        assert_eq!("", &result.other.get("TestOnlyOrderRecorder final").unwrap().clone());
+        assert_eq!("node#1, way#11, relation#21, node#2, way#12, relation#22, node#3, way#13, relation#23", &data.other.get("TestOnlyOrderRecorder initial").unwrap().clone());
+        assert_eq!("", &data.other.get("TestOnlyOrderRecorder final").unwrap().clone());
     }
     #[test]
     fn test_handler_chain_flush_in_one_call_with_all_elements_filter_all() {
         let _ = SimpleLogger::new().init();
         let handle_type = OsmElementTypeSelection::all();
 
-        let mut result = HandlerData::default();
+        let mut data = HandlerData::default();
         let mut handler_chain = HandlerChain::default()
             .add(TestOnlyOrderRecorder::new("initial"))
             .add(AllElementsFilter{handle_types: handle_type})
             .add(TestOnlyOrderRecorder::new("final"));
 
-        flush_elements_in_one_call(&mut handler_chain, &mut result, vec![
+        flush_elements_in_one_call(&mut handler_chain, &mut data, vec![
             (MemberType::Node, 1), (MemberType::Way, 11), (MemberType::Relation, 21),
             (MemberType::Node, 2), (MemberType::Way, 12), (MemberType::Relation, 22),
             (MemberType::Node, 3), (MemberType::Way, 13), (MemberType::Relation, 23),
         ]);
 
-        assert_eq!("node#1, node#2, node#3, way#11, way#12, way#13, relation#21, relation#22, relation#23", &result.other.get("TestOnlyOrderRecorder initial").unwrap().clone());
-        assert_eq!("", &result.other.get("TestOnlyOrderRecorder final").unwrap().clone());
+        assert_eq!("node#1, node#2, node#3, way#11, way#12, way#13, relation#21, relation#22, relation#23", &data.other.get("TestOnlyOrderRecorder initial").unwrap().clone());
+        assert_eq!("", &data.other.get("TestOnlyOrderRecorder final").unwrap().clone());
     }
 
     #[test]
     fn test_handler_chain_process_with_complex_elements_filter() {
         let _ = SimpleLogger::new().init();
 
-        let mut result = HandlerData::default();
+        let mut data = HandlerData::default();
         let mut handler_chain = HandlerChain::default()
             .add(TestOnlyOrderRecorder::new("initial"))
             .add(ComplexElementsFilter::ors_default())
             .add(TestOnlyOrderRecorder::new("final"));
 
         //should be removed:
-        handler_chain.process(simple_way_element(1, vec![], vec![("building", "x")]), &mut result);
-        handler_chain.process(simple_relation_element(1, vec![], vec![("building", "x")]), &mut result);
+        handler_chain.process(simple_way_element(1, vec![], vec![("building", "x")]), &mut data);
+        handler_chain.process(simple_relation_element(1, vec![], vec![("building", "x")]), &mut data);
         //should be accepted:
-        handler_chain.process(simple_way_element(2, vec![], vec![("route", "xyz")]), &mut result);
-        handler_chain.process(simple_relation_element(2, vec![], vec![("route", "xyz")]), &mut result);
+        handler_chain.process(simple_way_element(2, vec![], vec![("route", "xyz")]), &mut data);
+        handler_chain.process(simple_relation_element(2, vec![], vec![("route", "xyz")]), &mut data);
         //nodes should be accepted and passed through:
-        handler_chain.process(simple_node_element(1, vec![]), &mut result);
+        handler_chain.process(simple_node_element(1, vec![]), &mut data);
 
-        handler_chain.flush_handlers(&mut result);
-        handler_chain.collect_result(&mut result);
+        handler_chain.flush_handlers(&mut data);
+        handler_chain.close_handlers(&mut data);
 
-        assert_eq!("way#1, relation#1, way#2, relation#2, node#1", &result.other.get("TestOnlyOrderRecorder initial").unwrap().clone());
-        assert_eq!("way#2, relation#2, node#1",                    &result.other.get("TestOnlyOrderRecorder final").unwrap().clone());
+        assert_eq!("way#1, relation#1, way#2, relation#2, node#1", &data.other.get("TestOnlyOrderRecorder initial").unwrap().clone());
+        assert_eq!("way#2, relation#2, node#1",                    &data.other.get("TestOnlyOrderRecorder final").unwrap().clone());
     }
     #[test]
     fn test_handler_chain_flush_in_one_call_with_complex_elements_filter() {
         let _ = SimpleLogger::new().init();
 
-        let mut result = HandlerData::default();
+        let mut data = HandlerData::default();
         let mut handler_chain = HandlerChain::default()
             .add(TestOnlyOrderRecorder::new("initial"))
             .add(ComplexElementsFilter::ors_default())
             .add(TestOnlyOrderRecorder::new("final"));
 
         //should be removed:
-        result.ways.push(simple_way(1, vec![], vec![("building", "x")]));
-        result.relations.push(simple_relation(1, vec![], vec![("building", "x")]));
+        data.ways.push(simple_way(1, vec![], vec![("building", "x")]));
+        data.relations.push(simple_relation(1, vec![], vec![("building", "x")]));
         //should be accepted:
-        result.ways.push(simple_way(2, vec![], vec![("route", "xyz")]));
-        result.relations.push(simple_relation(2, vec![], vec![("route", "xyz")]));
+        data.ways.push(simple_way(2, vec![], vec![("route", "xyz")]));
+        data.relations.push(simple_relation(2, vec![], vec![("route", "xyz")]));
         //nodes should be accepted and passed through:
-        result.nodes.push(simple_node(1, vec![]));
+        data.nodes.push(simple_node(1, vec![]));
 
-        handler_chain.flush_handlers(&mut result);
-        handler_chain.collect_result(&mut result);
+        handler_chain.flush_handlers(&mut data);
+        handler_chain.close_handlers(&mut data);
 
-        assert_eq!("node#1, way#1, way#2, relation#1, relation#2", &result.other.get("TestOnlyOrderRecorder initial").unwrap().clone());
-        assert_eq!("node#1, way#2, relation#2",                    &result.other.get("TestOnlyOrderRecorder final").unwrap().clone());
+        assert_eq!("node#1, way#1, way#2, relation#1, relation#2", &data.other.get("TestOnlyOrderRecorder initial").unwrap().clone());
+        assert_eq!("node#1, way#2, relation#2",                    &data.other.get("TestOnlyOrderRecorder final").unwrap().clone());
     }
 
 }

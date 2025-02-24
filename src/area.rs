@@ -206,18 +206,18 @@ impl AreaHandler {
 impl Handler for AreaHandler {
     fn name(&self) -> String { "AreaHandler".to_string() }
 
-    fn handle(&mut self, result: &mut HandlerData) {
-        result.nodes.iter_mut().for_each(|node| self.handle_node(node));
-        result.country_not_found_node_count = self.country_not_found_node_count;
-        result.country_found_node_count = self.country_found_node_count;
+    fn handle(&mut self, data: &mut HandlerData) {
+        data.nodes.iter_mut().for_each(|node| self.handle_node(node));
+        data.country_not_found_node_count = self.country_not_found_node_count;
+        data.country_found_node_count = self.country_found_node_count;
     }
 
-    fn close(&mut self, result: &mut HandlerData){
-        result.other.insert("mapping".to_string(), format!("index:{} area:{} id:{} name:{}",
-                                                           &self.mapping.index.len(),
-                                                           &self.mapping.area.len(),
-                                                           &self.mapping.id.len(),
-                                                           &self.mapping.name.len(), ));
+    fn close(&mut self, data: &mut HandlerData){
+        data.other.insert("mapping".to_string(), format!("index:{} area:{} id:{} name:{}",
+                                                         &self.mapping.index.len(),
+                                                         &self.mapping.area.len(),
+                                                         &self.mapping.id.len(),
+                                                         &self.mapping.name.len(), ));
     }
 }
 
@@ -266,27 +266,27 @@ mod tests {
         MULTIPOINT((2.0 2.0), (3.5 2.0), (2.5 2.0), (6.5 2.0), (1.5 3.5))
          */
 
-        let mut result = HandlerData::default();
-        result.nodes.push(Node::new(0, 1, LonLat::new(1.5, 1.5).c(), 1, 1, 1, "s".to_string(), true, vec![]));
-        result.nodes.push(Node::new(1, 1, LonLat::new(3.0, 1.5).c(), 1, 1, 1, "r".to_string(), true, vec![]));
-        result.nodes.push(Node::new(2, 1, LonLat::new(2.0, 1.5).c(), 1, 1, 1, "b".to_string(), true, vec![]));
-        result.nodes.push(Node::new(3, 1, LonLat::new(6.0, 1.5).c(), 1, 1, 1, "t".to_string(), true, vec![]));
-        result.nodes.push(Node::new(4, 1, LonLat::new(1.0, 3.0).c(), 1, 1, 1, "_".to_string(), true, vec![]));
+        let mut data = HandlerData::default();
+        data.nodes.push(Node::new(0, 1, LonLat::new(1.5, 1.5).c(), 1, 1, 1, "s".to_string(), true, vec![]));
+        data.nodes.push(Node::new(1, 1, LonLat::new(3.0, 1.5).c(), 1, 1, 1, "r".to_string(), true, vec![]));
+        data.nodes.push(Node::new(2, 1, LonLat::new(2.0, 1.5).c(), 1, 1, 1, "b".to_string(), true, vec![]));
+        data.nodes.push(Node::new(3, 1, LonLat::new(6.0, 1.5).c(), 1, 1, 1, "t".to_string(), true, vec![]));
+        data.nodes.push(Node::new(4, 1, LonLat::new(1.0, 3.0).c(), 1, 1, 1, "_".to_string(), true, vec![]));
 
-        area_handler.handle(&mut result);
-        println!("{} {} {:?}", &result.nodes[0].id(),  &result.nodes[0].user(), &result.nodes[0].tags());
-        println!("{} {} {:?}", &result.nodes[1].id(),  &result.nodes[1].user(), &result.nodes[1].tags());
-        println!("{} {} {:?}", &result.nodes[2].id(),  &result.nodes[2].user(), &result.nodes[2].tags());
-        println!("{} {} {:?}", &result.nodes[3].id(),  &result.nodes[3].user(), &result.nodes[3].tags());
-        println!("{} {} {:?}", &result.nodes[4].id(),  &result.nodes[4].user(), &result.nodes[4].tags());
-        assert!(result.nodes[0].tags().iter().any(|tag| { tag.k() == "country" && tag.v() == "SQA"}));
-        assert!(result.nodes[1].tags().iter().any(|tag| { tag.k() == "country" && tag.v() == "REC"}));
-        assert!(result.nodes[3].tags().iter().all(|tag| { tag.k() == "country" && tag.v() == "TRI"}));
-        assert!(result.nodes[4].tags().iter().all(|tag| tag.k() != "country"));
+        area_handler.handle(&mut data);
+        println!("{} {} {:?}", &data.nodes[0].id(), &data.nodes[0].user(), &data.nodes[0].tags());
+        println!("{} {} {:?}", &data.nodes[1].id(), &data.nodes[1].user(), &data.nodes[1].tags());
+        println!("{} {} {:?}", &data.nodes[2].id(), &data.nodes[2].user(), &data.nodes[2].tags());
+        println!("{} {} {:?}", &data.nodes[3].id(), &data.nodes[3].user(), &data.nodes[3].tags());
+        println!("{} {} {:?}", &data.nodes[4].id(), &data.nodes[4].user(), &data.nodes[4].tags());
+        assert!(data.nodes[0].tags().iter().any(|tag| { tag.k() == "country" && tag.v() == "SQA"}));
+        assert!(data.nodes[1].tags().iter().any(|tag| { tag.k() == "country" && tag.v() == "REC"}));
+        assert!(data.nodes[3].tags().iter().all(|tag| { tag.k() == "country" && tag.v() == "TRI"}));
+        assert!(data.nodes[4].tags().iter().all(|tag| tag.k() != "country"));
 
         // If a coordinate is on the border of two areas, and this border is identical to a grid edge,
         // the coordinate is not assigned to both areas. We accept this limitation, because it is a rare case.
-        assert!(result.nodes[2].tags().iter().any(|tag| { tag.k() == "country" && (tag.v() == "SQA" || tag.v() == "REC" || tag.v() == "SQA,REC" || tag.v() == "REC,SQA")}));
+        assert!(data.nodes[2].tags().iter().any(|tag| { tag.k() == "country" && (tag.v() == "SQA" || tag.v() == "REC" || tag.v() == "SQA,REC" || tag.v() == "REC,SQA")}));
     }
     #[test]
     fn test_area_handler() {
@@ -314,24 +314,24 @@ mod tests {
         MULTIPOINT((2.0 2.0), (3.5 2.0), (2.5 2.0), (6.5 2.0), (1.5 3.5))
          */
 
-        let mut result = HandlerData::default();
-        result.nodes.push(Node::new(0, 1, LonLat::new(2.1, 2.1).c(), 1, 1, 1, "s".to_string(), true, vec![]));
-        result.nodes.push(Node::new(1, 1, LonLat::new(3.6, 2.1).c(), 1, 1, 1, "r".to_string(), true, vec![]));
-        result.nodes.push(Node::new(2, 1, LonLat::new(2.5, 2.1).c(), 1, 1, 1, "b".to_string(), true, vec![]));
-        result.nodes.push(Node::new(3, 1, LonLat::new(6.6, 2.1).c(), 1, 1, 1, "t".to_string(), true, vec![]));
-        result.nodes.push(Node::new(4, 1, LonLat::new(1.6, 3.6).c(), 1, 1, 1, "_".to_string(), true, vec![]));
+        let mut data = HandlerData::default();
+        data.nodes.push(Node::new(0, 1, LonLat::new(2.1, 2.1).c(), 1, 1, 1, "s".to_string(), true, vec![]));
+        data.nodes.push(Node::new(1, 1, LonLat::new(3.6, 2.1).c(), 1, 1, 1, "r".to_string(), true, vec![]));
+        data.nodes.push(Node::new(2, 1, LonLat::new(2.5, 2.1).c(), 1, 1, 1, "b".to_string(), true, vec![]));
+        data.nodes.push(Node::new(3, 1, LonLat::new(6.6, 2.1).c(), 1, 1, 1, "t".to_string(), true, vec![]));
+        data.nodes.push(Node::new(4, 1, LonLat::new(1.6, 3.6).c(), 1, 1, 1, "_".to_string(), true, vec![]));
 
-        area_handler.handle(&mut result);
-        println!("{} {} {:?}", &result.nodes[0].id(),  &result.nodes[0].user(), &result.nodes[0].tags());
-        println!("{} {} {:?}", &result.nodes[1].id(),  &result.nodes[1].user(), &result.nodes[1].tags());
-        println!("{} {} {:?}", &result.nodes[2].id(),  &result.nodes[2].user(), &result.nodes[2].tags());
-        println!("{} {} {:?}", &result.nodes[3].id(),  &result.nodes[3].user(), &result.nodes[3].tags());
-        println!("{} {} {:?}", &result.nodes[4].id(),  &result.nodes[4].user(), &result.nodes[4].tags());
-        assert!(result.nodes[0].tags().iter().any(|tag| { tag.k() == "country" && tag.v() == "SQA"}));
-        assert!(result.nodes[1].tags().iter().any(|tag| { tag.k() == "country" && tag.v() == "REC"}));
-        assert!(result.nodes[2].tags().iter().any(|tag| { tag.k() == "country" && (tag.v() == "SQA,REC" || tag.v() == "REC,SQA")}));
-        assert!(result.nodes[3].tags().iter().all(|tag| { tag.k() == "country" && tag.v() == "TRI"}));
-        assert!(result.nodes[4].tags().iter().all(|tag| tag.k() != "country"));
+        area_handler.handle(&mut data);
+        println!("{} {} {:?}", &data.nodes[0].id(), &data.nodes[0].user(), &data.nodes[0].tags());
+        println!("{} {} {:?}", &data.nodes[1].id(), &data.nodes[1].user(), &data.nodes[1].tags());
+        println!("{} {} {:?}", &data.nodes[2].id(), &data.nodes[2].user(), &data.nodes[2].tags());
+        println!("{} {} {:?}", &data.nodes[3].id(), &data.nodes[3].user(), &data.nodes[3].tags());
+        println!("{} {} {:?}", &data.nodes[4].id(), &data.nodes[4].user(), &data.nodes[4].tags());
+        assert!(data.nodes[0].tags().iter().any(|tag| { tag.k() == "country" && tag.v() == "SQA"}));
+        assert!(data.nodes[1].tags().iter().any(|tag| { tag.k() == "country" && tag.v() == "REC"}));
+        assert!(data.nodes[2].tags().iter().any(|tag| { tag.k() == "country" && (tag.v() == "SQA,REC" || tag.v() == "REC,SQA")}));
+        assert!(data.nodes[3].tags().iter().all(|tag| { tag.k() == "country" && tag.v() == "TRI"}));
+        assert!(data.nodes[4].tags().iter().all(|tag| tag.k() != "country"));
     }
 
     #[test]

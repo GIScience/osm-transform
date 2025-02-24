@@ -638,40 +638,40 @@ impl BufferingElevationEnricher {
 impl Handler for BufferingElevationEnricher {
     fn name(&self) -> String { "BufferingElevationEnricher".to_string() }
 
-    fn handle(&mut self, result: &mut HandlerData) {
-        trace!("{}.handle_result() called with {} nodes, {} ways, {} relations", self.name(), result.nodes.len(), result.ways.len(), result.relations.len());
+    fn handle(&mut self, data: &mut HandlerData) {
+        trace!("{}.handle() called with {} nodes, {} ways, {} relations", self.name(), data.nodes.len(), data.ways.len(), data.relations.len());
 
-        if result.nodes.len() > 0 {
-            result.nodes = self.handle_nodes(result.nodes.clone());
+        if data.nodes.len() > 0 {
+            data.nodes = self.handle_nodes(data.nodes.clone());
         }
-        if result.ways.len() > 0 {
-            for way in result.ways.iter_mut() {
-                result.nodes.extend(self.handle_way(way));
+        if data.ways.len() > 0 {
+            for way in data.ways.iter_mut() {
+                data.nodes.extend(self.handle_way(way));
             }
         }
     }
 
-    fn flush(&mut self, result: &mut HandlerData) {
-        trace!("{}.flush() called with {} nodes, {} ways, {} relations", self.name(), result.nodes.len(), result.ways.len(), result.relations.len());
+    fn flush(&mut self, data: &mut HandlerData) {
+        trace!("{}.flush() called with {} nodes, {} ways, {} relations", self.name(), data.nodes.len(), data.ways.len(), data.relations.len());
 
-        result.nodes = self.handle_and_flush_nodes(result.nodes.clone());
-        if result.ways.len()>0 {
-            for way in result.ways.iter_mut() {
-                result.nodes.extend(self.handle_way(way));
+        data.nodes = self.handle_and_flush_nodes(data.nodes.clone());
+        if data.ways.len()>0 {
+            for way in data.ways.iter_mut() {
+                data.nodes.extend(self.handle_way(way));
             }
         }
     }
 
-    fn close(&mut self, result: &mut HandlerData) {
-        result.other.insert("node_cache size".to_string(), format!("{}", self.node_cache.len()));
-        result.elevation_found_node_count = self.ele_lookups_successful as u64;
-        result.elevation_not_found_node_count = self.ele_lookups_failed as u64;
-        result.elevation_not_relevant_node_count = self.ele_lookups_skipped as u64;
-        result.splitted_way_count = self.splitted_way_count as u64;
-        result.elevation_tiff_count_total = self.geotiff_manager.index.get_geotiff_count() as u64;
-        result.elevation_tiff_count_used = self.elevation_tiffs_used.len() as u64;
-        result.elevation_flush_count = self.flush_count as u64;
-        result.elevation_total_buffered_nodes_max_reached_count = self.total_buffered_nodes_max_reached_count as u64;
+    fn close(&mut self, data: &mut HandlerData) {
+        data.other.insert("node_cache size".to_string(), format!("{}", self.node_cache.len()));
+        data.elevation_found_node_count = self.ele_lookups_successful as u64;
+        data.elevation_not_found_node_count = self.ele_lookups_failed as u64;
+        data.elevation_not_relevant_node_count = self.ele_lookups_skipped as u64;
+        data.splitted_way_count = self.splitted_way_count as u64;
+        data.elevation_tiff_count_total = self.geotiff_manager.index.get_geotiff_count() as u64;
+        data.elevation_tiff_count_used = self.elevation_tiffs_used.len() as u64;
+        data.elevation_flush_count = self.flush_count as u64;
+        data.elevation_total_buffered_nodes_max_reached_count = self.total_buffered_nodes_max_reached_count as u64;
     }
 }
 

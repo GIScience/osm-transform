@@ -42,28 +42,28 @@ const FILTERED_SPLIT_NODE_COUNT: u64 = 576u64;
 fn run_minimal() {
     let config = base_config();
     rusty_routes_transformer::init(&config);
-    let result = rusty_routes_transformer::run(&config);
-    println!("{}", result.statistics(&config));
-    assert_eq!(&result.input_node_count, &BAARLE_NODE_COUNT);
-    assert_eq!(&result.output_node_count, &BAARLE_NODE_COUNT);
-    assert_eq!(&result.input_relation_count, &BAARLE_RELATION_COUNT);
-    assert_eq!(&result.output_relation_count, &FILTERED_RELATION_COUNT);
-    assert_eq!(&result.input_way_count, &BAARLE_WAY_COUNT);
-    assert_eq!(&result.output_way_count, &FILTERED_WAY_COUNT);
+    let data = rusty_routes_transformer::run(&config);
+    println!("{}", data.statistics(&config));
+    assert_eq!(&data.input_node_count, &BAARLE_NODE_COUNT);
+    assert_eq!(&data.output_node_count, &BAARLE_NODE_COUNT);
+    assert_eq!(&data.input_relation_count, &BAARLE_RELATION_COUNT);
+    assert_eq!(&data.output_relation_count, &FILTERED_RELATION_COUNT);
+    assert_eq!(&data.input_way_count, &BAARLE_WAY_COUNT);
+    assert_eq!(&data.output_way_count, &FILTERED_WAY_COUNT);
 }
 #[test]
 fn run_minimal_write() {
     let mut config = base_config();
     config.output_pbf = Some(PathBuf::from("target/tmp/output-integration-test-run_minimal_write.pbf"));
     rusty_routes_transformer::init(&config);
-    let result = rusty_routes_transformer::run(&config);
-    println!("{}", result.statistics(&config));
-    assert_eq!(&result.input_node_count, &BAARLE_NODE_COUNT);
-    assert_eq!(&result.output_node_count, &BAARLE_NODE_COUNT);
-    assert_eq!(&result.input_relation_count, &BAARLE_RELATION_COUNT);
-    assert_eq!(&result.output_relation_count, &FILTERED_RELATION_COUNT);
-    assert_eq!(&result.input_way_count, &BAARLE_WAY_COUNT);
-    assert_eq!(&result.output_way_count, &FILTERED_WAY_COUNT);
+    let data = rusty_routes_transformer::run(&config);
+    println!("{}", data.statistics(&config));
+    assert_eq!(&data.input_node_count, &BAARLE_NODE_COUNT);
+    assert_eq!(&data.output_node_count, &BAARLE_NODE_COUNT);
+    assert_eq!(&data.input_relation_count, &BAARLE_RELATION_COUNT);
+    assert_eq!(&data.output_relation_count, &FILTERED_RELATION_COUNT);
+    assert_eq!(&data.input_way_count, &BAARLE_WAY_COUNT);
+    assert_eq!(&data.output_way_count, &FILTERED_WAY_COUNT);
 }
 #[test]
 fn run_all() {
@@ -79,14 +79,14 @@ fn run_all() {
     config.resolution_lon= 0.0001;
     config.resolution_lat= 0.0001;
     rusty_routes_transformer::init(&config);
-    let result = rusty_routes_transformer::run(&config);
-    println!("{}", result.statistics(&config));
-    assert_eq!(&result.input_node_count, &BAARLE_NODE_COUNT);
-    assert_eq!(&result.output_node_count, &FILTERED_SPLIT_NODE_COUNT);
-    assert_eq!(&result.input_relation_count, &BAARLE_RELATION_COUNT);
-    assert_eq!(&result.output_relation_count, &FILTERED_RELATION_COUNT);
-    assert_eq!(&result.input_way_count, &BAARLE_WAY_COUNT);
-    assert_eq!(&result.output_way_count, &FILTERED_WAY_COUNT);
+    let data = rusty_routes_transformer::run(&config);
+    println!("{}", data.statistics(&config));
+    assert_eq!(&data.input_node_count, &BAARLE_NODE_COUNT);
+    assert_eq!(&data.output_node_count, &FILTERED_SPLIT_NODE_COUNT);
+    assert_eq!(&data.input_relation_count, &BAARLE_RELATION_COUNT);
+    assert_eq!(&data.output_relation_count, &FILTERED_RELATION_COUNT);
+    assert_eq!(&data.input_way_count, &BAARLE_WAY_COUNT);
+    assert_eq!(&data.output_way_count, &FILTERED_WAY_COUNT);
     check_pbf("target/tmp/output-integration-test-run_all.pbf", Some(42645645));
     check_pbf("target/tmp/output-integration-test-run_all.pbf", Some(50000000001));
 }
@@ -95,14 +95,14 @@ fn run_country() {
     let mut config = base_config();
     config.country_csv = Some(PathBuf::from("test/mapping_test.csv"));
     rusty_routes_transformer::init(&config);
-    let result = rusty_routes_transformer::run(&config);
-    println!("{}", result.statistics(&config));
-    assert_eq!(&result.input_node_count, &BAARLE_NODE_COUNT);
-    assert_eq!(&result.output_node_count, &BAARLE_NODE_COUNT);
-    assert_eq!(&result.input_relation_count, &BAARLE_RELATION_COUNT);
-    assert_eq!(&result.output_relation_count, &FILTERED_RELATION_COUNT);
-    assert_eq!(&result.input_way_count, &BAARLE_WAY_COUNT);
-    assert_eq!(&result.output_way_count, &FILTERED_WAY_COUNT);
+    let data = rusty_routes_transformer::run(&config);
+    println!("{}", data.statistics(&config));
+    assert_eq!(&data.input_node_count, &BAARLE_NODE_COUNT);
+    assert_eq!(&data.output_node_count, &BAARLE_NODE_COUNT);
+    assert_eq!(&data.input_relation_count, &BAARLE_RELATION_COUNT);
+    assert_eq!(&data.output_relation_count, &FILTERED_RELATION_COUNT);
+    assert_eq!(&data.input_way_count, &BAARLE_WAY_COUNT);
+    assert_eq!(&data.output_way_count, &FILTERED_WAY_COUNT);
 }
 
 #[test]
@@ -110,14 +110,14 @@ fn run_node_filtering() {
     let mut config = base_config();
     config.with_node_filtering = true;
     rusty_routes_transformer::init(&config);
-    let result = rusty_routes_transformer::run(&config);
-    println!("{}", result.statistics(&config));
-    assert_eq!(&result.input_node_count, &BAARLE_NODE_COUNT);
-    assert_eq!(&result.output_node_count, &FILTERED_NODE_COUNT);
-    assert_eq!(&result.input_relation_count, &BAARLE_RELATION_COUNT);
-    assert_eq!(&result.output_relation_count, &FILTERED_RELATION_COUNT);
-    assert_eq!(&result.input_way_count, &BAARLE_WAY_COUNT);
-    assert_eq!(&result.output_way_count, &FILTERED_WAY_COUNT);
+    let data = rusty_routes_transformer::run(&config);
+    println!("{}", data.statistics(&config));
+    assert_eq!(&data.input_node_count, &BAARLE_NODE_COUNT);
+    assert_eq!(&data.output_node_count, &FILTERED_NODE_COUNT);
+    assert_eq!(&data.input_relation_count, &BAARLE_RELATION_COUNT);
+    assert_eq!(&data.output_relation_count, &FILTERED_RELATION_COUNT);
+    assert_eq!(&data.input_way_count, &BAARLE_WAY_COUNT);
+    assert_eq!(&data.output_way_count, &FILTERED_WAY_COUNT);
 }
 
 #[test]
@@ -125,28 +125,28 @@ fn run_remove_metadata() {
     let mut config = base_config();
     config.remove_metadata = true;
     rusty_routes_transformer::init(&config);
-    let result = rusty_routes_transformer::run(&config);
-    println!("{}", result.statistics(&config));
-    assert_eq!(&result.input_node_count, &BAARLE_NODE_COUNT);
-    assert_eq!(&result.output_node_count, &BAARLE_NODE_COUNT);
-    assert_eq!(&result.input_relation_count, &BAARLE_RELATION_COUNT);
-    assert_eq!(&result.output_relation_count, &FILTERED_RELATION_COUNT);
-    assert_eq!(&result.input_way_count, &BAARLE_WAY_COUNT);
-    assert_eq!(&result.output_way_count, &FILTERED_WAY_COUNT);
+    let data = rusty_routes_transformer::run(&config);
+    println!("{}", data.statistics(&config));
+    assert_eq!(&data.input_node_count, &BAARLE_NODE_COUNT);
+    assert_eq!(&data.output_node_count, &BAARLE_NODE_COUNT);
+    assert_eq!(&data.input_relation_count, &BAARLE_RELATION_COUNT);
+    assert_eq!(&data.output_relation_count, &FILTERED_RELATION_COUNT);
+    assert_eq!(&data.input_way_count, &BAARLE_WAY_COUNT);
+    assert_eq!(&data.output_way_count, &FILTERED_WAY_COUNT);
 }
 #[test]
 fn run_elevation() {
     let mut config = base_config();
     config.elevation_tiffs = vec!["test/*.tif".to_string()];
     rusty_routes_transformer::init(&config);
-    let result = rusty_routes_transformer::run(&config);
-    println!("{}", result.statistics(&config));
-    assert_eq!(&result.input_node_count, &BAARLE_NODE_COUNT);
-    assert_eq!(&result.output_node_count, &BAARLE_NODE_COUNT);
-    assert_eq!(&result.input_relation_count, &BAARLE_RELATION_COUNT);
-    assert_eq!(&result.output_relation_count, &FILTERED_RELATION_COUNT);
-    assert_eq!(&result.input_way_count, &BAARLE_WAY_COUNT);
-    assert_eq!(&result.output_way_count, &FILTERED_WAY_COUNT);
+    let data = rusty_routes_transformer::run(&config);
+    println!("{}", data.statistics(&config));
+    assert_eq!(&data.input_node_count, &BAARLE_NODE_COUNT);
+    assert_eq!(&data.output_node_count, &BAARLE_NODE_COUNT);
+    assert_eq!(&data.input_relation_count, &BAARLE_RELATION_COUNT);
+    assert_eq!(&data.output_relation_count, &FILTERED_RELATION_COUNT);
+    assert_eq!(&data.input_way_count, &BAARLE_WAY_COUNT);
+    assert_eq!(&data.output_way_count, &FILTERED_WAY_COUNT);
 }
 #[test]
 fn run_elevation_way_splitting() {
@@ -156,14 +156,14 @@ fn run_elevation_way_splitting() {
     config.resolution_lon= 0.0001;
     config.resolution_lat= 0.0001;
     rusty_routes_transformer::init(&config);
-    let result = rusty_routes_transformer::run(&config);
-    println!("{}", result.statistics(&config));
-    assert_eq!(&result.input_node_count, &BAARLE_NODE_COUNT);
-    assert!(&result.output_node_count > &BAARLE_NODE_COUNT);
-    assert_eq!(&result.input_relation_count, &BAARLE_RELATION_COUNT);
-    assert_eq!(&result.output_relation_count, &FILTERED_RELATION_COUNT);
-    assert_eq!(&result.input_way_count, &BAARLE_WAY_COUNT);
-    assert_eq!(&result.output_way_count, &FILTERED_WAY_COUNT);
+    let data = rusty_routes_transformer::run(&config);
+    println!("{}", data.statistics(&config));
+    assert_eq!(&data.input_node_count, &BAARLE_NODE_COUNT);
+    assert!(&data.output_node_count > &BAARLE_NODE_COUNT);
+    assert_eq!(&data.input_relation_count, &BAARLE_RELATION_COUNT);
+    assert_eq!(&data.output_relation_count, &FILTERED_RELATION_COUNT);
+    assert_eq!(&data.input_way_count, &BAARLE_WAY_COUNT);
+    assert_eq!(&data.output_way_count, &FILTERED_WAY_COUNT);
 }
 #[test]
 fn run_elevation_way_splitting_write() {
@@ -174,14 +174,14 @@ fn run_elevation_way_splitting_write() {
     config.resolution_lat= 0.0001;
     config.output_pbf = Some(PathBuf::from("target/tmp/output-integration-test-run_elevation_way_splitting_write.pbf"));
     rusty_routes_transformer::init(&config);
-    let result = rusty_routes_transformer::run(&config);
-    println!("{}", result.statistics(&config));
-    assert_eq!(&result.input_node_count, &BAARLE_NODE_COUNT);
-    assert_eq!(&result.output_node_count, &SPLIT_NODE_COUNT);
-    assert_eq!(&result.input_relation_count, &BAARLE_RELATION_COUNT);
-    assert_eq!(&result.output_relation_count, &FILTERED_RELATION_COUNT);
-    assert_eq!(&result.input_way_count, &BAARLE_WAY_COUNT);
-    assert_eq!(&result.output_way_count, &FILTERED_WAY_COUNT);
+    let data = rusty_routes_transformer::run(&config);
+    println!("{}", data.statistics(&config));
+    assert_eq!(&data.input_node_count, &BAARLE_NODE_COUNT);
+    assert_eq!(&data.output_node_count, &SPLIT_NODE_COUNT);
+    assert_eq!(&data.input_relation_count, &BAARLE_RELATION_COUNT);
+    assert_eq!(&data.output_relation_count, &FILTERED_RELATION_COUNT);
+    assert_eq!(&data.input_way_count, &BAARLE_WAY_COUNT);
+    assert_eq!(&data.output_way_count, &FILTERED_WAY_COUNT);
     check_pbf("target/tmp/output-integration-test-run_elevation_way_splitting_write.pbf", Some(42645645));
     check_pbf("target/tmp/output-integration-test-run_elevation_way_splitting_write.pbf", Some(50000000001));
 }

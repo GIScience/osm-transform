@@ -55,16 +55,16 @@ pub fn run(config: &Config) -> HandlerData {
     let mut stopwatch_total = StopWatch::new();
     stopwatch_total.start();
     //todo log input file name and size (should occur in log)
-    let mut result = HandlerData::default();
-    run_filter_chain(config, &mut result);
-    run_processing_chain(config, &mut result);
+    let mut data = HandlerData::default();
+    run_filter_chain(config, &mut data);
+    run_processing_chain(config, &mut data);
 
     info!("Total processing time: {}", stopwatch_total);
     stopwatch_total.stop();
-    result
+    data
 }
 
-fn run_filter_chain(config: &Config, result: &mut HandlerData){
+fn run_filter_chain(config: &Config, data: &mut HandlerData){
     let mut stopwatch_run_filter_chain = StopWatch::new();
     stopwatch_run_filter_chain.start();
     let info_msg = "1.Pass: Filtering pbf elements";
@@ -83,14 +83,14 @@ fn run_filter_chain(config: &Config, result: &mut HandlerData){
         handler_chain = handler_chain.add(SkipElevationNodeCollector::default())
     }
     //todo add IdCollector{handle_types: OsmElementTypeSelection::way_relation()}
-    let _ = process_with_handler(config, &mut handler_chain, result, info_msg).expect("Extraction of referenced node ids failed");
-    handler_chain.collect_result(result);
+    let _ = process_with_handler(config, &mut handler_chain, data, info_msg).expect("Extraction of referenced node ids failed");
+    handler_chain.close_handlers(data);
     info!("{} done, time: {}", info_msg, stopwatch_run_filter_chain);
     stopwatch_run_filter_chain.stop();
 }
 
-fn run_processing_chain(config: &Config, result: &mut HandlerData) {//TODO use bitvec filters also for ways and relations
-    result.clear_non_input_counts();
+fn run_processing_chain(config: &Config, data: &mut HandlerData) {//TODO use bitvec filters also for ways and relations
+    data.clear_non_input_counts();
     let mut handler_chain = HandlerChain::default()
         .add(ElementCounter::new(InputCount))
         .add(ElementPrinter::with_prefix("\ninput:----------------\n".to_string())
@@ -134,7 +134,7 @@ fn run_processing_chain(config: &Config, result: &mut HandlerData) {//TODO use b
             geotiff_manager,
             config.elevation_batch_size,
             config.elevation_total_buffer_size,
-            result.skip_ele.clone(),
+            data.skip_ele.clone(),
             config.elevation_way_splitting,
             config.resolution_lon,
             config.resolution_lat,
@@ -187,10 +187,10 @@ fn run_processing_chain(config: &Config, result: &mut HandlerData) {//TODO use b
     info!("{}...", info_msg);
     stopwatch.reset();
     stopwatch.start();
-    let _ = process_with_handler(config, &mut handler_chain, result, info_msg).expect("2.Pass: Processing pbf elements failed");
-    handler_chain.collect_result(result);
+    let _ = process_with_handler(config, &mut handler_chain, data, info_msg).expect("2.Pass: Processing pbf elements failed");
+    handler_chain.close_handlers(data);
     info!("{} done, time: {}", info_msg, stopwatch);
-    debug!("{} HandlerResult:\n{}", info_msg, result.format_multi_line());
+    debug!("{} HandlerData:\n{}", info_msg, data.format_multi_line());
     stopwatch.reset();
 }
 

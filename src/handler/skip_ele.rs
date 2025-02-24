@@ -28,13 +28,13 @@ impl Handler for SkipElevationNodeCollector {
         String::from("SkipElevationNodeCollector")
     }
 
-    fn handle(&mut self, result: &mut HandlerData) {
-        for way in & result.ways {
+    fn handle(&mut self, data: &mut HandlerData) {
+        for way in & data.ways {
             if self.skip_elevation(way) {
                 log::trace!("skipping elevation for way {}", way.id());
                 for &id in way.refs() {
                     log::trace!("skipping elevation for node {}", id);
-                    result.skip_ele.set(id as usize, true);
+                    data.skip_ele.set(id as usize, true);
                 }
             }
         }
@@ -68,35 +68,35 @@ mod test {
 
     #[test]
     fn test_skip_elevation_node_collector_handle_result() {
-        let mut result = HandlerData::default();
+        let mut data = HandlerData::default();
         let mut collector = SkipElevationNodeCollector::default();
-        result.ways.push(simple_way(1, vec![1, 2, 3], vec![HIGHWAY]));
-        result.ways.push(simple_way(2, vec![3, 4], vec![HIGHWAY, BRIDGE]));
-        result.ways.push(simple_way(3, vec![4, 5, 6], vec![HIGHWAY, NO_BRIDGE]));
-        result.ways.push(simple_way(4, vec![6, 7], vec![HIGHWAY, NO_BRIDGE, CUTTING]));
-        result.ways.push(simple_way(5, vec![7, 8, 9], vec![HIGHWAY, TUNNEL]));
+        data.ways.push(simple_way(1, vec![1, 2, 3], vec![HIGHWAY]));
+        data.ways.push(simple_way(2, vec![3, 4], vec![HIGHWAY, BRIDGE]));
+        data.ways.push(simple_way(3, vec![4, 5, 6], vec![HIGHWAY, NO_BRIDGE]));
+        data.ways.push(simple_way(4, vec![6, 7], vec![HIGHWAY, NO_BRIDGE, CUTTING]));
+        data.ways.push(simple_way(5, vec![7, 8, 9], vec![HIGHWAY, TUNNEL]));
 
-        collector.handle(&mut result);
+        collector.handle(&mut data);
 
-        assert!(!result.skip_ele.get(0).unwrap_or(false) );
-        assert!(!result.skip_ele.get(1).unwrap_or(false) );
-        assert!(!result.skip_ele.get(2).unwrap_or(false) );
-        assert!( result.skip_ele.get(3).unwrap_or(false) );
-        assert!( result.skip_ele.get(4).unwrap_or(false) );
-        assert!(!result.skip_ele.get(5).unwrap_or(false) );
-        assert!( result.skip_ele.get(6).unwrap_or(false) );
-        assert!( result.skip_ele.get(7).unwrap_or(false) );
-        assert!( result.skip_ele.get(8).unwrap_or(false) );
-        assert!( result.skip_ele.get(9).unwrap_or(false) );
+        assert!(!data.skip_ele.get(0).unwrap_or(false) );
+        assert!(!data.skip_ele.get(1).unwrap_or(false) );
+        assert!(!data.skip_ele.get(2).unwrap_or(false) );
+        assert!( data.skip_ele.get(3).unwrap_or(false) );
+        assert!( data.skip_ele.get(4).unwrap_or(false) );
+        assert!(!data.skip_ele.get(5).unwrap_or(false) );
+        assert!( data.skip_ele.get(6).unwrap_or(false) );
+        assert!( data.skip_ele.get(7).unwrap_or(false) );
+        assert!( data.skip_ele.get(8).unwrap_or(false) );
+        assert!( data.skip_ele.get(9).unwrap_or(false) );
     }
 
-    #[ignore]//SkipElevationNodeCollector uses now the bitvec of HandlerResult which is initialized with full size
+    #[ignore]//SkipElevationNodeCollector uses now the bitvec of HandlerData which is initialized with full size
     #[test]
     #[should_panic(expected = "index out of bounds")]
     fn node_id_collector_out_of_bounds(){
         let mut collector = SkipElevationNodeCollector::new(SkipElevationNodeCollector::DEFAULT_KEYS.to_vec());
-        let mut result = HandlerData::default();
-        result.ways.push(simple_way(1, vec![9, 10], vec![TUNNEL]));
+        let mut data = HandlerData::default();
+        data.ways.push(simple_way(1, vec![9, 10], vec![TUNNEL]));
         collector.handle(&mut HandlerData::default());
     }
 }

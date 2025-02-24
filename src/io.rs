@@ -5,9 +5,9 @@ use osm_io::osm::pbf;
 use crate::Config;
 use crate::handler::{HandlerChain, HandlerData};
 
-pub(crate) fn process_with_handler(config: &Config, handler_chain: &mut HandlerChain, result: &mut HandlerData, info_msg: &str) -> Result<(), anyhow::Error> {
-    let total_count = result.input_element_count();
-    result.clear_counts();
+pub(crate) fn process_with_handler(config: &Config, handler_chain: &mut HandlerChain, data: &mut HandlerData, info_msg: &str) -> Result<(), anyhow::Error> {
+    let total_count = data.input_element_count();
+    data.clear_counts();
     let reader = pbf::reader::Reader::new(&config.input_pbf)?;
     let mut count: i64 = 0;
     for element in reader.elements()? {
@@ -20,9 +20,9 @@ pub(crate) fn process_with_handler(config: &Config, handler_chain: &mut HandlerC
                 info!("{} - processed {} ({:.2}%) of {} elements", info_msg, count, percentage, total_count);
             }
         }
-        handler_chain.process(element, result);
+        handler_chain.process(element, data);
     }
-    handler_chain.flush_handlers(result);
+    handler_chain.flush_handlers(data);
     Ok(())
 }
 
