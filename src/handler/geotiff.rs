@@ -1,5 +1,5 @@
 use crate::handler::interpolate::WaySplitter;
-use crate::handler::{Handler, HandlerResult, HIGHEST_NODE_ID};
+use crate::handler::{Handler, HandlerData, HIGHEST_NODE_ID};
 use crate::srs::DynamicSrsResolver;
 use bit_vec::BitVec;
 use georaster::geotiff::{GeoTiffReader, RasterValue};
@@ -638,7 +638,7 @@ impl BufferingElevationEnricher {
 impl Handler for BufferingElevationEnricher {
     fn name(&self) -> String { "BufferingElevationEnricher".to_string() }
 
-    fn handle(&mut self, result: &mut HandlerResult) {
+    fn handle(&mut self, result: &mut HandlerData) {
         trace!("{}.handle_result() called with {} nodes, {} ways, {} relations", self.name(), result.nodes.len(), result.ways.len(), result.relations.len());
 
         if result.nodes.len() > 0 {
@@ -651,7 +651,7 @@ impl Handler for BufferingElevationEnricher {
         }
     }
 
-    fn flush(&mut self, result: &mut HandlerResult) {
+    fn flush(&mut self, result: &mut HandlerData) {
         trace!("{}.flush() called with {} nodes, {} ways, {} relations", self.name(), result.nodes.len(), result.ways.len(), result.relations.len());
 
         result.nodes = self.handle_and_flush_nodes(result.nodes.clone());
@@ -662,7 +662,7 @@ impl Handler for BufferingElevationEnricher {
         }
     }
 
-    fn close(&mut self, result: &mut HandlerResult) {
+    fn close(&mut self, result: &mut HandlerData) {
         result.other.insert("node_cache size".to_string(), format!("{}", self.node_cache.len()));
         result.elevation_found_node_count = self.ele_lookups_successful as u64;
         result.elevation_not_found_node_count = self.ele_lookups_failed as u64;

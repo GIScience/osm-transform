@@ -1,7 +1,7 @@
 use osm_io::osm::model::node::Node;
 use osm_io::osm::model::relation::Relation;
 use osm_io::osm::model::way::Way;
-use crate::handler::{Handler, HandlerResult};
+use crate::handler::{Handler, HandlerData};
 
 #[derive(Default)]
 pub(crate) struct MetadataRemover;
@@ -23,7 +23,7 @@ impl Handler for MetadataRemover {
         "MetadataRemover".to_string()
     }
 
-    fn handle(&mut self, result: &mut HandlerResult) {
+    fn handle(&mut self, result: &mut HandlerData) {
         result.nodes.iter_mut().for_each(|element| self.handle_node(element));
         result.ways.iter_mut().for_each(|element| self.handle_way(element));
         result.relations.iter_mut().for_each(|element| self.handle_relation(element));
@@ -38,13 +38,13 @@ mod test {
     use osm_io::osm::model::relation::{Member, MemberData, Relation};
     use osm_io::osm::model::tag::Tag;
     use osm_io::osm::model::way::Way;
-    use crate::handler::{Handler, HandlerResult};
+    use crate::handler::{Handler, HandlerData};
     use crate::handler::modify::MetadataRemover;
 
     #[test]
     fn metadata_remover_node() {
         let mut metadata_remover = MetadataRemover::default();
-        let mut result = HandlerResult::default();
+        let mut result = HandlerData::default();
         result.nodes.push(Node::new(1, 1, Coordinate::new(1.0f64, 1.1f64), 1, 1, 1, "a".to_string(), true,vec![
             Tag::new("a".to_string(), "x".to_string()),
             Tag::new("b".to_string(), "y".to_string()),
@@ -70,7 +70,7 @@ mod test {
     #[test]
     fn metadata_remover_way() {
         let mut metadata_remover = MetadataRemover::default();
-        let mut result = HandlerResult::default();
+        let mut result = HandlerData::default();
         result.ways.push(Way::new(1, 1, 1, 1, 1, "user".to_string(), true, vec![4, 6], vec![
             Tag::new("a".to_string(), "x".to_string()),
             Tag::new("b".to_string(), "y".to_string()),
@@ -95,7 +95,7 @@ mod test {
     #[test]
     fn metadata_remover_relation() {
         let mut metadata_remover = MetadataRemover::default();
-        let mut result = HandlerResult::default();
+        let mut result = HandlerData::default();
         result.relations.push(Relation::new(1, 1, 1, 1, 1, "user".to_string(), true, vec![
             Member::Node { member: MemberData::new(5, "a".to_string()) },
             Member::Node { member: MemberData::new(6, "b".to_string()) },

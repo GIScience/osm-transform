@@ -4,7 +4,7 @@ use std::path::PathBuf;
 use clap::Parser;
 
 use rusty_routes_transformer::{Config, init, run};
-use rusty_routes_transformer::handler::HandlerResult;
+use rusty_routes_transformer::handler::HandlerData;
 
 fn main() {
     let args = Args::parse();
@@ -14,7 +14,7 @@ fn main() {
     print_statistics(&config, handler_result);
 }
 
-fn print_statistics(config: &Config, handler_result: HandlerResult) {
+fn print_statistics(config: &Config, handler_result: HandlerData) {
     if config.statistics_level > 0 {
         println!("{}", handler_result.statistics(&config));
     }

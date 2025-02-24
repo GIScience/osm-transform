@@ -18,7 +18,7 @@ use regex::Regex;
 use crate::io::process_with_handler;
 use area::AreaHandler;
 use ElementCountResultType::{AcceptedCount, InputCount, OutputCount};
-use crate::handler::{HandlerChain, HandlerResult, OsmElementTypeSelection};
+use crate::handler::{HandlerChain, HandlerData, OsmElementTypeSelection};
 use crate::handler::collect::ReferencedNodeIdCollector;
 use crate::handler::filter::{AllElementsFilter, ComplexElementsFilter, FilterType, NodeIdFilter, TagFilterByKey};
 use crate::handler::geotiff::{BufferingElevationEnricher, GeoTiffManager};
@@ -51,11 +51,11 @@ pub fn init(config: &Config) {
     });
 }
 
-pub fn run(config: &Config) -> HandlerResult {
+pub fn run(config: &Config) -> HandlerData {
     let mut stopwatch_total = StopWatch::new();
     stopwatch_total.start();
     //todo log input file name and size (should occur in log)
-    let mut result = HandlerResult::default();
+    let mut result = HandlerData::default();
     run_filter_chain(config, &mut result);
     run_processing_chain(config, &mut result);
 
@@ -64,7 +64,7 @@ pub fn run(config: &Config) -> HandlerResult {
     result
 }
 
-fn run_filter_chain(config: &Config, result: &mut HandlerResult){
+fn run_filter_chain(config: &Config, result: &mut HandlerData){
     let mut stopwatch_run_filter_chain = StopWatch::new();
     stopwatch_run_filter_chain.start();
     let info_msg = "1.Pass: Filtering pbf elements";
@@ -89,7 +89,7 @@ fn run_filter_chain(config: &Config, result: &mut HandlerResult){
     stopwatch_run_filter_chain.stop();
 }
 
-fn run_processing_chain(config: &Config, result: &mut HandlerResult) {//TODO use bitvec filters also for ways and relations
+fn run_processing_chain(config: &Config, result: &mut HandlerData) {//TODO use bitvec filters also for ways and relations
     result.clear_non_input_counts();
     let mut handler_chain = HandlerChain::default()
         .add(ElementCounter::new(InputCount))

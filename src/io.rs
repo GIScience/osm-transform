@@ -1,12 +1,11 @@
 
 use anyhow;
-use benchmark_rs::stopwatch::StopWatch;
 use log::info;
 use osm_io::osm::pbf;
 use crate::Config;
-use crate::handler::{HandlerChain, HandlerResult};
+use crate::handler::{HandlerChain, HandlerData};
 
-pub(crate) fn process_with_handler(config: &Config, handler_chain: &mut HandlerChain, result: &mut HandlerResult, info_msg: &str) -> Result<(), anyhow::Error> {
+pub(crate) fn process_with_handler(config: &Config, handler_chain: &mut HandlerChain, result: &mut HandlerData, info_msg: &str) -> Result<(), anyhow::Error> {
     let total_count = result.input_element_count();
     result.clear_counts();
     let reader = pbf::reader::Reader::new(&config.input_pbf)?;
@@ -30,6 +29,7 @@ pub(crate) fn process_with_handler(config: &Config, handler_chain: &mut HandlerC
 #[cfg(test)]
 mod tests {
     use std::path::PathBuf;
+    use benchmark_rs::stopwatch::StopWatch;
     use osm_io::osm::model::coordinate::Coordinate;
     use osm_io::osm::model::element::Element;
     use osm_io::osm::model::node::Node;

@@ -15,7 +15,7 @@ use serde::Deserialize;
 use wkt::{Geometry, ToWkt};
 use wkt::Wkt;
 
-use crate::handler::{Handler, HandlerResult};
+use crate::handler::{Handler, HandlerData};
 
 const GRID_SIZE: usize = 64800;
 const AREA_ID_MULTIPLE: u16 = u16::MAX;
@@ -206,13 +206,13 @@ impl AreaHandler {
 impl Handler for AreaHandler {
     fn name(&self) -> String { "AreaHandler".to_string() }
 
-    fn handle(&mut self, result: &mut HandlerResult) {
+    fn handle(&mut self, result: &mut HandlerData) {
         result.nodes.iter_mut().for_each(|node| self.handle_node(node));
         result.country_not_found_node_count = self.country_not_found_node_count;
         result.country_found_node_count = self.country_found_node_count;
     }
 
-    fn close(&mut self, result: &mut HandlerResult){
+    fn close(&mut self, result: &mut HandlerData){
         result.other.insert("mapping".to_string(), format!("index:{} area:{} id:{} name:{}",
                                                            &self.mapping.index.len(),
                                                            &self.mapping.area.len(),
@@ -266,7 +266,7 @@ mod tests {
         MULTIPOINT((2.0 2.0), (3.5 2.0), (2.5 2.0), (6.5 2.0), (1.5 3.5))
          */
 
-        let mut result = HandlerResult::default();
+        let mut result = HandlerData::default();
         result.nodes.push(Node::new(0, 1, LonLat::new(1.5, 1.5).c(), 1, 1, 1, "s".to_string(), true, vec![]));
         result.nodes.push(Node::new(1, 1, LonLat::new(3.0, 1.5).c(), 1, 1, 1, "r".to_string(), true, vec![]));
         result.nodes.push(Node::new(2, 1, LonLat::new(2.0, 1.5).c(), 1, 1, 1, "b".to_string(), true, vec![]));
@@ -314,7 +314,7 @@ mod tests {
         MULTIPOINT((2.0 2.0), (3.5 2.0), (2.5 2.0), (6.5 2.0), (1.5 3.5))
          */
 
-        let mut result = HandlerResult::default();
+        let mut result = HandlerData::default();
         result.nodes.push(Node::new(0, 1, LonLat::new(2.1, 2.1).c(), 1, 1, 1, "s".to_string(), true, vec![]));
         result.nodes.push(Node::new(1, 1, LonLat::new(3.6, 2.1).c(), 1, 1, 1, "r".to_string(), true, vec![]));
         result.nodes.push(Node::new(2, 1, LonLat::new(2.5, 2.1).c(), 1, 1, 1, "b".to_string(), true, vec![]));

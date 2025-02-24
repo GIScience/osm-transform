@@ -4,7 +4,7 @@ use osm_io::osm::model::node::Node;
 use osm_io::osm::model::relation::Relation;
 use osm_io::osm::model::way::Way;
 
-use crate::handler::{HandlerResult, OsmElementTypeSelection, Handler};
+use crate::handler::{HandlerData, OsmElementTypeSelection, Handler};
 
 pub(crate) struct ElementCounter {
     pub result_type: ElementCountResultType,
@@ -19,7 +19,7 @@ impl ElementCounter {
 impl Handler for ElementCounter {
     fn name(&self) -> String { format!("ElementCounter {}", self.result_type.to_string()) }
 
-    fn handle(&mut self, result: &mut HandlerResult) {
+    fn handle(&mut self, result: &mut HandlerData) {
         log::trace!("{}.handle_result called: counting nodes+={}, ways+={}, relations+={}", self.name(), result.nodes.len(), result.ways.len(), result.relations.len());
         match self.result_type {
             ElementCountResultType::InputCount => {
@@ -180,7 +180,7 @@ impl ElementPrinter {
 }
 impl Handler for ElementPrinter {
     fn name(&self) -> String { format!("ElementPrinter {}", self.prefix) }
-    fn handle(&mut self, result: &mut HandlerResult) {
+    fn handle(&mut self, result: &mut HandlerData) {
         self.handle_nodes(result.nodes.clone());
         self.handle_ways(result.ways.clone());
         self.handle_relations(result.relations.clone());

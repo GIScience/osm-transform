@@ -1,7 +1,7 @@
 use bit_vec::BitVec;
 use osm_io::osm::model::relation::{Member};
 
-use crate::handler::{HandlerResult, Handler};
+use crate::handler::{HandlerData, Handler};
 
 pub(crate) struct ReferencedNodeIdCollector {
     count_unique: usize,
@@ -14,7 +14,7 @@ impl ReferencedNodeIdCollector {
     }
 
 
-    fn handle_ways_result(&mut self, result: &mut HandlerResult)  {
+    fn handle_ways_result(&mut self, result: &mut HandlerData)  {
         for element in & result.ways {
             for &id in element.refs() {
                 self.add_node_id(&mut result.node_ids, id);
@@ -22,7 +22,7 @@ impl ReferencedNodeIdCollector {
         }
     }
 
-    fn handle_relations_result(&mut self, result: &mut HandlerResult)  {
+    fn handle_relations_result(&mut self, result: &mut HandlerData)  {
         for element in &mut result.relations{
             for member in element.members() {
                 match member {
@@ -45,7 +45,7 @@ impl Handler for ReferencedNodeIdCollector {
         "ReferencedNodeIdCollector".to_string()
     }
 
-    fn handle(&mut self, result: &mut HandlerResult) {
+    fn handle(&mut self, result: &mut HandlerData) {
         self.handle_ways_result(result);
         self.handle_relations_result(result);
     }
@@ -53,13 +53,13 @@ impl Handler for ReferencedNodeIdCollector {
 
 #[cfg(test)]
 mod test {
-    use crate::handler::{HIGHEST_NODE_ID, Handler, HandlerResult};
+    use crate::handler::{HIGHEST_NODE_ID, Handler, HandlerData};
     use crate::handler::tests::{simple_node, simple_way, TestOnlyIdCollector};
 
     #[test]
     fn node_id_collector(){
         let mut collector = TestOnlyIdCollector::new(10);
-        let mut result = HandlerResult::default();
+        let mut result = HandlerData::default();
         result.nodes.push(simple_node(2, vec![]));
         collector.handle(&mut result);
         assert_eq!(false, result.node_ids.get(0).unwrap_or(false));
@@ -70,14 +70,14 @@ mod test {
     #[should_panic(expected = "index out of bounds: 12 >= 10")]
     fn node_id_collector_out_of_bounds(){
         let mut collector = TestOnlyIdCollector::new(10);
-        let mut result = HandlerResult::default();
+        let mut result = HandlerData::default();
         result.ways.push(simple_way(12, vec![], vec![]));
         collector.handle(&mut result);
     }
     #[test]
     fn node_id_collector_out_of_bounds_real(){
         let mut collector = TestOnlyIdCollector::new(HIGHEST_NODE_ID as usize);
-        let mut result = HandlerResult::default();
+        let mut result = HandlerData::default();
         result.nodes.push(simple_node(1, vec![]));
         collector.handle(&mut result);
         assert_eq!(false, result.node_ids.get(0).unwrap_or(false));

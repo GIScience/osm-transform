@@ -36,13 +36,13 @@ pub fn into_vec_relation_element(relation: Relation) -> Vec<Element> { vec![into
 pub trait Handler {
 
     fn name(&self) -> String;
-    fn handle(&mut self, _result: &mut HandlerResult){}
+    fn handle(&mut self, _result: &mut HandlerData){}
 
-    fn flush(&mut self, result: &mut HandlerResult)  {
+    fn flush(&mut self, result: &mut HandlerData)  {
         self.handle(result)
     }
 
-    fn close(&mut self, _result: &mut HandlerResult) {}
+    fn close(&mut self, _result: &mut HandlerData) {}
 }
 
 pub(crate) struct OsmElementTypeSelection {
@@ -60,7 +60,7 @@ impl OsmElementTypeSelection {
 }
 
 #[derive(Debug)]
-pub struct HandlerResult {
+pub struct HandlerData {
 
     ///Elements to handle
     pub nodes: Vec<Node>,
@@ -106,12 +106,12 @@ pub struct HandlerResult {
     /// Other statistics
     pub other: HashMap<String, String>,
 }
-impl HandlerResult {
+impl HandlerData {
     pub(crate) fn default() -> Self {
         Self::with_capacity(HIGHEST_NODE_ID as usize)
     }
     pub(crate) fn with_capacity(nbits: usize) -> Self {
-        HandlerResult {
+        HandlerData {
             nodes: vec![],
             ways: vec![],
             relations: vec![],
@@ -313,7 +313,7 @@ Unsplitted ways:           {unsplitted_way_count:>13} (TODO% of all accepted way
 
     pub(crate) fn clear(&mut self) {
         self.clear_elements();
-        self.clear_ids();
+        self.clear_intermediate_results();
         self.clear_counts();
     }
     pub(crate) fn clear_elements(&mut self) {
@@ -321,7 +321,7 @@ Unsplitted ways:           {unsplitted_way_count:>13} (TODO% of all accepted way
         self.ways.clear();
         self.relations.clear();
     }
-    pub(crate) fn clear_ids(&mut self) {
+    pub(crate) fn clear_intermediate_results(&mut self) {
         self.node_ids.clear();
         //todo self.way_ids.clear();
         //todo self.relation_ids.clear();
@@ -370,7 +370,7 @@ impl HandlerChain {
         self.processors.push(Box::new(processor));
         self
     }
-    pub(crate) fn process(&mut self, element: Element, result: &mut HandlerResult) {
+    pub(crate) fn process(&mut self, element: Element, result: &mut HandlerData) {
         trace!("######");
         trace!("###### Processing {}", format_element_id(&element));
         trace!("######");
@@ -407,7 +407,7 @@ impl HandlerChain {
         result.clear_elements();
     }
 
-    fn handle_element(&mut self, nodes: Vec<Node>, ways: Vec<Way>, relations: Vec<Relation>, result: &mut HandlerResult) {
+    fn handle_element(&mut self, nodes: Vec<Node>, ways: Vec<Way>, relations: Vec<Relation>, result: &mut HandlerData) {
         trace!("HandlerChain.handle_elements called with {} nodes {} ways {} relations", nodes.len(), ways.len(), relations.len());
         for processor in &mut self.processors {
             if nodes.len() == 0 && ways.len() == 0 && relations.len() == 0 {
@@ -419,7 +419,7 @@ impl HandlerChain {
         }
     }
 
-    pub(crate) fn flush_handlers(&mut self, result: &mut HandlerResult) {
+    pub(crate) fn flush_handlers(&mut self, result: &mut HandlerData) {
         trace!("######");
         trace!("###### HandlerChain.flush_handlers called with {} nodes {} ways {} relations", result.nodes.len(), result.ways.len(), result.relations.len());
         trace!("######");
@@ -432,7 +432,7 @@ impl HandlerChain {
         result.clear_elements();
     }
 
-    pub(crate) fn collect_result(&mut self, result: &mut HandlerResult) {
+    pub(crate) fn collect_result(&mut self, result: &mut HandlerData) {
         for processor in &mut self.processors {
             processor.close(result);
         }
@@ -541,7 +541,7 @@ pub(crate) mod tests {
     impl Handler for TestOnlyElementModifier {
         fn name(&self) -> String { "TestOnlyElementModifier".to_string() }
 
-        fn handle(&mut self, result: &mut HandlerResult) {
+        fn handle(&mut self, result: &mut HandlerData) {
             result.nodes.iter_mut().for_each(|node| self.handle_node(node));
         }
 
@@ -553,7 +553,7 @@ pub(crate) mod tests {
     impl Handler for TestOnlyElementReplacer {
         fn name(&self) -> String { "TestOnlyElementReplacer".to_string() }
 
-        fn handle(&mut self, result: &mut HandlerResult) {
+        fn handle(&mut self, result: &mut HandlerData) {
             for index in 0..result.nodes.len() {
                 if result.nodes[index].id() == 6 {
                     result.nodes[index] = simple_node(66, vec![("who", "dimpfelmoser")]);
@@ -568,7 +568,7 @@ pub(crate) mod tests {
     impl Handler for TestOnlyElementFilter {
         fn name(&self) -> String { "TestOnlyElementFilter".to_string() }
 
-        fn handle(&mut self, result: &mut HandlerResult) {
+        fn handle(&mut self, result: &mut HandlerData) {
             result.nodes.retain(|node| node.id() % 2 != 0 );
         }
     }
@@ -580,7 +580,7 @@ pub(crate) mod tests {
     impl Handler for TestOnlyElementAdder {
         fn name(&self) -> String { "TestOnlyElementAdder".to_string() }
 
-        fn handle(&mut self, result: &mut HandlerResult) {
+        fn handle(&mut self, result: &mut HandlerData) {
             let mut new_nodes = vec![];
             result.nodes.iter().for_each(|node| new_nodes.push(copy_node_with_new_id(node, node.id().add(100))));
             result.nodes.extend(new_nodes);
@@ -600,7 +600,7 @@ pub(crate) mod tests {
             vec![node, node_clone]
         }
 
-        fn handle_nodes(&mut self, result: &mut HandlerResult) {
+        fn handle_nodes(&mut self, result: &mut HandlerData) {
             self.nodes_cache.append(&mut result.nodes);
             result.nodes.clear();
             if self.nodes_cache.len() >= 3 {
@@ -608,7 +608,7 @@ pub(crate) mod tests {
             }
         }
 
-        fn handle_ways(&mut self, result: &mut HandlerResult) {
+        fn handle_ways(&mut self, result: &mut HandlerData) {
             self.ways_cache.append(&mut result.ways);
             result.ways.clear();
             if self.ways_cache.len() >= 3 {
@@ -616,13 +616,13 @@ pub(crate) mod tests {
             }
         }
 
-        fn flush_ways(&mut self, result: &mut HandlerResult) {
+        fn flush_ways(&mut self, result: &mut HandlerData) {
             result.ways.append(&mut self.ways_cache);
             self.ways_cache.clear();
         }
 
 
-        fn handle_relations(&mut self, result: &mut HandlerResult) {
+        fn handle_relations(&mut self, result: &mut HandlerData) {
             self.relations_cache.append(&mut result.relations);
             result.relations.clear();
             if self.relations_cache.len() >= 3 {
@@ -630,12 +630,12 @@ pub(crate) mod tests {
             }
         }
 
-        fn flush_relations(&mut self, result: &mut HandlerResult) {
+        fn flush_relations(&mut self, result: &mut HandlerData) {
             result.relations.append(&mut self.relations_cache);
             self.relations_cache.clear();
         }
 
-        fn handle_and_flush_nodes(&mut self, result: &mut HandlerResult) {
+        fn handle_and_flush_nodes(&mut self, result: &mut HandlerData) {
             let mut result_vec = Vec::new();
             self.nodes_cache.iter().for_each(|node| result_vec.extend(self.handle_node(node.clone())));
             result.nodes = result_vec;
@@ -646,12 +646,12 @@ pub(crate) mod tests {
         // fn struct_name() -> &'static str { "TestOnlyElementBuffer" }
         fn name(&self) -> String { "TestOnlyElementBuffer".to_string() }
 
-        fn handle(&mut self, result: &mut HandlerResult) {
+        fn handle(&mut self, result: &mut HandlerData) {
             self.handle_nodes(result);
             self.handle_ways(result);
             self.handle_relations(result);
         }
-        fn flush(&mut self, result: &mut HandlerResult)  {
+        fn flush(&mut self, result: &mut HandlerData)  {
             self.handle_and_flush_nodes(result);
             self.flush_ways(result);
             self.flush_relations(result);
@@ -675,7 +675,7 @@ pub(crate) mod tests {
     impl Handler for TestOnlyIdCollector {
         fn name(&self) -> String { "TestOnlyIdCollector".to_string() }
 
-        fn handle(&mut self, result: &mut HandlerResult) {
+        fn handle(&mut self, result: &mut HandlerData) {
             result.nodes.iter().for_each(|node| result.node_ids.set(node.id() as usize, true));
 
             result.ways.iter().for_each(|way| self.way_ids.set(way.id() as usize, true));
@@ -700,13 +700,13 @@ pub(crate) mod tests {
     impl Handler for TestOnlyOrderRecorder {
         fn name(&self) -> String { format!("TestOnlyOrderRecorder {}", self.result_key) }
 
-        fn handle(&mut self, result: &mut HandlerResult) {
+        fn handle(&mut self, result: &mut HandlerData) {
             result.nodes.iter().for_each(|node| self.received_ids.push(format!("node#{}", node.id().to_string())));
             result.ways.iter().for_each(|node| self.received_ids.push(format!("way#{}", node.id().to_string())));
             result.relations.iter().for_each(|node| self.received_ids.push(format!("relation#{}", node.id().to_string())));
         }
 
-        fn close(&mut self, result: &mut HandlerResult) {
+        fn close(&mut self, result: &mut HandlerData) {
             result.other.insert(format!("{}", self.name()), self.received_ids.join(", "));
         }
     }
@@ -739,7 +739,7 @@ pub(crate) mod tests {
     impl Handler for ElementEvaluator {
         fn name(&self) -> String { format!("ElementEvaluator#{}", self.id.clone()) }
 
-        fn handle(&mut self, result: &mut HandlerResult) {
+        fn handle(&mut self, result: &mut HandlerData) {
             result.nodes.iter().for_each(|node| {
                 self.node_results.insert(node.id(), (self.node_evaluator)(node));
             });
@@ -751,7 +751,7 @@ pub(crate) mod tests {
             });
         }
 
-        fn close(&mut self, result: &mut HandlerResult) {
+        fn close(&mut self, result: &mut HandlerData) {
             result.other.insert(format!("{} node results", self.name()), self.node_results.iter().map(|(k, v)| format!("{}:{}", k, v)).collect::<Vec<String>>().join(", "));
             result.other.insert(format!("{} way results", self.name()), self.way_results.iter().map(|(k, v)| format!("{}:{}", k, v)).collect::<Vec<String>>().join(", "));
             result.other.insert(format!("{} relation results", self.name()), self.relation_results.iter().map(|(k, v)| format!("{}:{}", k, v)).collect::<Vec<String>>().join(", "));
@@ -771,7 +771,7 @@ pub(crate) mod tests {
     #[test]
     /// Assert that it is possible to run a chain of processors.
     fn test_chain() {
-        let mut result = HandlerResult::default();
+        let mut result = HandlerData::default();
         let mut processor_chain = HandlerChain::default()
             .add(ElementCounter::new(ElementCountResultType::InputCount))
             .add(TestOnlyOrderRecorder::new("initial"))
@@ -811,7 +811,7 @@ pub(crate) mod tests {
     /// The test uses TestOnlyElementBufferingDuplicatingEditingProcessor for this.
     fn test_chain_with_buffer() {
         let _ = SimpleLogger::new().init();
-        let mut result = HandlerResult::default();
+        let mut result = HandlerData::default();
         let mut processor_chain = HandlerChain::default()
             .add(ElementCounter::new(ElementCountResultType::InputCount))
             .add(TestOnlyOrderRecorder::new("initial"))
@@ -847,7 +847,7 @@ pub(crate) mod tests {
     /// The test uses TestOnlyElementAdder for this.
     fn test_chain_with_element_adder() {
         let _ = SimpleLogger::new().init();
-        let mut result = HandlerResult::default();
+        let mut result = HandlerData::default();
         let mut processor_chain = HandlerChain::default()
             .add(ElementCounter::new(ElementCountResultType::InputCount))
             .add(TestOnlyOrderRecorder::new("initial"))
@@ -879,7 +879,7 @@ pub(crate) mod tests {
     /// The test uses TestOnlyElementFilter for this, which filters nodes with an even id.
     fn test_chain_with_element_filter() {
         let _ = SimpleLogger::new().init();
-        let mut result = HandlerResult::default();
+        let mut result = HandlerData::default();
         let mut processor_chain = HandlerChain::default()
             .add(ElementCounter::new(ElementCountResultType::InputCount))
             .add(TestOnlyOrderRecorder::new("initial"))
@@ -911,7 +911,7 @@ pub(crate) mod tests {
     /// The test uses TestOnlyElementReplacer for this, which replaces node#6 with a new instance.
     fn test_chain_with_element_replacer() {
         let _ = SimpleLogger::new().init();
-        let mut result = HandlerResult::default();
+        let mut result = HandlerData::default();
         let mut processor_chain = HandlerChain::default()
             .add(ElementCounter::new(ElementCountResultType::InputCount))
             .add(TestOnlyOrderRecorder::new("initial"))
@@ -938,7 +938,7 @@ pub(crate) mod tests {
         assert_eq!(&result.other.get("TestOnlyOrderRecorder final").unwrap().clone(), "node#1, node#2, node#66, node#8");
     }
 
-    fn assert_element_counts(result: & HandlerResult, input_node_count: u64, output_node_count: u64, input_relation_count: u64, output_relation_count: u64, input_way_count: u64, output_way_count: u64) {
+    fn assert_element_counts(result: &HandlerData, input_node_count: u64, output_node_count: u64, input_relation_count: u64, output_relation_count: u64, input_way_count: u64, output_way_count: u64) {
         assert_eq!(&result.input_node_count, &input_node_count);
         assert_eq!(&result.output_node_count, &output_node_count);
         assert_eq!(&result.input_relation_count, &input_relation_count);
@@ -956,7 +956,7 @@ pub(crate) mod tests {
     /// which is not explicitly asserted.
     fn test_chain_with_element_modifier() {
         let _ = SimpleLogger::new().init();
-        let mut result = HandlerResult::default();
+        let mut result = HandlerData::default();
         let mut processor_chain = HandlerChain::default()
             .add(ElementCounter::new(ElementCountResultType::InputCount))
             .add(TestOnlyOrderRecorder::new("initial"))
@@ -988,7 +988,7 @@ pub(crate) mod tests {
     #[test]
     fn handler_chain() {
         let _ = SimpleLogger::new().init();
-        let mut result = HandlerResult::default();
+        let mut result = HandlerData::default();
         let chain = HandlerChain::default()
             .add(ElementCounter::new(ElementCountResultType::InputCount))
             .add(TagValueBasedOsmElementsFilter::new(
@@ -1010,7 +1010,7 @@ pub(crate) mod tests {
     #[test]
     fn handler_chain_with_node_id_filter() {
         let _ = SimpleLogger::new().init();
-        let mut result = HandlerResult::default();
+        let mut result = HandlerData::default();
         result.node_ids.set(1usize, true);
         result.node_ids.set(2usize, true);
         let chain = HandlerChain::default()
@@ -1026,7 +1026,7 @@ pub(crate) mod tests {
     fn handler_chains_with_node_id_collector_and_filter() {
         let _ = SimpleLogger::new().init();
 
-        let mut result = HandlerResult::default();
+        let mut result = HandlerData::default();
         let mut chain1 = HandlerChain::default()
             .add(ReferencedNodeIdCollector::default());
 
@@ -1040,7 +1040,7 @@ pub(crate) mod tests {
         handle_test_nodes_and_verify_result(chain2, &mut result);
     }
 
-    fn handle_test_nodes_and_verify_result(mut handler_chain: HandlerChain, result: &mut HandlerResult) {
+    fn handle_test_nodes_and_verify_result(mut handler_chain: HandlerChain, result: &mut HandlerData) {
         handler_chain.process(simple_node_element(1, vec![(existing_tag().as_str(), "kasper")]), result);
         handler_chain.process(simple_node_element(2, vec![(existing_tag().as_str(), "seppl")]), result);
         handler_chain.process(simple_node_element(3, vec![(existing_tag().as_str(), "hotzenplotz")]), result);
@@ -1062,7 +1062,7 @@ pub(crate) mod tests {
     #[test]
     fn handler_chain_with_buffering_elevation_enricher_adds_new_nodes_with_elevation() {
         let _ = SimpleLogger::new().init();
-        let mut result = HandlerResult::default();
+        let mut result = HandlerData::default();
         let mut node_ids = BitVec::from_elem(10usize, false);
         node_ids.set(1usize, true);
         node_ids.set(2usize, true);
@@ -1107,7 +1107,7 @@ pub(crate) mod tests {
         assert_eq!(&result.other.get("ElementEvaluator#way_refs:way#201").unwrap().clone(), format!("101,{},102",HIGHEST_NODE_ID+1).as_str());
     }
 
-    fn add_to_result(result: &mut HandlerResult, elements: Vec<(MemberType, i64)>) {
+    fn add_to_result(result: &mut HandlerData, elements: Vec<(MemberType, i64)>) {
         for (member_type, id) in elements {
             match member_type {
                 MemberType::Node => result.nodes.push(simple_node(id, vec![])),
@@ -1116,7 +1116,7 @@ pub(crate) mod tests {
             }
         }
     }
-    fn process_elements_one_by_one(handler_chain: &mut HandlerChain, result: &mut HandlerResult, elements: Vec<(MemberType, i64)>) {
+    fn process_elements_one_by_one(handler_chain: &mut HandlerChain, result: &mut HandlerData, elements: Vec<(MemberType, i64)>) {
         for (member_type, id) in elements {
             match member_type {
                 MemberType::Node => handler_chain.process(simple_node_element(id, vec![]), result),
@@ -1127,7 +1127,7 @@ pub(crate) mod tests {
         handler_chain.flush_handlers(result);
         handler_chain.collect_result(result);
     }
-    fn flush_elements_one_by_one(handler_chain: &mut HandlerChain, result: &mut HandlerResult, elements: Vec<(MemberType, i64)>) {
+    fn flush_elements_one_by_one(handler_chain: &mut HandlerChain, result: &mut HandlerData, elements: Vec<(MemberType, i64)>) {
         for (member_type, id) in elements {
             match member_type {
                 MemberType::Node => {
@@ -1147,7 +1147,7 @@ pub(crate) mod tests {
         handler_chain.collect_result(result);
     }
 
-    fn flush_elements_in_one_call(handler_chain: &mut HandlerChain, result: &mut HandlerResult, elements: Vec<(MemberType, i64)>) {
+    fn flush_elements_in_one_call(handler_chain: &mut HandlerChain, result: &mut HandlerData, elements: Vec<(MemberType, i64)>) {
         add_to_result(result, elements);
         handler_chain.flush_handlers(result);
         handler_chain.collect_result(result);
@@ -1158,7 +1158,7 @@ pub(crate) mod tests {
         let _ = SimpleLogger::new().init();
         let handle_type = OsmElementTypeSelection::node_only();
 
-        let mut result = HandlerResult::default();
+        let mut result = HandlerData::default();
         let mut handler_chain = HandlerChain::default()
             .add(TestOnlyOrderRecorder::new("initial"))
             .add(AllElementsFilter{handle_types: handle_type})
@@ -1178,7 +1178,7 @@ pub(crate) mod tests {
         let _ = SimpleLogger::new().init();
         let handle_type = OsmElementTypeSelection::way_only();
 
-        let mut result = HandlerResult::default();
+        let mut result = HandlerData::default();
         let mut handler_chain = HandlerChain::default()
             .add(TestOnlyOrderRecorder::new("initial"))
             .add(AllElementsFilter{handle_types: handle_type})
@@ -1198,7 +1198,7 @@ pub(crate) mod tests {
         let _ = SimpleLogger::new().init();
         let handle_type = OsmElementTypeSelection::all();
 
-        let mut result = HandlerResult::default();
+        let mut result = HandlerData::default();
         let mut handler_chain = HandlerChain::default()
             .add(TestOnlyOrderRecorder::new("initial"))
             .add(AllElementsFilter{handle_types: handle_type})
@@ -1218,7 +1218,7 @@ pub(crate) mod tests {
         let _ = SimpleLogger::new().init();
         let handle_type = OsmElementTypeSelection::all();
 
-        let mut result = HandlerResult::default();
+        let mut result = HandlerData::default();
         let mut handler_chain = HandlerChain::default()
             .add(TestOnlyOrderRecorder::new("initial"))
             .add(AllElementsFilter{handle_types: handle_type})
@@ -1238,7 +1238,7 @@ pub(crate) mod tests {
         let _ = SimpleLogger::new().init();
         let handle_type = OsmElementTypeSelection::all();
 
-        let mut result = HandlerResult::default();
+        let mut result = HandlerData::default();
         let mut handler_chain = HandlerChain::default()
             .add(TestOnlyOrderRecorder::new("initial"))
             .add(AllElementsFilter{handle_types: handle_type})
@@ -1258,7 +1258,7 @@ pub(crate) mod tests {
     fn test_handler_chain_process_with_complex_elements_filter() {
         let _ = SimpleLogger::new().init();
 
-        let mut result = HandlerResult::default();
+        let mut result = HandlerData::default();
         let mut handler_chain = HandlerChain::default()
             .add(TestOnlyOrderRecorder::new("initial"))
             .add(ComplexElementsFilter::ors_default())
@@ -1283,7 +1283,7 @@ pub(crate) mod tests {
     fn test_handler_chain_flush_in_one_call_with_complex_elements_filter() {
         let _ = SimpleLogger::new().init();
 
-        let mut result = HandlerResult::default();
+        let mut result = HandlerData::default();
         let mut handler_chain = HandlerChain::default()
             .add(TestOnlyOrderRecorder::new("initial"))
             .add(ComplexElementsFilter::ors_default())

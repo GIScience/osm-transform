@@ -1,6 +1,6 @@
 use osm_io::osm::model::way::Way;
 
-use crate::handler::{HandlerResult, Handler};
+use crate::handler::{HandlerData, Handler};
 
 pub(crate) struct SkipElevationNodeCollector {
     no_elevation_keys: Vec<String>,
@@ -28,7 +28,7 @@ impl Handler for SkipElevationNodeCollector {
         String::from("SkipElevationNodeCollector")
     }
 
-    fn handle(&mut self, result: &mut HandlerResult) {
+    fn handle(&mut self, result: &mut HandlerData) {
         for way in & result.ways {
             if self.skip_elevation(way) {
                 log::trace!("skipping elevation for way {}", way.id());
@@ -44,7 +44,7 @@ impl Handler for SkipElevationNodeCollector {
 
 #[cfg(test)]
 mod test {
-    use crate::handler::{Handler, HandlerResult};
+    use crate::handler::{Handler, HandlerData};
     use crate::handler::skip_ele::SkipElevationNodeCollector;
     use crate::handler::tests::{simple_way};
     const TUNNEL: (&str, &str) = ("tunnel", "avalanche_protector");
@@ -68,7 +68,7 @@ mod test {
 
     #[test]
     fn test_skip_elevation_node_collector_handle_result() {
-        let mut result = HandlerResult::default();
+        let mut result = HandlerData::default();
         let mut collector = SkipElevationNodeCollector::default();
         result.ways.push(simple_way(1, vec![1, 2, 3], vec![HIGHWAY]));
         result.ways.push(simple_way(2, vec![3, 4], vec![HIGHWAY, BRIDGE]));
@@ -95,8 +95,8 @@ mod test {
     #[should_panic(expected = "index out of bounds")]
     fn node_id_collector_out_of_bounds(){
         let mut collector = SkipElevationNodeCollector::new(SkipElevationNodeCollector::DEFAULT_KEYS.to_vec());
-        let mut result = HandlerResult::default();
+        let mut result = HandlerData::default();
         result.ways.push(simple_way(1, vec![9, 10], vec![TUNNEL]));
-        collector.handle(&mut HandlerResult::default());
+        collector.handle(&mut HandlerData::default());
     }
 }
