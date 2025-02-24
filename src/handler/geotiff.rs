@@ -649,9 +649,6 @@ impl Handler for BufferingElevationEnricher {
                 result.nodes.extend(self.handle_way(way));
             }
         }
-        if result.relations.len() > 0 {
-            result.relations = self.handle_relations(result.relations.clone());
-        }
     }
 
     fn flush(&mut self, result: &mut HandlerResult) {

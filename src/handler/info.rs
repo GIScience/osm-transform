@@ -155,14 +155,7 @@ impl ElementPrinter {
             }
         }
     }
-}
-impl Handler for ElementPrinter {
-    fn name(&self) -> String { format!("ElementPrinter {}", self.prefix) }
-    fn handle_result(&mut self, result: &mut HandlerResult) {
-        self.handle_nodes(result.nodes.clone());
-        self.handle_ways(result.ways.clone());
-        self.handle_relations(result.relations.clone());
-    }
+
     fn handle_nodes(&mut self, elements: Vec<Node>) -> Vec<Node> {
         for node in &elements {
             self.handle_node(node);
@@ -182,6 +175,15 @@ impl Handler for ElementPrinter {
             self.handle_relation(relation);
         }
         elements
+    }
+
+}
+impl Handler for ElementPrinter {
+    fn name(&self) -> String { format!("ElementPrinter {}", self.prefix) }
+    fn handle_result(&mut self, result: &mut HandlerResult) {
+        self.handle_nodes(result.nodes.clone());
+        self.handle_ways(result.ways.clone());
+        self.handle_relations(result.relations.clone());
     }
 }
 

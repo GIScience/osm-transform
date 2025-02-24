@@ -41,42 +41,6 @@ pub trait Handler {
     fn flush(&mut self, result: &mut HandlerResult)  {
         self.handle_result(result)
     }
-    fn handle_elements(&mut self, nodes: Vec<Node>, ways: Vec<Way>, relations: Vec<Relation>) -> (Vec<Node>, Vec<Way>, Vec<Relation>){
-        trace!("Handler.handle_elements() called with {} nodes, {} ways, {} relations", nodes.len(), ways.len(), relations.len());
-        (self.handle_nodes(nodes), self.handle_ways(ways), self.handle_relations(relations))
-    }
-
-    fn handle_and_flush_elements(&mut self, nodes: Vec<Node>, ways: Vec<Way>, relations: Vec<Relation>) -> (Vec<Node>, Vec<Way>, Vec<Relation>) {
-        trace!("Handler.handle_and_flush_elements() called with {} nodes, {} ways, {} relations", nodes.len(), ways.len(), relations.len());
-        (self.handle_and_flush_nodes(nodes), self.handle_and_flush_ways(ways), self.handle_and_flush_relations(relations))
-    }
-
-    fn handle_nodes(&mut self, elements: Vec<Node>) -> Vec<Node> {
-        elements
-    }
-
-    fn handle_ways(&mut self, elements: Vec<Way>) -> Vec<Way> {
-        elements
-    }
-
-    fn handle_relations(&mut self, elements: Vec<Relation>) -> Vec<Relation> {
-        elements
-    }
-
-    fn handle_and_flush_nodes(&mut self, elements: Vec<Node>) -> Vec<Node> {
-        trace!("Handler.handle_and_flush_nodes() called with {} nodes", elements.len());
-        self.handle_nodes(elements)
-    }
-
-    fn handle_and_flush_ways(&mut self, elements: Vec<Way>) -> Vec<Way> {
-        trace!("Handler.handle_and_flush_ways() called with {} ways", elements.len());
-        self.handle_ways(elements)
-    }
-
-    fn handle_and_flush_relations(&mut self, elements: Vec<Relation>) -> Vec<Relation> {
-        trace!("Handler.handle_and_flush_relations() called with {} relations", elements.len());
-        self.handle_relations(elements)
-    }
 
     fn add_result(&mut self, result: &mut HandlerResult) {}
 }
