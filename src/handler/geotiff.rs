@@ -8,7 +8,6 @@ use itertools::Itertools;
 use log::{debug, error, log_enabled, trace, warn};
 use osm_io::osm::model::coordinate::Coordinate;
 use osm_io::osm::model::node::Node;
-use osm_io::osm::model::relation::Relation;
 use osm_io::osm::model::tag::Tag;
 use osm_io::osm::model::way::Way;
 use proj4rs::Proj;
@@ -614,19 +613,12 @@ impl BufferingElevationEnricher {
         result
     }
 
-    fn handle_nodes(&mut self, mut nodes: Vec<Node>) -> Vec<Node> {
+    fn handle_nodes(&mut self, nodes: Vec<Node>) -> Vec<Node> {
         let mut result_vec = Vec::new();
         for node in nodes {
             result_vec.extend(self.handle_node(node));
         }
         result_vec
-    }
-
-    fn handle_ways(&mut self, mut ways: Vec<Way>) -> Vec<Way> {
-        for way in ways.iter_mut() {
-            self.handle_way(way);
-        }
-        ways
     }
 
     fn handle_and_flush_nodes(&mut self, elements: Vec<Node> ) -> Vec<Node> {
@@ -731,6 +723,9 @@ impl LocationWithElevation {
 
 #[cfg(test)]
 mod tests {
+    use crate::handler::geotiff::{format_as_elevation_string, round_f32, round_f64, transform, BufferingElevationEnricher, GeoTiff, GeoTiffManager, LocationWithElevation};
+    use crate::handler::{HIGHEST_NODE_ID};
+    use crate::srs::DynamicSrsResolver;
     use bit_vec::BitVec;
     use epsg::CRS;
     use georaster::geotiff::{GeoTiffReader, RasterValue};
@@ -743,10 +738,6 @@ mod tests {
     use simple_logger::SimpleLogger;
     use std::fs::File;
     use std::io::BufReader;
-
-    use crate::handler::geotiff::{format_as_elevation_string, round_f32, round_f64, transform, BufferingElevationEnricher, GeoTiff, GeoTiffManager, LocationWithElevation};
-    use crate::handler::{Handler, HIGHEST_NODE_ID};
-    use crate::srs::DynamicSrsResolver;
 
     #[test]
     #[ignore]
@@ -840,11 +831,7 @@ mod tests {
         let tags_obj = tags.iter().map(|(k, v)| Tag::new(k.to_string(), v.to_string())).collect();
         Node::new(id, 1, wgs84_coordinate_limburg_vienna_house().get_coordinate(), 1, 1, 1, "a".to_string(), true, tags_obj)
     }
-    pub fn node_with_ele_from_location(id: i64, location: LocationWithElevation, tags: Vec<(&str, &str)>) -> Node {
-        let mut tags_obj: Vec<Tag> = tags.iter().map(|(k, v)| Tag::new(k.to_string(), v.to_string())).collect();
-        if &location.ele() != &0.0 { tags_obj.push(Tag::new("ele".to_string(), location.ele().to_string())); }
-        Node::new(id, 1, location.get_coordinate(), 1, 1, 1, "a".to_string(), true, tags_obj)
-    }
+
     pub fn simple_way_element(id: i64, node_refs: Vec<i64>, tags: Vec<(&str, &str)>) -> Way {
         let tags_obj = tags.iter().map(|(k, v)| Tag::new(k.to_string(), v.to_string())).collect();
         Way::new(id, 1, 1, 1, 1, "a".to_string(), true, node_refs, tags_obj)
@@ -1315,7 +1302,7 @@ mod tests {
         let mut way = simple_way_element(1, vec![1000, 1001], vec![]);
         assert!(&way.refs().len() == &2);
 
-        let nodes = handler.handle_way(&mut way);
+        let _nodes = handler.handle_way(&mut way);
 
         dbg!(&way);
         assert_eq!(&4, &way.refs().len());

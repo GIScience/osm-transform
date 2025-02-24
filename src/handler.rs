@@ -178,16 +178,6 @@ impl HandlerResult {
         result.nodes = nodes;
         result
     }
-    pub(crate) fn with_ways(&self, ways: Vec<Way>) -> Self {
-        let mut result = Self::default();
-        result.ways = ways;
-        result
-    }
-    pub(crate) fn with_relations(&self, relations: Vec<Relation>) -> Self {
-        let mut result = Self::default();
-        result.relations = relations;
-        result
-    }
 
     pub(crate) fn format_multi_line(&self) -> String {
         let input_node_count = self.input_node_count;
@@ -448,7 +438,7 @@ impl HandlerChain {
         result.clear_elements();
     }
 
-    fn handle_element(&mut self, mut nodes: Vec<Node>, mut ways: Vec<Way>, mut relations: Vec<Relation>, result: &mut HandlerResult) {
+    fn handle_element(&mut self, nodes: Vec<Node>, ways: Vec<Way>, relations: Vec<Relation>, result: &mut HandlerResult) {
         trace!("HandlerChain.handle_elements called with {} nodes {} ways {} relations", nodes.len(), ways.len(), relations.len());
         for processor in &mut self.processors {
             if nodes.len() == 0 && ways.len() == 0 && relations.len() == 0 {
@@ -491,7 +481,6 @@ impl HandlerChain {
 #[cfg(test)]
 #[allow(unused_variables)]
 pub(crate) mod tests {
-    use std::any::Any;
     use std::ops::Add;
     use bit_vec::BitVec;
     use osm_io::osm::model::coordinate::Coordinate;
@@ -550,9 +539,6 @@ pub(crate) mod tests {
     pub fn way_element(id: i64, version: i32, timestamp: i64, changeset: i64, uid: i32, user: String, visible: bool, refs: Vec<i64>, tags: Vec<Tag>) -> Element {
         Element::Way { way: Way::new(id, version, timestamp, changeset, uid, user, visible, refs, tags) }
     }
-    pub fn relation_element(id: i64, version: i32, timestamp: i64, changeset: i64, uid: i32, user: String, visible: bool, members: Vec<Member>, tags: Vec<Tag>) -> Element {
-        Element::Relation { relation: Relation::new(id, version, timestamp, changeset, uid, user, visible, members, tags) }
-    }
     pub fn copy_node_with_new_id(node: &Node, new_id: i64) -> Node {
         Node::new(new_id, node.version(), node.coordinate().clone(), node.timestamp(), node.changeset(), node.uid(), node.user().clone(), node.visible(), node.tags().clone())
     }
@@ -562,15 +548,7 @@ pub(crate) mod tests {
     pub fn as_way_element(way: Way) -> Element {
         Element::Way { way: way }
     }
-    pub fn as_relation_element(relation: Relation) -> Element {
-        Element::Relation { relation: relation }
-    }
 
-    pub fn node_with_ele_from_location(id: i64, location: LocationWithElevation, tags: Vec<(&str, &str)>) -> Node {
-        let mut tags_obj: Vec<Tag> = tags.iter().map(|(k, v)| Tag::new(k.to_string(), v.to_string())).collect();
-        if &location.ele() != &0.0 { tags_obj.push(Tag::new("ele".to_string(), location.ele().to_string())); }
-        Node::new(id, 1, location.get_coordinate(), 1, 1, 1, "a".to_string(), true, tags_obj)
-    }
     pub fn node_without_ele_from_location(id: i64, location: LocationWithElevation, tags: Vec<(&str, &str)>) -> Node {
         let tags_obj: Vec<Tag> = tags.iter().map(|(k, v)| Tag::new(k.to_string(), v.to_string())).collect();
         Node::new(id, 1, location.get_coordinate(), 1, 1, 1, "a".to_string(), true, tags_obj)
@@ -1083,7 +1061,7 @@ pub(crate) mod tests {
         let mut chain1 = HandlerChain::default()
             .add(ReferencedNodeIdCollector::default());
 
-        let mut chain2 = HandlerChain::default()
+        let chain2 = HandlerChain::default()
             .add(ElementCounter::new(ElementCountResultType::InputCount))
             .add(NodeIdFilter {})
             .add(ElementCounter::new(ElementCountResultType::OutputCount));

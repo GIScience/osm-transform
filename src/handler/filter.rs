@@ -1,6 +1,4 @@
 use std::collections::HashMap;
-use bit_vec::BitVec;
-use osm_io::osm::model::node::Node;
 use osm_io::osm::model::relation::Relation;
 use osm_io::osm::model::tag::Tag;
 use osm_io::osm::model::way::Way;

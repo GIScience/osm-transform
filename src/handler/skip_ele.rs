@@ -1,7 +1,6 @@
-use bit_vec::BitVec;
 use osm_io::osm::model::way::Way;
 
-use crate::handler::{HandlerResult, HIGHEST_NODE_ID, Handler};
+use crate::handler::{HandlerResult, Handler};
 
 pub(crate) struct SkipElevationNodeCollector {
     no_elevation_keys: Vec<String>,
@@ -9,14 +8,14 @@ pub(crate) struct SkipElevationNodeCollector {
 impl SkipElevationNodeCollector {
     const DEFAULT_KEYS: [&'static str; 4] = ["bridge", "tunnel", "cutting", "indoor"];
 
-    pub(crate) fn new(nbits: usize, no_elevation_keys: Vec<&str>) -> Self {
+    pub(crate) fn new(no_elevation_keys: Vec<&str>) -> Self {
         Self {
             no_elevation_keys: no_elevation_keys.iter().map(|&str| String::from(str)).collect()
         }
     }
 
     #[allow(dead_code)]
-    pub(crate) fn default() -> Self {Self::new(HIGHEST_NODE_ID as usize, Self::DEFAULT_KEYS.to_vec())
+    pub(crate) fn default() -> Self {Self::new(Self::DEFAULT_KEYS.to_vec())
     }
 
     fn skip_elevation(&mut self, way: &Way) -> bool {
@@ -57,7 +56,7 @@ mod test {
 
     #[test]
     fn test_skip_elevation() {
-        let mut collector = SkipElevationNodeCollector::new(0, SkipElevationNodeCollector::DEFAULT_KEYS.to_vec());
+        let mut collector = SkipElevationNodeCollector::new(SkipElevationNodeCollector::DEFAULT_KEYS.to_vec());
 
         assert!( collector.skip_elevation(&simple_way(0, vec![1, 2, 3], vec![TUNNEL])) );
         assert!( collector.skip_elevation(&simple_way(0, vec![1, 2, 3], vec![BRIDGE])) );
@@ -95,7 +94,7 @@ mod test {
     #[test]
     #[should_panic(expected = "index out of bounds")]
     fn node_id_collector_out_of_bounds(){
-        let mut collector = SkipElevationNodeCollector::new(10, SkipElevationNodeCollector::DEFAULT_KEYS.to_vec());
+        let mut collector = SkipElevationNodeCollector::new(SkipElevationNodeCollector::DEFAULT_KEYS.to_vec());
         let mut result = HandlerResult::default();
         result.ways.push(simple_way(1, vec![9, 10], vec![TUNNEL]));
         collector.handle_result(&mut HandlerResult::default());

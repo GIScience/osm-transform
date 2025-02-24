@@ -13,8 +13,7 @@ use std::path::PathBuf;
 use benchmark_rs::stopwatch::StopWatch;
 use log4rs::append::console::ConsoleAppender;
 use log4rs::config::{Appender, Logger, Root};
-use log::{info, debug, trace, LevelFilter, error, log_enabled};
-use osm_io::osm::pbf;
+use log::{info, debug, LevelFilter, log_enabled};
 use regex::Regex;
 use crate::io::process_with_handler;
 use area::AreaHandler;
@@ -57,40 +56,12 @@ pub fn run(config: &Config) -> HandlerResult {
     stopwatch_total.start();
     //todo log input file name and size (should occur in log)
     let mut result = HandlerResult::default();
-    // count_elements(config, &mut result);//todo add cli option for this - only really needed for very large files
     run_filter_chain(config, &mut result);
     run_processing_chain(config, &mut result);
 
     info!("Total processing time: {}", stopwatch_total);
     stopwatch_total.stop();
     result
-}
-fn count_elements(config: &Config, result: &mut HandlerResult) {
-    info!("Counting pbf elements...");
-    let mut stopwatch = StopWatch::new();
-    stopwatch.start();
-    let reader = pbf::reader::Reader::new(&config.input_pbf);
-    match reader {
-        Ok(reader) => {
-            let nwr_counts = reader.count_objects();
-            match nwr_counts {
-                Ok(counts) => {
-                    info!("Counting pbf elements done: {:?} nodes, ways, relations, time: {}", &counts, stopwatch);
-                    result.input_node_count = counts.0 as u64;
-                    result.input_way_count = counts.1 as u64;
-                    result.input_relation_count = counts.2 as u64;
-                }
-                Err(e) => {
-                    error!("Failed to count pbf elements: {}", e);
-                    panic!("Failed to count pbf elements: {}", e);
-                }
-            }
-        }
-        Err(e) => {
-            error!("Failed to read pbf file: {}", e);
-            panic!("Failed to read pbf file: {}", e);
-        }
-    }
 }
 
 fn run_filter_chain(config: &Config, result: &mut HandlerResult){

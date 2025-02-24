@@ -1,8 +1,7 @@
 use bit_vec::BitVec;
-use osm_io::osm::model::relation::{Member, Relation};
-use osm_io::osm::model::way::Way;
+use osm_io::osm::model::relation::{Member};
 
-use crate::handler::{HandlerResult, HIGHEST_NODE_ID, Handler};
+use crate::handler::{HandlerResult, Handler};
 
 pub(crate) struct ReferencedNodeIdCollector {
     count_unique: usize,

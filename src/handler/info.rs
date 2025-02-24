@@ -7,17 +7,11 @@ use osm_io::osm::model::way::Way;
 use crate::handler::{HandlerResult, OsmElementTypeSelection, Handler};
 
 pub(crate) struct ElementCounter {
-    pub nodes_count: u64,
-    pub ways_count: u64,
-    pub relations_count: u64,
     pub result_type: ElementCountResultType,
 }
 impl ElementCounter {
     pub fn new(result_type: ElementCountResultType) -> Self {
         Self {
-            nodes_count: 0,
-            ways_count: 0,
-            relations_count: 0,
             result_type,
         }
     }

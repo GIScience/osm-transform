@@ -1,13 +1,10 @@
 use std::path::PathBuf;
 use benchmark_rs::stopwatch::StopWatch;
 use osm_io::osm::model::element::Element;
-use osm_io::osm::model::node::Node;
-use osm_io::osm::model::relation::Relation;
-use osm_io::osm::model::way::Way;
 use osm_io::osm::pbf;
 use osm_io::osm::pbf::compression_type::CompressionType;
 use osm_io::osm::pbf::file_info::FileInfo;
-use crate::handler::{Handler, HandlerResult, into_node_element, into_relation_element, into_way_element, format_element_id};
+use crate::handler::{Handler, HandlerResult, format_element_id};
 
 pub struct SimpleOutputHandler {
     pub writer: pbf::writer::Writer,

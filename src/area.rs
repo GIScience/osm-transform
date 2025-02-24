@@ -109,7 +109,7 @@ impl AreaHandler {
                 Ok (mp) => {
                     self.add_area(index, &record.id, &record.name, &mp);
                 }
-                Err(e) => {
+                Err(_) => {
                     log::warn!("Area CSV file contains row with unsupported geometry! ID: {}, Name: {}", record.id, record.name);
                 }
             }
@@ -223,7 +223,6 @@ impl Handler for AreaHandler {
 
 #[cfg(test)]
 mod tests {
-    use geo::Geometry::Rect;
     use osm_io::osm::model::coordinate::Coordinate;
     use super::*;
     struct LonLat {
