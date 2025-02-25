@@ -167,28 +167,42 @@ impl AreaHandler {
     }
 
     fn save_area_records(&self, name: &str, mapping: &Mapping) {
-        let mut wtr = WriterBuilder::new().delimiter(b';').from_path(name.to_string() + "_id.csv").expect("failed to open writer");
+
+        let mut file_name = name.to_string() + "_id.csv";
+        let mut wtr = WriterBuilder::new().delimiter(b';').from_path(file_name.clone()).expect("failed to open writer");
         for (key, value) in mapping.id.iter() {
             wtr.write_record(&[key.to_string(), value.to_string()]).expect("failed to write");
         }
         wtr.flush().expect("failed to flush");
-        let mut wtr = WriterBuilder::new().delimiter(b';').from_path(name.to_string() + "_name.csv").expect("failed to open writer");
+        log::debug!("Saved {} with {} entries", file_name , mapping.id.len());
+
+        file_name = name.to_string() + "_name.csv";
+        let mut wtr = WriterBuilder::new().delimiter(b';').from_path(file_name.clone()).expect("failed to open writer");
         for (key, value) in mapping.name.iter() {
             wtr.write_record(&[key.to_string(), value.to_string()]).expect("failed to write");
         }
         wtr.flush().expect("failed to flush");
-        let mut wtr = WriterBuilder::new().delimiter(b';').from_path(name.to_string() + "_index.csv").expect("failed to open writer");
+        log::debug!("Saved {} with {} entries", file_name, mapping.name.len());
+
+        file_name = name.to_string() + "_index.csv";
+        let mut wtr = WriterBuilder::new().delimiter(b';').from_path(file_name.clone()).expect("failed to open writer");
+        let mut count = 0;
         for id in 0..self.mapping.grid_size {
             if mapping.index[id] > 0 {
+                count += 1;
                 wtr.write_record(&[id.to_string(), mapping.index[id].to_string()]).expect("failed to write");
             }
         }
         wtr.flush().expect("failed to flush");
-        let mut wtr = WriterBuilder::new().delimiter(b';').from_path(name.to_string() + "_area.csv").expect("failed to open writer");
+        log::debug!("Saved {} with {} entries", file_name, count);
+
+        file_name = name.to_string() + "_area.csv";
+        let mut wtr = WriterBuilder::new().delimiter(b';').from_path(file_name.clone()).expect("failed to open writer");
         for (key, values) in mapping.area.iter() {
             wtr.write_record(&[key.to_string(), values.id.to_string(), values.geo.wkt_string()]).expect("failed to write");
         }
         wtr.flush().expect("failed to flush");
+        log::debug!("Saved {} with {} entries", file_name, mapping.area.len());
     }
     fn handle_node(&mut self, node: &mut Node) {
         let mut result_vec: Vec<String> = Vec::new();

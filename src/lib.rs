@@ -158,7 +158,7 @@ fn run_processing_chain(config: &Config, data: &mut HandlerData) {//TODO use bit
 
     match &config.country_csv {//todo move after elevation handling
         Some(path_buf) => {
-            info!("Creating spatial country index...");
+            info!("Creating spatial country index with country-tile-size={}...", config.country_tile_size);
             stopwatch.start();
             let mut area_handler = AreaHandler::new(config.country_tile_size);
             area_handler.load(path_buf.clone()).expect("Area handler failed to load CSV file");
