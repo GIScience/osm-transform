@@ -17,7 +17,7 @@ use wkt::Wkt;
 
 use crate::handler::{Handler, HandlerData};
 
-const GRID_SIZE: usize = 64800;
+//const GRID_SIZE: usize = 64800;
 const AREA_ID_MULTIPLE: u16 = u16::MAX;
 
 pub struct Tile {
@@ -33,20 +33,37 @@ pub(crate) struct AreaHandler {
 }
 
 pub(crate) struct Mapping {
-    pub index: [u16; GRID_SIZE],
+    pub tile_size: f64,
+    pub grid_size: usize,
+    pub num_tiles_lon: usize,
+    pub num_tiles_lat: usize,
+    pub index: Vec<u16>,
     pub area: BTreeMultiMap<u16, AreaIntersect>,
     pub id: BTreeMap<u16, String>,
     pub name: BTreeMap<u16, String>,
 }
 
-impl Default for Mapping {
-    fn default() -> Self {
+impl Mapping {
+    fn new(tile_size: f64) -> Self {
+        let num_tiles_lon = (360.0 / tile_size).ceil() as usize;
+        let num_tiles_lat = (180.0 / tile_size).ceil() as usize;
+        let grid_size = num_tiles_lon * num_tiles_lat;
         Self {
-            index: [0; GRID_SIZE],
+            tile_size,
+            grid_size,
+            num_tiles_lon,
+            num_tiles_lat,
+            index: vec![0; grid_size],
             area: BTreeMultiMap::new(),
             id: BTreeMap::new(),
             name: BTreeMap::new(),
         }
+    }
+
+}
+impl Default for Mapping {
+    fn default() -> Self {
+        Mapping::new(1.0)
     }
 }
 
@@ -66,22 +83,22 @@ pub fn wkt_string_to_multipolygon(wkt_string: &str) -> Result<MultiPolygon<f64>,
 
 impl Default for AreaHandler {
     fn default() -> Self {
+        let mapping = Mapping::default();
+        let mut grid: Vec<Tile> = Vec::new();
+        for tile_number_lat in 0..mapping.num_tiles_lat {
+            for tile_number_lon in 0..mapping.num_tiles_lon {
+                let box_lon = tile_number_lon as f64 * mapping.tile_size - 180.0;
+                let box_lat = tile_number_lat as f64 * mapping.tile_size - 90.0;
+                let bbox = Rect::new(coord! {x: box_lon, y: box_lat},
+                                     coord! {x: box_lon + mapping.tile_size, y: box_lat + mapping.tile_size}, );
+                let poly = bbox.to_polygon().into();
+                grid.push(Tile { bbox, poly });
+            }
+        }
+
         Self {
-            mapping: Mapping::default(),
-            grid: {
-                let mut grid: Vec<Tile> = Vec::new();
-                for grid_lat in 0..180 {
-                    for grid_lon in 0..360 {
-                        let box_lon = grid_lon  - 180;
-                        let box_lat = grid_lat  - 90;
-                        let bbox = Rect::new(coord! {x: box_lon as f64, y: box_lat as f64},
-                                             coord! {x: (box_lon + 1) as f64, y: (box_lat + 1) as f64},);
-                        let poly = bbox.to_polygon().into();
-                        grid.push(Tile{bbox, poly});
-                    }
-                }
-                grid
-            },
+            mapping,
+            grid,
             country_not_found_node_count: 0,
             country_found_node_count: 0,
         }
@@ -115,7 +132,7 @@ impl AreaHandler {
             }
             index = index + 1;
         }
-        AreaHandler::save_area_records(file_basename, &self.mapping);
+        self.save_area_records(file_basename, &self.mapping);
 
         Ok(())
     }
@@ -126,7 +143,7 @@ impl AreaHandler {
         self.mapping.name.insert(country_index, name.to_string());
         let area_bbox = &area_geometry.bounding_rect().unwrap();
         let mut _intersecting_grid_tiles = 0;
-        for grid_id in 0..GRID_SIZE {//TODO make configurable grid size, ~0.2-0.5 degree could be better
+        for grid_id in 0..self.mapping.grid_size {
             let tile_bbox = &self.grid[grid_id].bbox;
             if tile_bbox.intersects(area_bbox) && tile_bbox.intersects(area_geometry) {
                 _intersecting_grid_tiles += 1;
@@ -147,7 +164,7 @@ impl AreaHandler {
         }
     }
 
-    fn save_area_records(name: &str, mapping: &Mapping) {
+    fn save_area_records(&self, name: &str, mapping: &Mapping) {
         let mut wtr = WriterBuilder::new().delimiter(b';').from_path(name.to_string() + "_id.csv").expect("failed to open writer");
         for (key, value) in mapping.id.iter() {
             wtr.write_record(&[key.to_string(), value.to_string()]).expect("failed to write");
@@ -159,7 +176,7 @@ impl AreaHandler {
         }
         wtr.flush().expect("failed to flush");
         let mut wtr = WriterBuilder::new().delimiter(b';').from_path(name.to_string() + "_index.csv").expect("failed to open writer");
-        for id in 0..GRID_SIZE {
+        for id in 0..self.mapping.grid_size {
             if mapping.index[id] > 0 {
                 wtr.write_record(&[id.to_string(), mapping.index[id].to_string()]).expect("failed to write");
             }
@@ -176,7 +193,7 @@ impl AreaHandler {
         if node.coordinate().lat() >= 90.0 || node.coordinate().lat() <= -90.0 {
             return;
         }
-        let grid_index = (node.coordinate().lat() as i32 + 90) * 360 + (node.coordinate().lon() as i32 + 180);
+        let grid_index = (node.coordinate().lat() as i32 + 90) * self.mapping.num_tiles_lon as i32 + (node.coordinate().lon() as i32 + self.mapping.num_tiles_lat as i32);
         let coord = Coord {x: node.coordinate().lon(), y: node.coordinate().lat()};
         match self.mapping.index[grid_index as usize] {
             0 => { // no area
@@ -253,7 +270,7 @@ mod tests {
             &wkt_string_to_multipolygon("MULTIPOLYGON(((5.0 1.0, 7.0 1.0, 6.0 2.0, 5.0 1.0)))").unwrap()
         );
 
-        AreaHandler::save_area_records("test_area_handler", &area_handler.mapping);
+        area_handler.save_area_records("test_area_handler", &area_handler.mapping);
         /*
         |
        2| ssbrrrr   t
@@ -301,7 +318,7 @@ mod tests {
                               &wkt_string_to_multipolygon("POLYGON((1.5 1.5, 1.5 2.5, 2.5 2.5, 2.5 1.5, 1.5 1.5))").unwrap()
         );
 
-        AreaHandler::save_area_records("test_area_handler", &area_handler.mapping);
+        area_handler.save_area_records("test_area_handler", &area_handler.mapping);
         /*
         |
        2| ssbrrrr   t
