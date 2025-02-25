@@ -92,6 +92,10 @@ pub struct Args {
     #[arg(short = 'S', long, action = clap::ArgAction::Count)]
     pub stat: u8,
 
+    /// Tile size for the country index grid
+    #[arg(long, default_value = "1.0")]
+    pub country_tile_size: f64,
+
     //todo add custom filter options
 }
 impl Args {
@@ -114,6 +118,7 @@ impl Args {
             resolution_lat: self.resolution_lat,
             elevation_threshold: self.elevation_threshold,
             statistics_level: self.stat,
+            country_tile_size: self.country_tile_size,
         }
     }
 }

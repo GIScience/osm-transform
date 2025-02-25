@@ -146,7 +146,7 @@ fn run_processing_chain(config: &Config, data: &mut HandlerData) {//TODO use bit
         Some(path_buf) => {
             info!("Creating spatial country index...");
             stopwatch.start();
-            let mut area_handler = AreaHandler::default();
+            let mut area_handler = AreaHandler::new(config.country_tile_size);
             area_handler.load(path_buf.clone()).expect("Area handler failed to load CSV file");
             debug!("Loaded: {} areas", area_handler.mapping.id.len());
             info!("Creating spatial country index done, time: {}", stopwatch);
@@ -214,4 +214,5 @@ pub struct Config {
     pub resolution_lat: f64,
     pub elevation_threshold: f64,
     pub statistics_level: u8,
+    pub country_tile_size: f64,
 }

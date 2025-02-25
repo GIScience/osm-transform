@@ -17,7 +17,6 @@ use wkt::Wkt;
 
 use crate::handler::{Handler, HandlerData};
 
-//const GRID_SIZE: usize = 64800;
 const AREA_ID_MULTIPLE: u16 = u16::MAX;
 
 pub struct Tile {
@@ -38,7 +37,7 @@ pub(crate) struct Mapping {
     pub num_tiles_lon: usize,
     pub num_tiles_lat: usize,
     pub index: Vec<u16>,
-    pub area: BTreeMultiMap<u16, AreaIntersect>,
+    pub area: BTreeMultiMap<u32, AreaIntersect>,
     pub id: BTreeMap<u16, String>,
     pub name: BTreeMap<u16, String>,
 }
@@ -83,7 +82,13 @@ pub fn wkt_string_to_multipolygon(wkt_string: &str) -> Result<MultiPolygon<f64>,
 
 impl Default for AreaHandler {
     fn default() -> Self {
-        let mapping = Mapping::default();
+        AreaHandler::new(1.0)
+    }
+}
+
+impl AreaHandler {
+    pub(crate) fn new(tile_size: f64) -> Self {
+        let mapping = Mapping::new(tile_size);
         let mut grid: Vec<Tile> = Vec::new();
         for tile_number_lat in 0..mapping.num_tiles_lat {
             for tile_number_lon in 0..mapping.num_tiles_lon {
@@ -103,9 +108,6 @@ impl Default for AreaHandler {
             country_found_node_count: 0,
         }
     }
-}
-
-impl AreaHandler {
 
     pub fn load(&mut self, path_buf: PathBuf) -> Result<(), Box<dyn Error>> {
         #[derive(Debug, Deserialize)]
@@ -154,10 +156,10 @@ impl AreaHandler {
                     let intersect = area_geometry.intersection(tile_poly);
                     if !intersect.is_empty() {
                         if self.mapping.index[grid_id] != 0 && self.mapping.index[grid_id] != AREA_ID_MULTIPLE {
-                            self.mapping.area.insert(grid_id as u16, AreaIntersect{id: self.mapping.index[grid_id], geo: tile_poly.clone()});
+                            self.mapping.area.insert(grid_id as u32, AreaIntersect{id: self.mapping.index[grid_id], geo: tile_poly.clone()});
                         }
                         self.mapping.index[grid_id] = AREA_ID_MULTIPLE;
-                        self.mapping.area.insert(grid_id as u16, AreaIntersect{id: country_index, geo: intersect});
+                        self.mapping.area.insert(grid_id as u32, AreaIntersect{id: country_index, geo: intersect});
                     }
                 }
             }
@@ -193,7 +195,7 @@ impl AreaHandler {
         if node.coordinate().lat() >= 90.0 || node.coordinate().lat() <= -90.0 {
             return;
         }
-        let grid_index = (node.coordinate().lat() as i32 + 90) * self.mapping.num_tiles_lon as i32 + (node.coordinate().lon() as i32 + self.mapping.num_tiles_lat as i32);
+        let grid_index = ((node.coordinate().lat() + 90.0) / self.mapping.tile_size) as i32 * self.mapping.num_tiles_lon as i32 + ((node.coordinate().lon() +180.0) / self.mapping.tile_size) as i32 ;
         let coord = Coord {x: node.coordinate().lon(), y: node.coordinate().lat()};
         match self.mapping.index[grid_index as usize] {
             0 => { // no area
@@ -201,7 +203,7 @@ impl AreaHandler {
             }
             AREA_ID_MULTIPLE => { // multiple areas
                 self.country_found_node_count += 1;
-                for area in self.mapping.area.get_vec(&(grid_index as u16)).unwrap() {
+                for area in self.mapping.area.get_vec(&(grid_index as u32)).unwrap() {
                     if area.geo.intersects(&coord) {
                         result_vec.push(self.mapping.id[&area.id].to_string())
                     }
@@ -270,7 +272,8 @@ mod tests {
             &wkt_string_to_multipolygon("MULTIPOLYGON(((5.0 1.0, 7.0 1.0, 6.0 2.0, 5.0 1.0)))").unwrap()
         );
 
-        area_handler.save_area_records("test_area_handler", &area_handler.mapping);
+        // area_handler.save_area_records("test_area_handler_borders_identical_to_grid_edge", &area_handler.mapping);
+
         /*
         |
        2| ssbrrrr   t
@@ -291,6 +294,7 @@ mod tests {
         data.nodes.push(Node::new(4, 1, LonLat::new(1.0, 3.0).c(), 1, 1, 1, "_".to_string(), true, vec![]));
 
         area_handler.handle(&mut data);
+
         println!("{} {} {:?}", &data.nodes[0].id(), &data.nodes[0].user(), &data.nodes[0].tags());
         println!("{} {} {:?}", &data.nodes[1].id(), &data.nodes[1].user(), &data.nodes[1].tags());
         println!("{} {} {:?}", &data.nodes[2].id(), &data.nodes[2].user(), &data.nodes[2].tags());
@@ -318,18 +322,7 @@ mod tests {
                               &wkt_string_to_multipolygon("POLYGON((1.5 1.5, 1.5 2.5, 2.5 2.5, 2.5 1.5, 1.5 1.5))").unwrap()
         );
 
-        area_handler.save_area_records("test_area_handler", &area_handler.mapping);
-        /*
-        |
-       2| ssbrrrr   t
-        | ssbrrrr  ttt
-       1| ssbrrrr ttttt
-        |
-        +----------------
-          1 2 3 4 5 6 7 8
-        MULTIPOINT((1.5 1.5), (3.0 1.5), (2.0 1.5), (6.0 1.5), (1.0 3.0))
-        MULTIPOINT((2.0 2.0), (3.5 2.0), (2.5 2.0), (6.5 2.0), (1.5 3.5))
-         */
+        // area_handler.save_area_records("test_area_handler", &area_handler.mapping);
 
         let mut data = HandlerData::default();
         data.nodes.push(Node::new(0, 1, LonLat::new(2.1, 2.1).c(), 1, 1, 1, "s".to_string(), true, vec![]));
@@ -339,6 +332,43 @@ mod tests {
         data.nodes.push(Node::new(4, 1, LonLat::new(1.6, 3.6).c(), 1, 1, 1, "_".to_string(), true, vec![]));
 
         area_handler.handle(&mut data);
+
+        println!("{} {} {:?}", &data.nodes[0].id(), &data.nodes[0].user(), &data.nodes[0].tags());
+        println!("{} {} {:?}", &data.nodes[1].id(), &data.nodes[1].user(), &data.nodes[1].tags());
+        println!("{} {} {:?}", &data.nodes[2].id(), &data.nodes[2].user(), &data.nodes[2].tags());
+        println!("{} {} {:?}", &data.nodes[3].id(), &data.nodes[3].user(), &data.nodes[3].tags());
+        println!("{} {} {:?}", &data.nodes[4].id(), &data.nodes[4].user(), &data.nodes[4].tags());
+        assert!(data.nodes[0].tags().iter().any(|tag| { tag.k() == "country" && tag.v() == "SQA"}));
+        assert!(data.nodes[1].tags().iter().any(|tag| { tag.k() == "country" && tag.v() == "REC"}));
+        assert!(data.nodes[2].tags().iter().any(|tag| { tag.k() == "country" && (tag.v() == "SQA,REC" || tag.v() == "REC,SQA")}));
+        assert!(data.nodes[3].tags().iter().all(|tag| { tag.k() == "country" && tag.v() == "TRI"}));
+        assert!(data.nodes[4].tags().iter().all(|tag| tag.k() != "country"));
+    }
+
+    #[test]
+    fn test_area_handler_with_smaller_tile_size() {
+        let mut area_handler = AreaHandler::new(0.25);
+        area_handler.add_area(3, &"TRI".to_string(), &"Trianglia".to_string(),
+                              &wkt_string_to_multipolygon("MULTIPOLYGON(((5.6 1.6, 7.6 1.6, 6.6 2.6, 5.6 1.6)))").unwrap()
+        );
+        area_handler.add_area(2, &"REC".to_string(), &"Rectanglia".to_string(),
+                              &wkt_string_to_multipolygon("MULTIPOLYGON(((2.6 1.6, 2.6 2.6, 4.6 2.6, 4.6 1.6, 2.6 1.6)))").unwrap()
+        );
+        area_handler.add_area(1, &"SQA".to_string(), &"Squareland".to_string(),
+                              &wkt_string_to_multipolygon("POLYGON((1.6 1.6, 1.6 2.6, 2.6 2.6, 2.6 1.6, 1.6 1.6))").unwrap()
+        );
+
+        // area_handler.save_area_records("test_area_handler_with_smaller_tile_size", &area_handler.mapping);
+
+        let mut data = HandlerData::default();
+        data.nodes.push(Node::new(0, 1, LonLat::new(2.4, 2.4).c(), 1, 1, 1, "s".to_string(), true, vec![]));
+        data.nodes.push(Node::new(1, 1, LonLat::new(3.7, 2.2).c(), 1, 1, 1, "r".to_string(), true, vec![]));
+        data.nodes.push(Node::new(2, 1, LonLat::new(2.6, 2.2).c(), 1, 1, 1, "b".to_string(), true, vec![]));
+        data.nodes.push(Node::new(3, 1, LonLat::new(6.7, 2.2).c(), 1, 1, 1, "t".to_string(), true, vec![]));
+        data.nodes.push(Node::new(4, 1, LonLat::new(1.7, 3.7).c(), 1, 1, 1, "_".to_string(), true, vec![]));
+
+        area_handler.handle(&mut data);
+
         println!("{} {} {:?}", &data.nodes[0].id(), &data.nodes[0].user(), &data.nodes[0].tags());
         println!("{} {} {:?}", &data.nodes[1].id(), &data.nodes[1].user(), &data.nodes[1].tags());
         println!("{} {} {:?}", &data.nodes[2].id(), &data.nodes[2].user(), &data.nodes[2].tags());
