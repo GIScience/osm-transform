@@ -111,20 +111,6 @@ fn run_processing_chain(config: &Config, data: &mut HandlerData) {//TODO use bit
     handler_chain = handler_chain.add(ElementCounter::new(AcceptedCount));//todo needed? let writers count?
 
     let mut stopwatch = StopWatch::new();
-    match &config.country_csv {
-        Some(path_buf) => {
-            info!("Creating spatial country index...");
-            stopwatch.start();
-            let mut area_handler = AreaHandler::default();
-            area_handler.load(path_buf.clone()).expect("Area handler failed to load CSV file");
-            debug!("Loaded: {} areas", area_handler.mapping.id.len());
-            info!("Creating spatial country index done, time: {}", stopwatch);
-            stopwatch.reset();
-
-            handler_chain = handler_chain.add(area_handler);
-        }
-        None => (),
-    }
 
     if &config.elevation_tiffs.len() > &0 {
         stopwatch.start();
@@ -154,6 +140,21 @@ fn run_processing_chain(config: &Config, data: &mut HandlerData) {//TODO use bit
         }
         info!("Creating spatial elevation index done, time: {}", stopwatch);
         stopwatch.reset();
+    }
+
+    match &config.country_csv {//todo move after elevation handling
+        Some(path_buf) => {
+            info!("Creating spatial country index...");
+            stopwatch.start();
+            let mut area_handler = AreaHandler::default();
+            area_handler.load(path_buf.clone()).expect("Area handler failed to load CSV file");
+            debug!("Loaded: {} areas", area_handler.mapping.id.len());
+            info!("Creating spatial country index done, time: {}", stopwatch);
+            stopwatch.reset();
+
+            handler_chain = handler_chain.add(area_handler);
+        }
+        None => (),
     }
 
     handler_chain = handler_chain.add(TagFilterByKey::new(
