@@ -3,13 +3,14 @@ use std::path::PathBuf;
 
 use clap::Parser;
 
-use rusty_routes_transformer::{Config, init, run};
+use rusty_routes_transformer::{Config, init, run, validate};
 use rusty_routes_transformer::handler::HandlerData;
 
 fn main() {
     let args = Args::parse();
     let config = args.to_config();
     init(&config);
+    validate(&config);
     let handler_data = run(&config);
     print_statistics(&config, handler_data);
 }

@@ -51,6 +51,20 @@ pub fn init(config: &Config) {
     });
 }
 
+pub fn validate(config: &Config) {
+    validate_country_tile_size(&config.country_tile_size);
+}
+
+fn validate_country_tile_size(country_tile_size: &f64) {
+    if country_tile_size <= &0.0 {
+        panic!("Country tile size must be greater than 0.0");
+    }
+    if &180.0 % (1.0/country_tile_size) != 0.0 {
+        panic!("Country tile size must be a divisor of 180.0");
+    }
+}
+
+
 pub fn run(config: &Config) -> HandlerData {
     let mut stopwatch_total = StopWatch::new();
     stopwatch_total.start();
