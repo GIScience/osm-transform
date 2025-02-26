@@ -9,11 +9,13 @@ extern crate maplit;
 
 use std::sync::Once;
 use std::collections::HashSet;
+use std::fs;
+use std::fs::File;
 use std::path::PathBuf;
 use benchmark_rs::stopwatch::StopWatch;
 use log4rs::append::console::ConsoleAppender;
 use log4rs::config::{Appender, Logger, Root};
-use log::{info, debug, LevelFilter, log_enabled};
+use log::{info, debug, LevelFilter, log_enabled, warn};
 use regex::Regex;
 use crate::io::process_with_handler;
 use area::AreaHandler;
@@ -52,7 +54,39 @@ pub fn init(config: &Config) {
 }
 
 pub fn validate(config: &Config) {
+    validate_file(&config.input_pbf, "Input file", "pbf");
     validate_country_tile_size(&config.country_tile_size);
+}
+
+fn validate_file(path_buf: &PathBuf, label: &str, expected_extension: &str) {
+    if !path_buf.exists() {
+        panic!("{} does not exist: {}", label, path_buf.display());
+    }
+    if !path_buf.is_file() {
+        panic!("{} is not a file: {}", label,path_buf.display());
+    }
+    if path_buf.metadata().unwrap().len() == 0 {
+        panic!("{} is empty: {}", label, path_buf.display());
+    }
+    if ! File::open(path_buf).is_ok() {
+        panic!("{} could not be opened: {}", label, path_buf.display());
+    }
+    match path_buf.canonicalize() {
+        Ok(absolute_path) => {
+            match fs::metadata(&absolute_path) {
+                Ok(metadata) => {
+                    let file_size = metadata.len();
+                    info!("Found valid {}: {}, size: {} bytes", label, absolute_path.display(), file_size);
+                }
+                Err(e) => {
+                    warn!("Failed to get metadata for {}: {}", label.to_lowercase(), e);
+                }
+            }
+        }
+        Err(e) => {
+            warn!("Failed to get absolute path of {}: {}", label.to_lowercase(), e);
+        }
+    }
 }
 
 fn validate_country_tile_size(country_tile_size: &f64) {

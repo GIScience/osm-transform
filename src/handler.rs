@@ -8,9 +8,9 @@ pub(crate) mod interpolate;
 pub(crate) mod skip_ele;
 
 use std::collections::HashMap;
-
+use std::fs;
 use bit_vec::BitVec;
-use log::trace;
+use log::{info, trace, warn};
 use osm_io::osm::model::element::Element;
 use osm_io::osm::model::node::Node;
 use osm_io::osm::model::relation::Relation;
@@ -234,11 +234,15 @@ other={other}"#)
         let country_detections = country_found_node_count + country_not_found_node_count;
         let elevation_detections = elevation_found_node_count + elevation_not_found_node_count + elevation_not_relevant_node_count;
         let unsplitted_way_count = o_way_cnt - splitted_way_count;
+
+        let mut input_abs_path = config.input_pbf.canonicalize().unwrap().display().to_string();
+        let mut input_file_size = config.input_pbf.metadata().unwrap().len();
+
         let mut formatted_statistics = format!("
 Summary:
 ========
 
-Processing of file TODO (TODO bytes) completed in TODO seconds.
+Processing of file {input_abs_path} ({input_file_size} bytes) completed in TODO seconds.
 
 Element counts at specific processing stages:
 ---------------------------------------------
