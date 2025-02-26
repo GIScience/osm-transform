@@ -198,7 +198,7 @@ other={other}"#)
     pub fn format_one_line(&self) -> String {
         self.format_multi_line().replace("\n", ", ")
     }
-    pub fn statistics(&self, config: &Config) -> String {
+    pub fn summary(&self, config: &Config) -> String {
         if config.statistics_level == 0 {
             return "".to_string()
         }

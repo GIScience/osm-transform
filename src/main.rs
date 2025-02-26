@@ -17,7 +17,7 @@ fn main() {
 
 fn print_statistics(config: &Config, handler_data: HandlerData) {
     if config.statistics_level > 0 {
-        println!("{}", handler_data.statistics(&config));
+        println!("{}", handler_data.summary(&config));
     }
 }
 

@@ -44,7 +44,7 @@ fn run_minimal() {
     let config = base_config();
     rusty_routes_transformer::init(&config);
     let data = rusty_routes_transformer::run(&config);
-    println!("{}", data.statistics(&config));
+    println!("{}", data.summary(&config));
     assert_eq!(&data.input_node_count, &BAARLE_NODE_COUNT);
     assert_eq!(&data.output_node_count, &BAARLE_NODE_COUNT);
     assert_eq!(&data.input_relation_count, &BAARLE_RELATION_COUNT);
@@ -58,7 +58,7 @@ fn run_minimal_write() {
     config.output_pbf = Some(PathBuf::from("target/tmp/output-integration-test-run_minimal_write.pbf"));
     rusty_routes_transformer::init(&config);
     let data = rusty_routes_transformer::run(&config);
-    println!("{}", data.statistics(&config));
+    println!("{}", data.summary(&config));
     assert_eq!(&data.input_node_count, &BAARLE_NODE_COUNT);
     assert_eq!(&data.output_node_count, &BAARLE_NODE_COUNT);
     assert_eq!(&data.input_relation_count, &BAARLE_RELATION_COUNT);
@@ -81,7 +81,7 @@ fn run_all() {
     config.resolution_lat= 0.0001;
     rusty_routes_transformer::init(&config);
     let data = rusty_routes_transformer::run(&config);
-    println!("{}", data.statistics(&config));
+    println!("{}", data.summary(&config));
     assert_eq!(&data.input_node_count, &BAARLE_NODE_COUNT);
     assert_eq!(&data.output_node_count, &FILTERED_SPLIT_NODE_COUNT);
     assert_eq!(&data.input_relation_count, &BAARLE_RELATION_COUNT);
@@ -97,7 +97,7 @@ fn run_country() {
     config.country_csv = Some(PathBuf::from("test/mapping_test.csv"));
     rusty_routes_transformer::init(&config);
     let data = rusty_routes_transformer::run(&config);
-    println!("{}", data.statistics(&config));
+    println!("{}", data.summary(&config));
     assert_eq!(&data.input_node_count, &BAARLE_NODE_COUNT);
     assert_eq!(&data.output_node_count, &BAARLE_NODE_COUNT);
     assert_eq!(&data.input_relation_count, &BAARLE_RELATION_COUNT);
@@ -112,7 +112,7 @@ fn run_node_filtering() {
     config.with_node_filtering = true;
     rusty_routes_transformer::init(&config);
     let data = rusty_routes_transformer::run(&config);
-    println!("{}", data.statistics(&config));
+    println!("{}", data.summary(&config));
     assert_eq!(&data.input_node_count, &BAARLE_NODE_COUNT);
     assert_eq!(&data.output_node_count, &FILTERED_NODE_COUNT);
     assert_eq!(&data.input_relation_count, &BAARLE_RELATION_COUNT);
@@ -127,7 +127,7 @@ fn run_remove_metadata() {
     config.remove_metadata = true;
     rusty_routes_transformer::init(&config);
     let data = rusty_routes_transformer::run(&config);
-    println!("{}", data.statistics(&config));
+    println!("{}", data.summary(&config));
     assert_eq!(&data.input_node_count, &BAARLE_NODE_COUNT);
     assert_eq!(&data.output_node_count, &BAARLE_NODE_COUNT);
     assert_eq!(&data.input_relation_count, &BAARLE_RELATION_COUNT);
@@ -141,7 +141,7 @@ fn run_elevation() {
     config.elevation_tiffs = vec!["test/*.tif".to_string()];
     rusty_routes_transformer::init(&config);
     let data = rusty_routes_transformer::run(&config);
-    println!("{}", data.statistics(&config));
+    println!("{}", data.summary(&config));
     assert_eq!(&data.input_node_count, &BAARLE_NODE_COUNT);
     assert_eq!(&data.output_node_count, &BAARLE_NODE_COUNT);
     assert_eq!(&data.input_relation_count, &BAARLE_RELATION_COUNT);
@@ -158,7 +158,7 @@ fn run_elevation_way_splitting() {
     config.resolution_lat= 0.0001;
     rusty_routes_transformer::init(&config);
     let data = rusty_routes_transformer::run(&config);
-    println!("{}", data.statistics(&config));
+    println!("{}", data.summary(&config));
     assert_eq!(&data.input_node_count, &BAARLE_NODE_COUNT);
     assert!(&data.output_node_count > &BAARLE_NODE_COUNT);
     assert_eq!(&data.input_relation_count, &BAARLE_RELATION_COUNT);
@@ -176,7 +176,7 @@ fn run_elevation_way_splitting_write() {
     config.output_pbf = Some(PathBuf::from("target/tmp/output-integration-test-run_elevation_way_splitting_write.pbf"));
     rusty_routes_transformer::init(&config);
     let data = rusty_routes_transformer::run(&config);
-    println!("{}", data.statistics(&config));
+    println!("{}", data.summary(&config));
     assert_eq!(&data.input_node_count, &BAARLE_NODE_COUNT);
     assert_eq!(&data.output_node_count, &SPLIT_NODE_COUNT);
     assert_eq!(&data.input_relation_count, &BAARLE_RELATION_COUNT);
