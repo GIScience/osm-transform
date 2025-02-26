@@ -9,6 +9,7 @@ fn base_config() -> Config {
         input_pbf: PathBuf::from("test/baarle_small.pbf"),
         output_pbf: None,
         country_csv: None,
+        country_tile_size: 0.4,
         elevation_tiffs: vec![],
         elevation_batch_size: 10000,
         elevation_total_buffer_size: 50000,
