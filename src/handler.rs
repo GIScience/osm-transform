@@ -69,7 +69,7 @@ pub struct HandlerData {
 
     /// Intermediate filter results created by the handlers in the first pass
     /// and consumed by filters in the second pass.
-    pub node_ids: BitVec, //todo rename to accept_node_ids
+    pub accept_node_ids: BitVec,
     //todo add: pub accept_way_ids: BitVec,
     //todo add: pub accept_relation_ids: BitVec,
     pub skip_ele: BitVec, //todo rename to nodes_without_elevation_ids
@@ -116,7 +116,7 @@ impl HandlerData {
             ways: vec![],
             relations: vec![],
 
-            node_ids: BitVec::from_elem(nbits, false),
+            accept_node_ids: BitVec::from_elem(nbits, false),
             skip_ele: BitVec::from_elem(nbits, false),
 
             input_node_count: 0,
@@ -158,6 +158,7 @@ impl HandlerData {
         let output_node_count = self.output_node_count;
         let output_way_count = self.output_way_count;
         let output_relation_count = self.output_relation_count;
+        let accept_node_ids_count = self.accept_node_ids.len();
         let country_not_found_node_count = self.country_not_found_node_count;
         let country_found_node_count = self.country_found_node_count;
         let elevation_found_node_count = self.elevation_found_node_count;
@@ -178,6 +179,7 @@ accepted_relation_count={accepted_relation_count}
 output_node_count={output_node_count}
 output_way_count={output_way_count}
 output_relation_count={output_relation_count}
+accept_node_ids_count={accept_node_ids_count}
 country_not_found_node_count={country_not_found_node_count}
 country_found_node_count={country_found_node_count}
 elevation_found_node_count={elevation_found_node_count}
@@ -322,7 +324,7 @@ Unsplitted ways:           {unsplitted_way_count:>13} (TODO% of all accepted way
         self.relations.clear();
     }
     pub(crate) fn clear_intermediate_results(&mut self) {
-        self.node_ids.clear();
+        self.accept_node_ids.clear();
         //todo self.way_ids.clear();
         //todo self.relation_ids.clear();
         self.skip_ele.clear();
@@ -675,7 +677,7 @@ pub(crate) mod tests {
         fn name(&self) -> String { "TestOnlyIdCollector".to_string() }
 
         fn handle(&mut self, data: &mut HandlerData) {
-            data.nodes.iter().for_each(|node| data.node_ids.set(node.id() as usize, true));
+            data.nodes.iter().for_each(|node| data.accept_node_ids.set(node.id() as usize, true));
 
             data.ways.iter().for_each(|way| self.way_ids.set(way.id() as usize, true));
             data.relations.iter().for_each(|relation| self.relation_ids.set(relation.id() as usize, true));
@@ -793,11 +795,11 @@ pub(crate) mod tests {
                               0, 0);
         assert_eq!(&data.other.get("TestOnlyOrderRecorder initial").unwrap().clone(), "node#1, node#2, node#6, node#8");
         assert_eq!(&data.other.get("TestOnlyOrderRecorder final").unwrap().clone(), "node#1, node#2, node#6, node#8");
-        assert!(&data.node_ids.get(1).unwrap());
-        assert!(&data.node_ids.get(2).unwrap());
-        assert!(&data.node_ids.get(6).unwrap());
-        assert!(&data.node_ids.get(8).unwrap());
-        assert!( ! &data.node_ids.get(3).unwrap());
+        assert!(&data.accept_node_ids.get(1).unwrap());
+        assert!(&data.accept_node_ids.get(2).unwrap());
+        assert!(&data.accept_node_ids.get(6).unwrap());
+        assert!(&data.accept_node_ids.get(8).unwrap());
+        assert!( ! &data.accept_node_ids.get(3).unwrap());
     }
 
     #[test]
@@ -1010,8 +1012,8 @@ pub(crate) mod tests {
     fn handler_chain_with_node_id_filter() {
         let _ = SimpleLogger::new().init();
         let mut data = HandlerData::default();
-        data.node_ids.set(1usize, true);
-        data.node_ids.set(2usize, true);
+        data.accept_node_ids.set(1usize, true);
+        data.accept_node_ids.set(2usize, true);
         let chain = HandlerChain::default()
             .add(ElementCounter::new(ElementCountResultType::InputCount))
             .add(NodeIdFilter {})
@@ -1051,11 +1053,11 @@ pub(crate) mod tests {
                               4, 2,
                               0, 0,
                               0, 0);
-        assert_eq!(data.node_ids[0], false);
-        assert_eq!(data.node_ids[1], true);
-        assert_eq!(data.node_ids[2], true);
-        assert_eq!(data.node_ids[3], false);
-        assert_eq!(data.node_ids[4], false);
+        assert_eq!(data.accept_node_ids[0], false);
+        assert_eq!(data.accept_node_ids[1], true);
+        assert_eq!(data.accept_node_ids[2], true);
+        assert_eq!(data.accept_node_ids[3], false);
+        assert_eq!(data.accept_node_ids[4], false);
     }
 
     #[test]

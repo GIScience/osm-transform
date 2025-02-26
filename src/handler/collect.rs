@@ -17,7 +17,7 @@ impl ReferencedNodeIdCollector {
     fn handle_ways_result(&mut self, data: &mut HandlerData)  {
         for element in & data.ways {
             for &id in element.refs() {
-                self.add_node_id(&mut data.node_ids, id);
+                self.add_node_id(&mut data.accept_node_ids, id);
             }
         }
     }
@@ -27,7 +27,7 @@ impl ReferencedNodeIdCollector {
             for member in element.members() {
                 match member {
                     Member::Node { member } => {
-                        self.add_node_id(&mut data.node_ids, member.id());
+                        self.add_node_id(&mut data.accept_node_ids, member.id());
                     }
                     Member::Way { .. } => {}
                     Member::Relation { .. } => {}
@@ -62,9 +62,9 @@ mod test {
         let mut data = HandlerData::default();
         data.nodes.push(simple_node(2, vec![]));
         collector.handle(&mut data);
-        assert_eq!(false, data.node_ids.get(0).unwrap_or(false));
-        assert_eq!(false, data.node_ids.get(1).unwrap_or(false));
-        assert_eq!(true, data.node_ids.get(2).unwrap_or(false));
+        assert_eq!(false, data.accept_node_ids.get(0).unwrap_or(false));
+        assert_eq!(false, data.accept_node_ids.get(1).unwrap_or(false));
+        assert_eq!(true, data.accept_node_ids.get(2).unwrap_or(false));
     }
     #[test]
     #[should_panic(expected = "index out of bounds: 12 >= 10")]
@@ -80,15 +80,15 @@ mod test {
         let mut data = HandlerData::default();
         data.nodes.push(simple_node(1, vec![]));
         collector.handle(&mut data);
-        assert_eq!(false, data.node_ids.get(0).unwrap_or(false));
-        assert_eq!(true, data.node_ids.get(1).unwrap_or(false));
-        assert_eq!(false, data.node_ids.get(2).unwrap_or(false));
-        assert_eq!(false, data.node_ids.get(11414456780).unwrap_or(false));
+        assert_eq!(false, data.accept_node_ids.get(0).unwrap_or(false));
+        assert_eq!(true, data.accept_node_ids.get(1).unwrap_or(false));
+        assert_eq!(false, data.accept_node_ids.get(2).unwrap_or(false));
+        assert_eq!(false, data.accept_node_ids.get(11414456780).unwrap_or(false));
 
         data.clear_elements();
         data.nodes.push(simple_node(11414456780, vec![]));
         collector.handle(&mut data);
-        assert_eq!(true, data.node_ids.get(11414456780).unwrap_or(false));
+        assert_eq!(true, data.accept_node_ids.get(11414456780).unwrap_or(false));
     }
 
 }

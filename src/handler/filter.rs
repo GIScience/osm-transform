@@ -167,7 +167,7 @@ impl Handler for NodeIdFilter {
         "NodeIdFilter".to_string()
     }
     fn handle(&mut self, data: &mut HandlerData) {
-        data.nodes.retain(|node| data.node_ids.get(node.id() as usize) == Some(true));
+        data.nodes.retain(|node| data.accept_node_ids.get(node.id() as usize) == Some(true));
     }
 }
 
