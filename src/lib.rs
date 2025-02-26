@@ -134,7 +134,7 @@ fn run_processing_chain(config: &Config, data: &mut HandlerData) {//TODO use bit
             geotiff_manager,
             config.elevation_batch_size,
             config.elevation_total_buffer_size,
-            data.skip_ele.clone(),
+            data.no_elevation_node_ids.clone(),
             config.elevation_way_splitting,
             config.resolution_lon,
             config.resolution_lat,

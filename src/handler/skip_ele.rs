@@ -34,7 +34,7 @@ impl Handler for SkipElevationNodeCollector {
                 log::trace!("skipping elevation for way {}", way.id());
                 for &id in way.refs() {
                     log::trace!("skipping elevation for node {}", id);
-                    data.skip_ele.set(id as usize, true);
+                    data.no_elevation_node_ids.set(id as usize, true);
                 }
             }
         }
@@ -78,16 +78,16 @@ mod test {
 
         collector.handle(&mut data);
 
-        assert!(!data.skip_ele.get(0).unwrap_or(false) );
-        assert!(!data.skip_ele.get(1).unwrap_or(false) );
-        assert!(!data.skip_ele.get(2).unwrap_or(false) );
-        assert!( data.skip_ele.get(3).unwrap_or(false) );
-        assert!( data.skip_ele.get(4).unwrap_or(false) );
-        assert!(!data.skip_ele.get(5).unwrap_or(false) );
-        assert!( data.skip_ele.get(6).unwrap_or(false) );
-        assert!( data.skip_ele.get(7).unwrap_or(false) );
-        assert!( data.skip_ele.get(8).unwrap_or(false) );
-        assert!( data.skip_ele.get(9).unwrap_or(false) );
+        assert!(!data.no_elevation_node_ids.get(0).unwrap_or(false) );
+        assert!(!data.no_elevation_node_ids.get(1).unwrap_or(false) );
+        assert!(!data.no_elevation_node_ids.get(2).unwrap_or(false) );
+        assert!( data.no_elevation_node_ids.get(3).unwrap_or(false) );
+        assert!( data.no_elevation_node_ids.get(4).unwrap_or(false) );
+        assert!(!data.no_elevation_node_ids.get(5).unwrap_or(false) );
+        assert!( data.no_elevation_node_ids.get(6).unwrap_or(false) );
+        assert!( data.no_elevation_node_ids.get(7).unwrap_or(false) );
+        assert!( data.no_elevation_node_ids.get(8).unwrap_or(false) );
+        assert!( data.no_elevation_node_ids.get(9).unwrap_or(false) );
     }
 
     #[ignore]//SkipElevationNodeCollector uses now the bitvec of HandlerData which is initialized with full size

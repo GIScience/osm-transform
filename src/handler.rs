@@ -72,7 +72,7 @@ pub struct HandlerData {
     pub accept_node_ids: BitVec,
     //todo add: pub accept_way_ids: BitVec,
     //todo add: pub accept_relation_ids: BitVec,
-    pub skip_ele: BitVec, //todo rename to nodes_without_elevation_ids
+    pub no_elevation_node_ids: BitVec, //todo rename to nodes_without_elevation_ids
     
     /// InputCount
     pub input_node_count: u64,
@@ -117,7 +117,7 @@ impl HandlerData {
             relations: vec![],
 
             accept_node_ids: BitVec::from_elem(nbits, false),
-            skip_ele: BitVec::from_elem(nbits, false),
+            no_elevation_node_ids: BitVec::from_elem(nbits, false),
 
             input_node_count: 0,
             input_way_count: 0,
@@ -159,6 +159,7 @@ impl HandlerData {
         let output_way_count = self.output_way_count;
         let output_relation_count = self.output_relation_count;
         let accept_node_ids_count = self.accept_node_ids.len();
+        let no_elevation_node_ids_count = self.no_elevation_node_ids.len();
         let country_not_found_node_count = self.country_not_found_node_count;
         let country_found_node_count = self.country_found_node_count;
         let elevation_found_node_count = self.elevation_found_node_count;
@@ -180,6 +181,7 @@ output_node_count={output_node_count}
 output_way_count={output_way_count}
 output_relation_count={output_relation_count}
 accept_node_ids_count={accept_node_ids_count}
+no_elevation_node_ids_count={no_elevation_node_ids_count}
 country_not_found_node_count={country_not_found_node_count}
 country_found_node_count={country_found_node_count}
 elevation_found_node_count={elevation_found_node_count}
@@ -327,7 +329,7 @@ Unsplitted ways:           {unsplitted_way_count:>13} (TODO% of all accepted way
         self.accept_node_ids.clear();
         //todo self.way_ids.clear();
         //todo self.relation_ids.clear();
-        self.skip_ele.clear();
+        self.no_elevation_node_ids.clear();
     }
     pub(crate) fn clear_counts(&mut self) {
         self.input_node_count = 0;
