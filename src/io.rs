@@ -12,7 +12,7 @@ pub(crate) fn process_with_handler(config: &Config, handler_chain: &mut HandlerC
     let mut count: i64 = 0;
     for element in reader.elements()? {
         count += 1;
-        if count % 10_000_000 == 0 {
+        if count % 100_000_000 == 0 {
             if total_count == 0 {
                 info!("{} - processed {} elements", info_msg, count);
             } else {

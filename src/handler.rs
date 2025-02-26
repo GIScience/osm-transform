@@ -8,15 +8,15 @@ pub(crate) mod interpolate;
 pub(crate) mod skip_ele;
 
 use std::collections::HashMap;
-use std::fs;
+use std::time::Duration;
 use bit_vec::BitVec;
-use log::{info, trace, warn};
+use log::trace;
 use osm_io::osm::model::element::Element;
 use osm_io::osm::model::node::Node;
 use osm_io::osm::model::relation::Relation;
 use osm_io::osm::model::way::Way;
 use crate::Config;
-
+use chrono::NaiveTime;
 pub(crate) const HIGHEST_NODE_ID: i64 = 50_000_000_000;
 
 pub fn format_element_id(element: &Element) -> String {
@@ -91,6 +91,7 @@ pub struct HandlerData {
 
     /// Country mapping statistics
     pub country_found_node_count: u64,
+    pub multiple_country_found_node_count: u64,
     pub country_not_found_node_count: u64,
 
     /// Elevation enrichment statistics
@@ -104,6 +105,7 @@ pub struct HandlerData {
     pub elevation_tiff_count_used: u64,
 
     /// Other statistics
+    pub total_processing_time: Duration,
     pub other: HashMap<String, String>,
 }
 impl HandlerData {
@@ -127,6 +129,7 @@ impl HandlerData {
             accepted_relation_count: 0,
             country_not_found_node_count: 0,
             country_found_node_count: 0,
+            multiple_country_found_node_count: 0,
             elevation_found_node_count: 0,
             elevation_not_found_node_count: 0,
             elevation_not_relevant_node_count: 0,
@@ -139,6 +142,7 @@ impl HandlerData {
             elevation_flush_count: 0,
             elevation_total_buffered_nodes_max_reached_count: 0,
 
+            total_processing_time: Duration::from_secs(0),
             other: hashmap! {},
         }
     }
@@ -162,6 +166,7 @@ impl HandlerData {
         let no_elevation_node_ids_count = self.no_elevation_node_ids.len();
         let country_not_found_node_count = self.country_not_found_node_count;
         let country_found_node_count = self.country_found_node_count;
+        let multiple_country_found_node_count = self.multiple_country_found_node_count;
         let elevation_found_node_count = self.elevation_found_node_count;
         let elevation_not_found_node_count = self.elevation_not_found_node_count;
         let elevation_not_relevant_node_count = self.elevation_not_relevant_node_count;
@@ -170,6 +175,7 @@ impl HandlerData {
         let elevation_tiff_count_used = self.elevation_tiff_count_used;
         let elevation_buffer_flush_count_buffer_max_reached = self.elevation_flush_count;
         let elevation_buffer_flush_count_total_max_reached = self.elevation_total_buffered_nodes_max_reached_count;
+        let total_processing_time = Self::format_duration(&self.total_processing_time);
         let other = self.other.iter().map(|(k, v)| format!("    {}={}", k, v)).collect::<Vec<String>>().join("\n");
             format!(r#"input_node_count={input_node_count}
 input_way_count={input_way_count}
@@ -184,6 +190,7 @@ accept_node_ids_count={accept_node_ids_count}
 no_elevation_node_ids_count={no_elevation_node_ids_count}
 country_not_found_node_count={country_not_found_node_count}
 country_found_node_count={country_found_node_count}
+multiple_country_found_node_count={multiple_country_found_node_count}
 elevation_found_node_count={elevation_found_node_count}
 elevation_not_found_node_count={elevation_not_found_node_count}
 elevation_not_relevant_node_count={elevation_not_relevant_node_count}
@@ -192,12 +199,21 @@ elevation_tiff_count_total={elevation_tiff_count_total}
 elevation_tiff_count_used={elevation_tiff_count_used}
 elevation_buffer_flush_count_buffer_max_reached={elevation_buffer_flush_count_buffer_max_reached}
 elevation_buffer_flush_count_total_max_reached={elevation_buffer_flush_count_total_max_reached}
+total_processing_time={total_processing_time}
 other={other}"#)
     }
 
     pub fn format_one_line(&self) -> String {
         self.format_multi_line().replace("\n", ", ")
     }
+    fn format_duration(duration: &Duration) -> String {
+        let seconds = duration.as_secs();
+        let nanoseconds = duration.subsec_nanos() % 1_000_000_000;
+
+        let time = NaiveTime::from_num_seconds_from_midnight_opt(seconds as u32, nanoseconds).unwrap();
+        time.format("%H:%M:%S.%3f").to_string()
+    }
+
     pub fn summary(&self, config: &Config) -> String {
         if config.statistics_level == 0 {
             return "".to_string()
@@ -214,6 +230,7 @@ other={other}"#)
 
         let country_not_found_node_count = self.country_not_found_node_count;
         let country_found_node_count = self.country_found_node_count;
+        let multiple_country_found_node_count = self.multiple_country_found_node_count;
 
         let elevation_found_node_count = self.elevation_found_node_count;
         let elevation_not_found_node_count = self.elevation_not_found_node_count;
@@ -223,7 +240,7 @@ other={other}"#)
         let elevation_tiff_count_used = self.elevation_tiff_count_used;
         let elevation_flush_count = self.elevation_flush_count;
         let elevation_total_buffered_nodes_max_reached_count = self.elevation_total_buffered_nodes_max_reached_count;
-
+        let total_processing_time = Self::format_duration(&self.total_processing_time);
         // derived values
         let filt_node = (i_node_ct as i64 - a_node_ct as i64) * -1;
         let filt_ways = (i_way_cnt as i64 - a_way_cnt as i64) * -1;
@@ -232,17 +249,27 @@ other={other}"#)
         let addd_ways = o_way_cnt as i64 - a_way_cnt as i64;
         let addd_rels = o_rel_cnt as i64 - a_rel_cnt as i64;
         let country_detections = country_found_node_count + country_not_found_node_count;
+        let country_found_percentage = (country_found_node_count as f64 / country_detections as f64) * 100.0;
+        let country_not_found_percentage = (country_not_found_node_count as f64 / country_detections as f64) * 100.0;
+        let multiple_country_found_percentage = (multiple_country_found_node_count as f64 / country_detections as f64) * 100.0;
         let elevation_detections = elevation_found_node_count + elevation_not_found_node_count + elevation_not_relevant_node_count;
+        let elevation_found_percentage = (elevation_found_node_count as f64 / elevation_detections as f64) * 100.0;
+        let elevation_not_found_percentage = (elevation_not_found_node_count as f64 / elevation_detections as f64) * 100.0;
+        let elevation_not_relevant_percentage = (elevation_not_relevant_node_count as f64 / elevation_detections as f64) * 100.0;
+        let elevation_tiff_used_percentage = (elevation_tiff_count_used as f64 / elevation_tiff_count_total as f64) * 100.0;
         let unsplitted_way_count = o_way_cnt - splitted_way_count;
+        let splitted_way_percentage = (splitted_way_count as f64 / a_way_cnt as f64) * 100.0;
+        let unsplitted_way_percentage = (unsplitted_way_count as f64 / a_way_cnt as f64) * 100.0;
 
-        let mut input_abs_path = config.input_pbf.canonicalize().unwrap().display().to_string();
-        let mut input_file_size = config.input_pbf.metadata().unwrap().len();
+        let input_abs_path = config.input_pbf.canonicalize().unwrap().display().to_string();
+        let input_file_size = config.input_pbf.metadata().unwrap().len();
 
         let mut formatted_statistics = format!("
 Summary:
 ========
 
-Processing of file {input_abs_path} ({input_file_size} bytes) completed in TODO seconds.
+Processing of file {input_abs_path} ({input_file_size} bytes)
+completed in {total_processing_time}.
 
 Element counts at specific processing stages:
 ---------------------------------------------
@@ -252,10 +279,8 @@ Element counts at specific processing stages:
          |         diff |        total |         diff |        total |         diff |        total
 ---------+--------------+--------------+--------------+--------------+--------------+-------------
     read |{i_node_ct:+13} |{i_node_ct:>13} |{i_way_cnt:+13} |{i_way_cnt:>13} |{i_rel_cnt:+13} |{i_rel_cnt:>13}
-TODO add custom filter counts
 accepted |{filt_node:+13} |{a_node_ct:>13} |{filt_ways:+13} |{a_way_cnt:>13} |{filt_rels:+13} |{a_rel_cnt:>13}
  written |{addd_node:+13} |{o_node_ct:>13} |{addd_ways:+13} |{o_way_cnt:>13} |{addd_rels:+13} |{o_rel_cnt:>13}
-
  ");
         if config.statistics_level == 1 {
             return formatted_statistics
@@ -264,17 +289,12 @@ accepted |{filt_node:+13} |{a_node_ct:>13} |{filt_ways:+13} |{a_way_cnt:>13} |{f
         match &config.country_csv {
             Some(_) => {
                 formatted_statistics.push_str(format!("
-
 Country enrichment:
 -------------------
-Country detected for      {country_found_node_count:>13} nodes (TODO% of all accepted nodes)
->1 country detected for   TODO nodes
-Country not found for     {country_not_found_node_count:>13} nodes
 Country detections total: {country_detections:>13}
-TODO: nodes per country (ordered by node count, ¹ percentage of all accepted nodes):
-         1234567 (0.12%¹) Malta
-         1234567 (0.12%¹) Malta
-         1234567 (0.12%¹) Malta
+Country found for         {country_found_node_count:>13} nodes ({country_found_percentage:.2}%)
+Country not found for     {country_not_found_node_count:>13} nodes ({country_not_found_percentage:.2}%)
+>1 country found for      {multiple_country_found_node_count:>13} nodes ({multiple_country_found_percentage:.2}%)
 ").as_str());
             }
             None => {}
@@ -282,36 +302,29 @@ TODO: nodes per country (ordered by node count, ¹ percentage of all accepted no
 
         if &config.elevation_tiffs.len() > &0 {
             formatted_statistics.push_str(format!("
-
 Elevation enrichment:
 ---------------------
-Elevation detected for      {elevation_found_node_count:>13} nodes
-Elevation not found for     {elevation_not_found_node_count:>13} nodes
-Elevation not relevant for  {elevation_not_relevant_node_count:>13} nodes (tunnels, bridges, ...)
 Elevation detections total: {elevation_detections:>13}
+Elevation found for         {elevation_found_node_count:>13} nodes ({elevation_found_percentage:.2}%)
+Elevation not found for     {elevation_not_found_node_count:>13} nodes ({elevation_not_found_percentage:.2}%)
+Elevation not relevant for  {elevation_not_relevant_node_count:>13} nodes ({elevation_not_relevant_percentage:.2}% tunnels, bridges, etc.)
 ").as_str());
 
-            if config.statistics_level > 3 {
+            if config.statistics_level > 2 {
                 formatted_statistics.push_str(format!("
 Loaded elevation tiff files:      {elevation_tiff_count_total:>5}
-Used elevation tiff files:        {elevation_tiff_count_used:>5}
+Used elevation tiff files:        {elevation_tiff_count_used:>5} ({elevation_tiff_used_percentage:.2}%)
 Elevation buffers flush count:    {elevation_flush_count:>5}
-TODO: nodes per tiff file (ordered by node count, ¹ percentage of all accepted nodes):
-         1234567 (23.14%¹) srtm_32_03.tif
-         1234567 (23.14%¹) srtm_32_03.tif
-         1234567 (23.14%¹) srtm_32_03.tif
-Total max buffered nodes reached: {elevation_total_buffered_nodes_max_reached_count:>13} times
-
-
+Total max buffered nodes reached: {elevation_total_buffered_nodes_max_reached_count:>5} times
 ").as_str())
             }
         if config.elevation_way_splitting {
             formatted_statistics.push_str(format!("
-
 Elevation way splitting:
 ------------------------
-Added {addd_node} nodes to {splitted_way_count:>13} ways (TODO% of all accepted ways)
-Unsplitted ways:           {unsplitted_way_count:>13} (TODO% of all accepted ways)
+Added {addd_node:>13} nodes
+to    {splitted_way_count:>13} ways ({splitted_way_percentage:.2}% of all accepted ways)
+left  {unsplitted_way_count:>13} ways unsplitted ({unsplitted_way_percentage:.2}% of all accepted ways)
 ").as_str());
         }
 

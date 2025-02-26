@@ -29,6 +29,7 @@ pub(crate) struct AreaHandler {
     grid: Vec<Tile>,
     country_not_found_node_count: u64,
     country_found_node_count: u64,
+    multiple_country_found_node_count: u64,
 }
 
 pub(crate) struct Mapping {
@@ -106,6 +107,7 @@ impl AreaHandler {
             grid,
             country_not_found_node_count: 0,
             country_found_node_count: 0,
+            multiple_country_found_node_count: 0,
         }
     }
 
@@ -217,6 +219,7 @@ impl AreaHandler {
             }
             AREA_ID_MULTIPLE => { // multiple areas
                 self.country_found_node_count += 1;
+                self.multiple_country_found_node_count +=1;
                 for area in self.mapping.area.get_vec(&(grid_index as u32)).unwrap() {
                     if area.geo.intersects(&coord) {
                         result_vec.push(self.mapping.id[&area.id].to_string())
@@ -241,11 +244,12 @@ impl Handler for AreaHandler {
 
     fn handle(&mut self, data: &mut HandlerData) {
         data.nodes.iter_mut().for_each(|node| self.handle_node(node));
-        data.country_not_found_node_count = self.country_not_found_node_count;
-        data.country_found_node_count = self.country_found_node_count;
     }
 
     fn close(&mut self, data: &mut HandlerData){
+        data.country_not_found_node_count = self.country_not_found_node_count;
+        data.country_found_node_count = self.country_found_node_count;
+        data.multiple_country_found_node_count = self.multiple_country_found_node_count;
         data.other.insert("mapping".to_string(), format!("index:{} area:{} id:{} name:{}",
                                                          &self.mapping.index.len(),
                                                          &self.mapping.area.len(),

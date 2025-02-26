@@ -54,11 +54,11 @@ pub fn init(config: &Config) {
 }
 
 pub fn validate(config: &Config) {
-    validate_file(&config.input_pbf, "Input file", "pbf");
+    validate_file(&config.input_pbf, "Input file");
     validate_country_tile_size(&config.country_tile_size);
 }
 
-fn validate_file(path_buf: &PathBuf, label: &str, expected_extension: &str) {
+fn validate_file(path_buf: &PathBuf, label: &str) {
     if !path_buf.exists() {
         panic!("{} does not exist: {}", label, path_buf.display());
     }
@@ -76,7 +76,7 @@ fn validate_file(path_buf: &PathBuf, label: &str, expected_extension: &str) {
             match fs::metadata(&absolute_path) {
                 Ok(metadata) => {
                     let file_size = metadata.len();
-                    info!("Found valid {}: {}, size: {} bytes", label, absolute_path.display(), file_size);
+                    info!("Found valid {}: {}, size: {} bytes", label.to_lowercase(), absolute_path.display(), file_size);
                 }
                 Err(e) => {
                     warn!("Failed to get metadata for {}: {}", label.to_lowercase(), e);
@@ -105,9 +105,8 @@ pub fn run(config: &Config) -> HandlerData {
     let mut data = HandlerData::default();
     run_filter_chain(config, &mut data);
     run_processing_chain(config, &mut data);
-
-    info!("Total processing time: {}", stopwatch_total);
     stopwatch_total.stop();
+    data.total_processing_time = stopwatch_total.accumulated();
     data
 }
 
