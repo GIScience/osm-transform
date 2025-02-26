@@ -174,7 +174,7 @@ impl Handler for NodeIdFilter {
 
 
 
-pub(crate) struct ComplexElementsFilter { //TODO rename to WayRelationFilterForRouting
+pub(crate) struct ComplexElementsFilter {
     pub has_good_key_predicate: HasOneOfTagKeysPredicate,     //TODO add cli option (parse comma separated list)
     pub has_good_key_value_predicate: HasTagKeyValuePredicate,//TODO add cli option (parse comma:colon separated list)
     pub has_bad_key_predicate: HasNoneOfTagKeysPredicate,     //TODO add cli option (parse comma separated list)

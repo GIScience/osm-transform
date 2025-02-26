@@ -68,7 +68,6 @@ fn validate_country_tile_size(country_tile_size: &f64) {
 pub fn run(config: &Config) -> HandlerData {
     let mut stopwatch_total = StopWatch::new();
     stopwatch_total.start();
-    //todo log input file name and size (should occur in log)
     let mut data = HandlerData::default();
     run_filter_chain(config, &mut data);
     run_processing_chain(config, &mut data);

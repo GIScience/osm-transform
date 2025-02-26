@@ -28,8 +28,6 @@ pub struct GeoTiff {
     pixel_height: f64,
     pixels_horizontal: u32,
     pixels_vertical: u32,
-    // data_type: ,//todo
-    // no_data_value: ,//todo
     geotiffreader: GeoTiffReader<BufReader<File>>,
 }
 

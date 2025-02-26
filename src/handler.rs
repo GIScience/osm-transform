@@ -72,7 +72,7 @@ pub struct HandlerData {
     pub accept_node_ids: BitVec,
     //todo add: pub accept_way_ids: BitVec,
     //todo add: pub accept_relation_ids: BitVec,
-    pub no_elevation_node_ids: BitVec, //todo rename to nodes_without_elevation_ids
+    pub no_elevation_node_ids: BitVec,
     
     /// InputCount
     pub input_node_count: u64,
