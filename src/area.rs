@@ -209,9 +209,9 @@ impl AreaHandler {
         if node.coordinate().lat() >= 90.0 || node.coordinate().lat() <= -90.0 {
             return;
         }
-        let grid_index = ((node.coordinate().lat() + 90.0) / self.mapping.tile_size) as i32 * self.mapping.num_tiles_lon as i32 + ((node.coordinate().lon() +180.0) / self.mapping.tile_size) as i32 ;
+        let grid_index = ((node.coordinate().lat() + 90.0) / self.mapping.tile_size) as usize * self.mapping.num_tiles_lon + ((node.coordinate().lon() +180.0) / self.mapping.tile_size) as usize ;
         let coord = Coord {x: node.coordinate().lon(), y: node.coordinate().lat()};
-        match self.mapping.index[grid_index as usize] {
+        match self.mapping.index[grid_index] {
             0 => { // no area
                 self.country_not_found_node_count += 1;
             }
