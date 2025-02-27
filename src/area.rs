@@ -111,7 +111,7 @@ impl AreaHandler {
         }
     }
 
-    pub fn load(&mut self, path_buf: PathBuf) -> Result<(), Box<dyn Error>> {
+    pub fn build_index(&mut self, path_buf: PathBuf) -> Result<(), Box<dyn Error>> {
         #[derive(Debug, Deserialize)]
         struct Record {
             id: String,
