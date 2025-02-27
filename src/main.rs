@@ -119,6 +119,7 @@ impl Args {
             print_way_ids: HashSet::from_iter(self.print_way_ids),
             print_relation_ids: HashSet::from_iter(self.print_relation_ids),
             remove_metadata: ! self.keep_metadata,
+            keep_original_elevation: self.keep_original_elevation,
             resolution_lon: self.resolution_lon,
             resolution_lat: self.resolution_lat,
             elevation_threshold: self.elevation_threshold,

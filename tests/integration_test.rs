@@ -15,6 +15,7 @@ fn base_config() -> Config {
         elevation_total_buffer_size: 50000,
         elevation_way_splitting: false,
         remove_metadata: false,
+        keep_original_elevation: false,
         with_node_filtering: false,
         print_node_ids: HashSet::new(),
         print_way_ids: HashSet::new(),
