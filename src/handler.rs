@@ -371,6 +371,8 @@ left  {unsplitted_way_count:>13} ways unsplitted ({unsplitted_way_percentage:.2}
         self.elevation_tiff_count_used = 0;
         self.elevation_flush_count = 0;
         self.elevation_total_buffered_nodes_max_reached_count = 0;
+        self.multiple_country_found_node_count = 0;
+        self.total_processing_time = Duration::from_secs(0);
         self.other.clear();
     }
     pub(crate) fn input_element_count(&self) -> u64 {
