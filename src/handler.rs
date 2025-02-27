@@ -332,11 +332,6 @@ left  {unsplitted_way_count:>13} ways unsplitted ({unsplitted_way_percentage:.2}
         formatted_statistics
     }
 
-    pub(crate) fn clear(&mut self) {
-        self.clear_elements();
-        self.clear_intermediate_results();
-        self.clear_counts();
-    }
     pub(crate) fn clear_elements(&mut self) {
         self.nodes.clear();
         self.ways.clear();

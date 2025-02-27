@@ -34,6 +34,8 @@ use crate::output::{SimpleOutputHandler, SplittingOutputHandler};
 // parallel.
 static INIT: Once = Once::new();
 
+const TAGS_TO_REMOVE: &str = "(.*:)?source(:.*)?|(.*:)?note(:.*)?|url|created_by|fixme|wikipedia";
+
 pub fn init(config: &Config) {
     INIT.call_once(|| {
         let log_level: LevelFilter;
@@ -205,7 +207,7 @@ fn run_processing_chain(config: &Config, data: &mut HandlerData) {//TODO use bit
 
     handler_chain = handler_chain.add(TagFilterByKey::new(
         OsmElementTypeSelection::all(),
-        Regex::new("(.*:)?source(:.*)?|(.*:)?note(:.*)?|url|created_by|fixme|wikipedia").unwrap(),
+        Regex::new(TAGS_TO_REMOVE).unwrap(),
         FilterType::RemoveMatching));
 
     handler_chain = handler_chain.add(ElementCounter::new(OutputCount));

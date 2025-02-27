@@ -37,12 +37,21 @@ impl HasNoneOfTagKeysPredicate {
     }
 }
 
+pub(crate) struct HasOnlyMatchingTagsPredicate {
+    pub(crate) key_regex: regex::Regex,
+}
+impl HasOnlyMatchingTagsPredicate {
+    pub(crate) fn test(&mut self, tags: &Vec<Tag>) -> bool {
+        tags.iter().all(|tag| self.key_regex.is_match(tag.k()))
+    }
+
+}
 
 #[cfg(test)]
 mod test {
     use std::collections::HashMap;
     use osm_io::osm::model::tag::Tag;
-    use crate::handler::predicate::{HasNoneOfTagKeysPredicate, HasOneOfTagKeysPredicate, HasTagKeyValuePredicate};
+    use crate::handler::predicate::{HasNoneOfTagKeysPredicate, HasOneOfTagKeysPredicate, HasOnlyMatchingTagsPredicate, HasTagKeyValuePredicate};
 
     #[test]
     fn has_one_of_tag_keys_predicate_with_only_matching_tags() {
@@ -154,5 +163,30 @@ mod test {
             Tag::new("bad".to_string(), "1".to_string()),
         ]));
     }
-
+    #[test]
+    fn has_only_matching_keys_predicate_with_only_matching_tags() {
+        let mut predicate = HasOnlyMatchingTagsPredicate { key_regex: regex::Regex::new(".*good|nice").unwrap() };
+        assert_eq!(true, predicate.test(&vec![
+            Tag::new("good".to_string(), "1".to_string()),
+            Tag::new("nice".to_string(), "2".to_string()),
+            Tag::new("very-good".to_string(), "3".to_string()),
+        ]));
+    }
+    #[test]
+    fn has_only_matching_keys_predicate_with_only_non_matching_tags() {
+        let mut predicate = HasOnlyMatchingTagsPredicate { key_regex: regex::Regex::new(".*good|nice").unwrap() };
+        assert_eq!(false, predicate.test(&vec![
+            Tag::new("kasperl".to_string(), "1".to_string()),
+            Tag::new("seppl".to_string(), "2".to_string()),
+        ]));
+    }
+    #[test]
+    fn has_only_matching_keys_predicate_with_matching_and_non_matching_tags() {
+        let mut predicate = HasOnlyMatchingTagsPredicate { key_regex: regex::Regex::new(".*good|nice").unwrap() };
+        assert_eq!(false, predicate.test(&vec![
+            Tag::new("kasperl".to_string(), "1".to_string()),
+            Tag::new("seppl".to_string(), "2".to_string()),
+            Tag::new("nice".to_string(), "3".to_string()),
+        ]));
+    }
 }

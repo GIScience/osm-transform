@@ -4,7 +4,8 @@ use osm_io::osm::model::tag::Tag;
 use osm_io::osm::model::way::Way;
 use regex::Regex;
 use crate::handler::{OsmElementTypeSelection, Handler, HandlerData};
-use crate::handler::predicate::{HasOneOfTagKeysPredicate, HasTagKeyValuePredicate, HasNoneOfTagKeysPredicate};
+use crate::handler::predicate::{HasOneOfTagKeysPredicate, HasTagKeyValuePredicate, HasNoneOfTagKeysPredicate, HasOnlyMatchingTagsPredicate};
+use crate::TAGS_TO_REMOVE;
 
 #[derive(Debug)]
 #[allow(dead_code)]
@@ -177,17 +178,20 @@ impl Handler for NodeIdFilter {
 pub(crate) struct ComplexElementsFilter {
     pub has_good_key_predicate: HasOneOfTagKeysPredicate,     //TODO add cli option (parse comma separated list)
     pub has_good_key_value_predicate: HasTagKeyValuePredicate,//TODO add cli option (parse comma:colon separated list)
-    pub has_bad_key_predicate: HasNoneOfTagKeysPredicate,     //TODO add cli option (parse comma separated list)
+    pub has_no_bad_key_predicate: HasNoneOfTagKeysPredicate,  //TODO add cli option (parse comma separated list)
+    pub has_only_matching_tags_predicate: HasOnlyMatchingTagsPredicate,//TODO add cli option (parse comma separated list)
 }
 impl ComplexElementsFilter {
     pub(crate) fn new(
         has_good_key_predicate: HasOneOfTagKeysPredicate,
         has_good_key_value_predicate: HasTagKeyValuePredicate,
-        has_bad_key_predicate: HasNoneOfTagKeysPredicate) -> Self {
+        has_no_bad_key_predicate: HasNoneOfTagKeysPredicate,
+        has_only_matching_tags_predicate: HasOnlyMatchingTagsPredicate) -> Self {
         Self {
             has_good_key_predicate,
             has_good_key_value_predicate,
-            has_bad_key_predicate,
+            has_no_bad_key_predicate,
+            has_only_matching_tags_predicate,
         }
     }
 
@@ -214,12 +218,15 @@ impl ComplexElementsFilter {
                     "power".to_string(),
                     "communication".to_string(),
                     "man_made".to_string()]
-            })
+            },
+            HasOnlyMatchingTagsPredicate { key_regex: Regex::new("(.*:)?source(:.*)?|(.*:)?note(:.*)?|url|created_by|fixme|wikipedia").unwrap() }
+        )
     }
     fn accept_by_tags(&mut self, tags: &Vec<Tag>) -> bool {
-        self.has_good_key_predicate.test(tags) ||
-            self.has_good_key_value_predicate.test(tags) ||
-            self.has_bad_key_predicate.test(tags)
+        (self.has_good_key_predicate.test(tags)
+            || self.has_good_key_value_predicate.test(tags)
+            || self.has_no_bad_key_predicate.test(tags))
+            && (! self.has_only_matching_tags_predicate.test(tags))
     }
 
     fn is_way_accepted(&mut self, way: &Way) -> bool {
@@ -576,6 +583,26 @@ mod test {
         filter.handle(&mut data);
         assert_eq!(data.ways.len(), 1);
 
+        // has only keys to be removed => should be filtered
+        data = HandlerData::default();
+        data.ways.push(Way::new(6, 1, 1, 1, 1, "a".to_string(), true, vec![],
+                                vec![
+                                    Tag::new("fixme".to_string(), "x".to_string()),
+                                    Tag::new("wikipedia".to_string(), "x".to_string()),
+                                ]));
+        filter.handle(&mut data);
+        assert_eq!(data.ways.len(), 0);
+
+        // has only keys to be removed => should be filtered
+        data = HandlerData::default();
+        data.ways.push(Way::new(6, 1, 1, 1, 1, "a".to_string(), true, vec![],
+                                vec![
+                                    Tag::new("fixme".to_string(), "x".to_string()),
+                                    Tag::new("wikipedia".to_string(), "x".to_string()),
+                                    Tag::new("something".to_string(), "x".to_string()),
+                                ]));
+        filter.handle(&mut data);
+        assert_eq!(data.ways.len(), 1);
     }
 
 }
