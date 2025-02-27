@@ -38,7 +38,7 @@ pub struct Args {
     pub(crate) country_csv: Option<PathBuf>,
 
     /// Elevation GeoTiff Files (glob patterns allowed) to enrich nodes with elevation data.
-    #[arg(short = 'e', long, value_name = "PATTERN", action = clap::ArgAction::Append)]
+    #[arg(short = 'e', long, value_name = "PATTERN", num_args = 1..)]
     pub(crate) elevation_tiffs: Vec<String>,
 
     /// Size of the elevation buffer for each elevation tiff file. This is the number of nodes that are buffered in memory before their elevation is read from the elevation tiff file in a batch.
