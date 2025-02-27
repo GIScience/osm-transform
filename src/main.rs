@@ -77,6 +77,10 @@ pub struct Args {
     #[arg(long)]
     pub keep_metadata: bool,
 
+    /// Do NOT overwrite original elevation data with the value from an elevation tiff.
+    #[arg(long)]
+    pub keep_original_elevation: bool,
+
     /// Resolution for way splitting in direction longitude
     #[arg(long, default_value = "0.001")]
     pub resolution_lon: f64,

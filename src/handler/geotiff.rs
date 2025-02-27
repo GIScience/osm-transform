@@ -339,6 +339,7 @@ pub(crate) struct BufferingElevationEnricher {
     resolution_lon: f64,
     resolution_lat: f64,
     elevation_way_splitting: bool,
+    keep_original_elevation: bool,
     elevation_threshold: f64,
     ele_lookups_successful: usize,
     ele_lookups_failed: usize,
@@ -355,6 +356,7 @@ impl BufferingElevationEnricher {
                total_buffered_nodes_max: usize,
                skip_ele: BitVec,
                elevation_way_splitting: bool,
+               keep_original_elevation: bool,
                resolution_lon: f64,
                resolution_lat: f64,
                elevation_threshold: f64) -> Self {
@@ -370,6 +372,7 @@ impl BufferingElevationEnricher {
             resolution_lon,
             resolution_lat,
             elevation_way_splitting,
+            keep_original_elevation: false,
             elevation_threshold,
             ele_lookups_successful: 0,
             ele_lookups_failed: 0,
@@ -415,6 +418,9 @@ impl BufferingElevationEnricher {
         buffer_vec.iter_mut().for_each(|node|
             if self.skip_elevation(node) {
                 self.ele_lookups_skipped += 1; }
+            else if self.keep_original_elevation && node.tags().iter().any(|tag| { tag.k() == "ele" }) {
+                self.ele_lookups_skipped += 1;
+            }
             else {
                 self.add_elevation(geotiff, node)
             });
@@ -716,7 +722,7 @@ impl LocationWithElevation {
 #[cfg(test)]
 mod tests {
     use crate::handler::geotiff::{format_as_elevation_string, round_f32, round_f64, transform, BufferingElevationEnricher, GeoTiff, GeoTiffManager, LocationWithElevation};
-    use crate::handler::{HIGHEST_NODE_ID};
+    use crate::handler::{Handler, HandlerData, HIGHEST_NODE_ID};
     use crate::srs::DynamicSrsResolver;
     use bit_vec::BitVec;
     use epsg::CRS;
@@ -1155,6 +1161,7 @@ mod tests {
             5,
             BitVec::from_elem(10usize, false),
             false,
+            false,
             0.01,
             0.01,
             1.0);
@@ -1201,6 +1208,7 @@ mod tests {
             6,
             BitVec::from_elem(10usize, false),
             false,
+            false,
             0.01,
             0.01,
             1.0);
@@ -1228,12 +1236,45 @@ mod tests {
     }
 
     #[test]
+    fn test_buffering_elevation_enricher_keep_original_elevation() {
+        let _ = SimpleLogger::new().init();
+        let mut handler = BufferingElevationEnricher::new(
+            GeoTiffManager::with_file_pattern("test/region*.tif"),
+            4,
+            5,
+            BitVec::from_elem(10usize, false),
+            false,
+            true,
+            0.01,
+            0.01,
+            1.0);
+
+        let mut data = HandlerData::default();
+        data.nodes.push(simple_node_element_limburg(1, vec![("ele", "10000")]));
+        data.nodes.push(simple_node_element_limburg(2, vec![]));
+        handler.flush(&mut data);
+
+        assert_eq!(data.nodes.iter().any(|node| node.id() == 1 && node.tags().iter().any(|tag| tag.k().eq("ele") && tag.v().eq("10000"))), true);
+        assert_eq!(data.nodes.iter().any(|node| node.id() == 2 && node.tags().iter().any(|tag| tag.k().eq("ele") && !tag.v().is_empty())), true);
+
+        handler.keep_original_elevation = false;
+        data = HandlerData::default();
+        data.nodes.push(simple_node_element_limburg(1, vec![("ele", "10000")]));
+        data.nodes.push(simple_node_element_limburg(2, vec![]));
+        handler.flush(&mut data);
+
+        assert_eq!(data.nodes.iter().any(|node| node.id() == 1 && node.tags().iter().any(|tag| tag.k().eq("ele") && !tag.v().eq("10000"))), true);
+        assert_eq!(data.nodes.iter().any(|node| node.id() == 2 && node.tags().iter().any(|tag| tag.k().eq("ele") && !tag.v().is_empty())), true);
+    }
+
+    #[test]
     fn test_node_cache_is_filled() {
         let mut handler = BufferingElevationEnricher::new(
             GeoTiffManager::with_file_pattern("test/region*.tif"),
             5,
             6,
             BitVec::from_elem(10usize, false),
+            false,
             false,
             0.01,
             0.01,
@@ -1260,6 +1301,7 @@ mod tests {
             6,
             BitVec::from_elem(10usize, false),
             true,
+            false,
             0.01,
             0.01,
             1.0);
@@ -1284,6 +1326,7 @@ mod tests {
             6,
             BitVec::from_elem(10usize, false),
             true,
+            false,
             0.005,
             0.005,
             1.0);

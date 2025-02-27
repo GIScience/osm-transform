@@ -1093,6 +1093,7 @@ pub(crate) mod tests {
                 6,
                 BitVec::from_elem(10usize, false),
                 true,
+                false,
                 0.01,
                 0.01,
                 1.0))

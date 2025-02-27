@@ -170,6 +170,7 @@ fn run_processing_chain(config: &Config, data: &mut HandlerData) {//TODO use bit
             config.elevation_total_buffer_size,
             data.no_elevation_node_ids.clone(),
             config.elevation_way_splitting,
+            config.keep_original_elevation,
             config.resolution_lon,
             config.resolution_lat,
             config.elevation_threshold);
@@ -263,4 +264,5 @@ pub struct Config {
     pub elevation_threshold: f64,
     pub statistics_level: u8,
     pub country_tile_size: f64,
+    pub keep_original_elevation: bool,
 }
