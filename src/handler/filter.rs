@@ -219,7 +219,7 @@ impl ComplexElementsFilter {
                     "communication".to_string(),
                     "man_made".to_string()]
             },
-            HasOnlyMatchingTagsPredicate { key_regex: Regex::new("(.*:)?source(:.*)?|(.*:)?note(:.*)?|url|created_by|fixme|wikipedia").unwrap() }
+            HasOnlyMatchingTagsPredicate { key_regex: Regex::new(TAGS_TO_REMOVE).unwrap() }
         )
     }
     fn accept_by_tags(&mut self, tags: &Vec<Tag>) -> bool {
