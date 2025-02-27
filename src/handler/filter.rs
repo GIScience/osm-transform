@@ -518,7 +518,7 @@ mod test {
         assert_eq!(data.ways.len(), 1);
 
         // has key to keep, bad key 'building' should not take effect => should be accepted
-        data.clear();
+        data = HandlerData::default();
         data.ways.push(Way::new(2, 1, 1, 1, 1, "a".to_string(), true, vec![],
                                 vec![
                                       Tag::new("route".to_string(), "xyz".to_string()),
@@ -528,7 +528,7 @@ mod test {
         assert_eq!(data.ways.len(), 1);
 
         // has key-value to keep, bad key 'building' should not take effect => should be accepted
-        data.clear();
+        data = HandlerData::default();
         data.ways.push(Way::new(3, 1, 1, 1, 1, "a".to_string(), true, vec![],
                                 vec![
                                                   Tag::new("railway".to_string(), "platform".to_string()),
@@ -538,7 +538,7 @@ mod test {
         assert_eq!(data.ways.len(), 1);
 
         // has no key or key-value to keep, but also no bad key => should be accepted
-        data.clear();
+        data = HandlerData::default();
         data.ways.push(Way::new(4, 1, 1, 1, 1, "a".to_string(), true, vec![],
                                 vec![
                                                   Tag::new("railway".to_string(), "wrong-value".to_string()),
@@ -548,7 +548,7 @@ mod test {
         assert_eq!(data.ways.len(), 1);
 
         // has no key or key-value to keep, some other key, but also one bad key => should be filtered
-        data.clear();
+        data = HandlerData::default();
         data.ways.push(Way::new(5, 1, 1, 1, 1, "a".to_string(), true, vec![],
                                 vec![
                                                   Tag::new("railway".to_string(), "wrong-value".to_string()),
@@ -559,7 +559,7 @@ mod test {
         assert_eq!(data.ways.len(), 0);
 
         // has only one bad key => should be filtered
-        data.clear();
+        data = HandlerData::default();
         data.ways.push(Way::new(6, 1, 1, 1, 1, "a".to_string(), true, vec![],
                                 vec![
                                                   Tag::new("building".to_string(), "x".to_string()),
@@ -568,7 +568,7 @@ mod test {
         assert_eq!(data.ways.len(), 0);
 
         // has only one other key => should be accepted
-        data.clear();
+        data = HandlerData::default();
         data.ways.push(Way::new(7, 1, 1, 1, 1, "a".to_string(), true, vec![],
                                 vec![
                                                   Tag::new("something".to_string(), "x".to_string()),
