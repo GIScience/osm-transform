@@ -1,3 +1,5 @@
+use log::{log_enabled, trace};
+use log::Level::Trace;
 use osm_io::osm::model::way::Way;
 
 use crate::handler::{HandlerData, Handler};
@@ -31,9 +33,9 @@ impl Handler for SkipElevationNodeCollector {
     fn handle(&mut self, data: &mut HandlerData) {
         for way in & data.ways {
             if self.skip_elevation(way) {
-                log::trace!("skipping elevation for way {}", way.id());
+                if log_enabled!(Trace) { trace!("skipping elevation for way {}", way.id()); }
                 for &id in way.refs() {
-                    log::trace!("skipping elevation for node {}", id);
+                    if log_enabled!(Trace) { trace!("skipping elevation for node {}", id); }
                     data.no_elevation_node_ids.set(id as usize, true);
                 }
             }

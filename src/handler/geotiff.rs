@@ -18,6 +18,7 @@ use std::fs::File;
 use std::io::BufReader;
 use std::panic;
 use std::path::PathBuf;
+use log::Level::Trace;
 
 pub struct GeoTiff {
     proj_wgs_84: Proj,
@@ -203,7 +204,7 @@ impl GeoTiffManager {
     }
 
     pub fn load_geotiff(&mut self, file_path: &str) -> Result<GeoTiff, Box<dyn Error>> {
-        trace!("Loading geotiff {}", file_path);
+        debug!("Loading geotiff {}", file_path);
         let img_file = BufReader::new(File::open(file_path).expect(format!("Could not open input file {}", file_path).as_str()));
         let geotiffreader = GeoTiffReader::open(img_file).expect(format!("Could not read input file {} as tiff", file_path).as_str());
 
@@ -440,7 +441,7 @@ impl BufferingElevationEnricher {
         match geotiff_name {
             None => {
                 self.ele_lookups_failed += 1;
-                if log_enabled!(log::Level::Trace) {
+                if log_enabled!(Trace) {
                     warn!("no geotiff found for lon/lat {}/{}", lon, lat);
                 }
                 None
@@ -459,7 +460,7 @@ impl BufferingElevationEnricher {
         match result_value {
             None => {
                 self.ele_lookups_failed += 1;
-                if log_enabled!(log::Level::Trace) {
+                if log_enabled!(Trace) {
                     warn!("no elevation value for node#{}", node.id());
                 }
             }
@@ -486,7 +487,7 @@ impl BufferingElevationEnricher {
         let (buffer_option, node_option) = self.buffer_node(node);
         match buffer_option {
             None => {
-                if log_enabled!(log::Level::Trace) {
+                if log_enabled!(Trace) {
                     warn!("node#{} was not buffered - no geotiff found for it?", &node_id);
                 }
                 match node_option {
@@ -519,7 +520,7 @@ impl BufferingElevationEnricher {
     }
 
     pub(crate) fn handle_way(&mut self, way: &mut Way) -> Vec<Node> {
-        trace!("handle_way with WaySplitter called");
+        if log_enabled!(Trace) { trace!("handle_way with WaySplitter called"); }
         if ! self.elevation_way_splitting {
             return vec![];
         }
@@ -537,7 +538,7 @@ impl BufferingElevationEnricher {
             let from_location = self.node_cache.get(&from_node_id);
             let to_location = self.node_cache.get(&to_node_id);
             if from_location.is_none() || to_location.is_none() {
-                trace!("{}.handle_way#{}: Cannot split way segment: node_cache does not contain nodes {} and {}", self.name(), way.id(), from_node_id, to_node_id);
+                if log_enabled!(Trace) { trace!("{}.handle_way#{}: Cannot split way segment: node_cache does not contain nodes {} and {}", self.name(), way.id(), from_node_id, to_node_id); }
                 continue;
             }
             let from_location = from_location.unwrap();
@@ -551,20 +552,20 @@ impl BufferingElevationEnricher {
                 let elevation = self.get_elevation(intermediate_locations[index].lon, intermediate_locations[index].lat);
                 intermediate_locations[index].ele = elevation.unwrap_or(0.0);
             }
-            trace!("{}.handle_way#{}: adding {} intermediate nodes for way segment from {} to {}", self.name(), way.id(), intermediate_locations.len(), from_node_id, to_node_id);
+            if log_enabled!(Trace) { trace!("{}.handle_way#{}: adding {} intermediate nodes for way segment from {} to {}", self.name(), way.id(), intermediate_locations.len(), from_node_id, to_node_id); }
             for index in 1..(intermediate_locations.len()-1) {
                 let location = &intermediate_locations[index];
                 let before_ele = intermediate_locations[index-1].ele();
                 let after_ele = intermediate_locations[index+1].ele();
                 // TODO: what if some elevations are not present
-                trace!("{}.handle_way#{}: elevation before={}, current={}, after={}",
-                    self.name(), way.id(), before_ele, location.ele(), after_ele);
+                if log_enabled!(Trace) { trace!("{}.handle_way#{}: elevation before={}, current={}, after={}",
+                    self.name(), way.id(), before_ele, location.ele(), after_ele); }
                 if (location.ele() - (before_ele + after_ele) / 2.0).abs() >= self.elevation_threshold {
                     let node = Node::new(self.next_node_id(), 0, location.get_coordinate(), 0, 0, 0, String::default(), true, vec![
                         Tag::new("ele".to_string(), location.ele().to_string())
                     ]);
 
-                    trace!("created intermediate node {}", node.id());
+                    if log_enabled!(Trace) { trace!("created intermediate node {}", node.id()); }
                     references.push(node.id().clone());
                     intermediate_nodes.push(node);
                 }
@@ -643,7 +644,7 @@ impl Handler for BufferingElevationEnricher {
     fn name(&self) -> String { "BufferingElevationEnricher".to_string() }
 
     fn handle(&mut self, data: &mut HandlerData) {
-        trace!("{}.handle() called with {} nodes, {} ways, {} relations", self.name(), data.nodes.len(), data.ways.len(), data.relations.len());
+        if log_enabled!(Trace) { trace!("{}.handle() called with {} nodes, {} ways, {} relations", self.name(), data.nodes.len(), data.ways.len(), data.relations.len()); }
 
         if data.nodes.len() > 0 {
             data.nodes = self.handle_nodes(data.nodes.clone());
@@ -656,7 +657,7 @@ impl Handler for BufferingElevationEnricher {
     }
 
     fn flush(&mut self, data: &mut HandlerData) {
-        trace!("{}.flush() called with {} nodes, {} ways, {} relations", self.name(), data.nodes.len(), data.ways.len(), data.relations.len());
+        if log_enabled!(Trace) { trace!("{}.flush() called with {} nodes, {} ways, {} relations", self.name(), data.nodes.len(), data.ways.len(), data.relations.len()); }
 
         data.nodes = self.handle_and_flush_nodes(data.nodes.clone());
         if data.ways.len()>0 {

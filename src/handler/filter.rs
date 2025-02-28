@@ -1,4 +1,6 @@
 use std::collections::HashMap;
+use log::Level::Trace;
+use log::log_enabled;
 use osm_io::osm::model::relation::Relation;
 use osm_io::osm::model::tag::Tag;
 use osm_io::osm::model::way::Way;
@@ -232,11 +234,11 @@ impl ComplexElementsFilter {
     fn is_way_accepted(&mut self, way: &Way) -> bool {
         match self.accept_by_tags(way.tags()) {
             true => {
-                log::trace!("accepting way {}", way.id());
+                if log_enabled!(Trace) { log::trace!("accepting way {}", way.id()); }
                 true
             }
             false => {
-                log::trace!("removing way {}", way.id());
+                if log_enabled!(Trace) { log::trace!("removing way {}", way.id()); }
                 false
             }
         }
@@ -245,11 +247,11 @@ impl ComplexElementsFilter {
     fn is_relation_accepted(&mut self, relation: &Relation) -> bool {
         match self.accept_by_tags(relation.tags()) {
             true => {
-                log::trace!("accepting relation {}", relation.id());
+                if log_enabled!(Trace) { log::trace!("accepting relation {}", relation.id()); }
                 true
             }
             false => {
-                log::trace!("removing relation {}", relation.id());
+                if log_enabled!(Trace) { log::trace!("removing relation {}", relation.id()); }
                 false
             }
         }

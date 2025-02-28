@@ -16,6 +16,7 @@ use benchmark_rs::stopwatch::StopWatch;
 use log4rs::append::console::ConsoleAppender;
 use log4rs::config::{Appender, Logger, Root};
 use log::{info, debug, LevelFilter, log_enabled, warn};
+use log::Level::Trace;
 use regex::Regex;
 use crate::io::process_with_handler;
 use area::AreaHandler;
@@ -186,14 +187,14 @@ fn run_processing_chain(config: &Config, data: &mut HandlerData) {//TODO use bit
             config.resolution_lon,
             config.resolution_lat,
             config.elevation_threshold);
-        if log_enabled!(log::Level::Trace) {
+        if log_enabled!(Trace) {
             handler_chain = handler_chain.add(ElementPrinter::with_prefix(" before BufferingElevationEnricher:----------------\n".to_string())
                 .with_node_ids(config.print_node_ids.clone())
                 .with_way_ids(config.print_way_ids.clone())
                 .with_relation_ids(config.print_relation_ids.clone()));
         }
         handler_chain = handler_chain.add(elevation_enricher);
-        if log_enabled!(log::Level::Trace) {
+        if log_enabled!(Trace) {
             handler_chain = handler_chain.add(ElementPrinter::with_prefix(" after BufferingElevationEnricher:----------------\n".to_string())
                 .with_node_ids(config.print_node_ids.clone())
                 .with_way_ids(config.print_way_ids.clone())

@@ -1,5 +1,6 @@
 use std::collections::HashSet;
-
+use log::{log_enabled, trace};
+use log::Level::Trace;
 use osm_io::osm::model::node::Node;
 use osm_io::osm::model::relation::Relation;
 use osm_io::osm::model::way::Way;
@@ -20,7 +21,7 @@ impl Handler for ElementCounter {
     fn name(&self) -> String { format!("ElementCounter {}", self.result_type.to_string()) }
 
     fn handle(&mut self, data: &mut HandlerData) {
-        log::trace!("{}.handle called: counting nodes+={}, ways+={}, relations+={}", self.name(), data.nodes.len(), data.ways.len(), data.relations.len());
+        if log_enabled!(Trace) { trace!("{}.handle called: counting nodes+={}, ways+={}, relations+={}", self.name(), data.nodes.len(), data.ways.len(), data.relations.len()); }
         match self.result_type {
             ElementCountResultType::InputCount => {
                 data.input_node_count += data.nodes.len() as u64;

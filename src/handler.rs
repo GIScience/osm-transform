@@ -10,13 +10,15 @@ pub(crate) mod skip_ele;
 use std::collections::HashMap;
 use std::time::Duration;
 use bit_vec::BitVec;
-use log::trace;
+use log::{log_enabled, trace};
 use osm_io::osm::model::element::Element;
 use osm_io::osm::model::node::Node;
 use osm_io::osm::model::relation::Relation;
 use osm_io::osm::model::way::Way;
 use crate::Config;
 use chrono::NaiveTime;
+use log::Level::Trace;
+
 pub(crate) const HIGHEST_NODE_ID: i64 = 50_000_000_000;
 
 pub fn format_element_id(element: &Element) -> String {
@@ -389,9 +391,9 @@ impl HandlerChain {
         self
     }
     pub(crate) fn process(&mut self, element: Element, data: &mut HandlerData) {
-        trace!("######");
-        trace!("###### Processing {}", format_element_id(&element));
-        trace!("######");
+        if log_enabled!(Trace) { trace!("######"); }
+        if log_enabled!(Trace) { trace!("###### Processing {}", format_element_id(&element));}
+        if log_enabled!(Trace) { trace!("######");}
         data.clear_elements();
         match element {
             Element::Node { node } => {
@@ -426,20 +428,20 @@ impl HandlerChain {
     }
 
     fn handle_element(&mut self, nodes: Vec<Node>, ways: Vec<Way>, relations: Vec<Relation>, data: &mut HandlerData) {
-        trace!("HandlerChain.handle_elements called with {} nodes {} ways {} relations", nodes.len(), ways.len(), relations.len());
+        if log_enabled!(Trace) { trace!("HandlerChain.handle_elements called with {} nodes {} ways {} relations", nodes.len(), ways.len(), relations.len()); }
         for processor in &mut self.processors {
             if nodes.len() == 0 && ways.len() == 0 && relations.len() == 0 {
                 break
             }
-            trace!("HandlerChain.handle_element calling {} with data {}", processor.name(), data.format_one_line());
+            if log_enabled!(Trace) { trace!("HandlerChain.handle_element calling {} with data {}", processor.name(), data.format_one_line()); }
             processor.handle(data);
         }
     }
 
     pub(crate) fn flush_handlers(&mut self, data: &mut HandlerData) {
-        trace!("######");
-        trace!("###### HandlerChain.flush_handlers called with {} nodes {} ways {} relations", data.nodes.len(), data.ways.len(), data.relations.len());
-        trace!("######");
+        if log_enabled!(Trace) { trace!("######"); }
+        if log_enabled!(Trace) { trace!("###### HandlerChain.flush_handlers called with {} nodes {} ways {} relations", data.nodes.len(), data.ways.len(), data.relations.len()); }
+        if log_enabled!(Trace) { trace!("######"); }
         for processor in &mut self.processors {
             trace!("HandlerChain.flush_handlers calling {} with data {}", processor.name(), data.format_one_line());
             // (nodes, ways, relations) = processor.handle_and_flush_elements(nodes, ways, relations);

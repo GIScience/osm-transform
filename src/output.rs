@@ -1,5 +1,7 @@
 use std::path::PathBuf;
 use benchmark_rs::stopwatch::StopWatch;
+use log::{debug, info, log_enabled, trace};
+use log::Level::Trace;
 use osm_io::osm::model::element::Element;
 use osm_io::osm::pbf;
 use osm_io::osm::pbf::compression_type::CompressionType;
@@ -102,15 +104,15 @@ impl Handler for SplittingOutputHandler {
         self.way_relation_writer.close().expect("Failed to close way_relation_writer");
         self.node_writer.close().expect("Failed to close node writer");
         data.other.insert("output files".to_string(), format!("{:?}, {:?}", &self.way_relation_writer.path(), &self.node_writer.path()));
-        log::debug!("Reading the newly generated file {:?} and appending all elements to {:?}...", &self.way_relation_writer.path(), &self.node_writer.path());
-        log::info!("Merging output to {:?}...", &self.node_writer.path().as_os_str());
+        debug!("Reading the newly generated file {:?} and appending all elements to {:?}...", &self.way_relation_writer.path(), &self.node_writer.path());
+        info!("Merging output to {:?}...", &self.node_writer.path().as_os_str());
         let mut stopwatch = StopWatch::new();
         stopwatch.start();
         let fresh_way_relation_reader = pbf::reader::Reader::new(&self.way_relation_writer.path());
         match fresh_way_relation_reader {
             Ok(reader) => {
                 for element in reader.elements().unwrap() {
-                    log::trace!("fresh_way_relation_reader copies element {} to node_writer", format_element_id(&element));
+                    if log_enabled!(Trace) { trace!("fresh_way_relation_reader copies element {} to node_writer", format_element_id(&element)); }
                     //todo print progress
                     self.node_writer.write_element(element).expect("Failed to write element");
                 }
@@ -118,7 +120,7 @@ impl Handler for SplittingOutputHandler {
             Err(_) => {}
         }
         self.node_writer.close().expect("Failed to close node writer");
-        log::info!("Merging output to {:?} done, time: {}", &self.node_writer.path(), stopwatch);
+        info!("Merging output to {:?} done, time: {}", &self.node_writer.path(), stopwatch);
         stopwatch.stop();
     }
 }
