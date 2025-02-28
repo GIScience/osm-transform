@@ -10,6 +10,7 @@ use clap::builder::OsStr;
 use csv::{ReaderBuilder, WriterBuilder};
 use geo::{BoundingRect, Contains, Coord, coord, Intersects, MultiPolygon, Rect, HasDimensions};
 use geo::BooleanOps;
+use log::{debug, warn};
 use osm_io::osm::model::node::Node;
 use osm_io::osm::model::tag::Tag;
 use serde::{Deserialize, Serialize};
@@ -175,7 +176,7 @@ impl AreaHandler {
                     self.add_area(index, &record.key, &record.name, &mp);
                 }
                 Err(_) => {
-                    log::warn!("Area CSV file contains row with unsupported geometry! ID: {}, Name: {}", record.key, record.name);
+                    warn!("Area CSV file contains row with unsupported geometry! ID: {}, Name: {}", record.key, record.name);
                 }
             }
             index = index + 1;
@@ -209,7 +210,7 @@ impl AreaHandler {
         let path_buf = create_index_file_path_buf(base_name, KEY_FILE_SUFFIX);
         let file =  File::open(path_buf.clone())?;
         let mut rdr = ReaderBuilder::new().delimiter(b';').from_reader(file);
-        log::debug!("Loading key file: {}", path_buf.to_str().unwrap_or_default());
+        debug!("Loading key file: {}", path_buf.to_str().unwrap_or_default());
         for result in rdr.deserialize() {
             let record: Record = result?;
             self.mapping.id.insert(record.area_idx, record.area_key);
@@ -225,7 +226,7 @@ impl AreaHandler {
         let path_buf = create_index_file_path_buf(base_name, NAME_FILE_SUFFIX);
         let file =  File::open(path_buf.clone())?;
         let mut rdr = ReaderBuilder::new().delimiter(b';').from_reader(file);
-        log::debug!("Loading name file: {}", path_buf.to_str().unwrap_or_default());
+        debug!("Loading name file: {}", path_buf.to_str().unwrap_or_default());
         for result in rdr.deserialize() {
             let record: Record = result?;
             self.mapping.name.insert(record.area_idx, record.area_name);
@@ -241,7 +242,7 @@ impl AreaHandler {
         let path_buf = create_index_file_path_buf(base_name, INDEX_FILE_SUFFIX);
         let file =  File::open(path_buf.clone())?;
         let mut rdr = ReaderBuilder::new().delimiter(b';').from_reader(file);
-        log::debug!("Loading index file: {}", path_buf.to_str().unwrap_or_default());
+        debug!("Loading index file: {}", path_buf.to_str().unwrap_or_default());
         for result in rdr.deserialize() {
             let record: Record = result?;
             self.mapping.index[record.grid_idx] = record.area_idx;
@@ -259,7 +260,7 @@ impl AreaHandler {
         let path_buf = create_index_file_path_buf(base_name, AREA_FILE_SUFFIX);
         let file =  File::open(path_buf.clone())?;
         let mut rdr = ReaderBuilder::new().delimiter(b';').from_reader(file);
-        log::debug!("Loading area file: {}", path_buf.to_str().unwrap_or_default());
+        debug!("Loading area file: {}", path_buf.to_str().unwrap_or_default());
         for result in rdr.deserialize() {
             let record: Record = result?;
             self.mapping.area.insert(record.grid_idx, AreaIntersect{id: record.area_idx, geo: wkt_string_to_multipolygon(record.intersect_geom.as_str()).unwrap()});
@@ -299,7 +300,7 @@ impl AreaHandler {
         let mut file_name = name.to_string() + "." + INFO_FILE_SUFFIX;
         let file = File::create(file_name.clone()).unwrap();
         serde_yaml::to_writer(file, &self.mapping.meta_info());
-        log::debug!("Saved {}", file_name );
+        debug!("Saved {}", file_name );
 
         file_name = name.to_string() + "." + KEY_FILE_SUFFIX;
         let mut wtr = WriterBuilder::new().delimiter(b';').from_path(file_name.clone()).expect("failed to open writer");
@@ -308,7 +309,7 @@ impl AreaHandler {
             wtr.write_record(&[key.to_string(), value.to_string()]).expect("failed to write");
         }
         wtr.flush().expect("failed to flush");
-        log::debug!("Saved {} with {} entries", file_name , mapping.id.len());
+        debug!("Saved {} with {} entries", file_name , mapping.id.len());
 
         file_name = name.to_string() + "." + NAME_FILE_SUFFIX;
         let mut wtr = WriterBuilder::new().delimiter(b';').from_path(file_name.clone()).expect("failed to open writer");
@@ -317,7 +318,7 @@ impl AreaHandler {
             wtr.write_record(&[key.to_string(), value.to_string()]).expect("failed to write");
         }
         wtr.flush().expect("failed to flush");
-        log::debug!("Saved {} with {} entries", file_name, mapping.name.len());
+        debug!("Saved {} with {} entries", file_name, mapping.name.len());
 
         file_name = name.to_string() + "." + INDEX_FILE_SUFFIX;
         let mut wtr = WriterBuilder::new().delimiter(b';').from_path(file_name.clone()).expect("failed to open writer");
@@ -330,7 +331,7 @@ impl AreaHandler {
             }
         }
         wtr.flush().expect("failed to flush");
-        log::debug!("Saved {} with {} entries", file_name, count);
+        debug!("Saved {} with {} entries", file_name, count);
 
         file_name = name.to_string() + "." + AREA_FILE_SUFFIX;
         let mut wtr = WriterBuilder::new().delimiter(b';').from_path(file_name.clone()).expect("failed to open writer");
@@ -339,7 +340,7 @@ impl AreaHandler {
             wtr.write_record(&[key.to_string(), values.id.to_string(), values.geo.wkt_string()]).expect("failed to write");
         }
         wtr.flush().expect("failed to flush");
-        log::debug!("Saved {} with {} entries", file_name, mapping.area.len());
+        debug!("Saved {} with {} entries", file_name, mapping.area.len());
     }
 
     fn handle_node(&mut self, node: &mut Node) {
