@@ -40,12 +40,7 @@ const TAGS_TO_REMOVE: &str = "(.*:)?source(:.*)?|(.*:)?note(:.*)?|url|created_by
 pub fn init(config: &Config) {
     INIT.call_once(|| {
         let log_level: LevelFilter;
-        match config.debug {
-            0 => log_level = LevelFilter::Off,
-            1 => log_level = LevelFilter::Info,
-            2 => log_level = LevelFilter::Debug,
-            _ => log_level = LevelFilter::Trace,
-        }
+            log_level = config.get_log_level();
         let stdout = ConsoleAppender::builder()
             .encoder(Box::new(log4rs::encode::pattern::PatternEncoder::new("{d(%Y-%m-%d %H:%M:%S%.3f %Z)(utc)} - {l:5} - {m}{n}")))
             .build();
@@ -61,8 +56,30 @@ pub fn init(config: &Config) {
 pub fn validate(config: &Config) {
     validate_file(&config.input_pbf, "Input file");
     validate_country_tile_size(&config.country_tile_size);
-    validate_optional_file(&config.country_csv, "Country CSV file");
-    AreaMappingManager::country().validate_index_files(&config.country_index);
+    if config.should_build_country_index() {
+        match &config.country_data {
+            Some(country_source) => {
+                validate_file(country_source, "Country CSV file");
+                let index_dir = AreaMappingManager::country().get_index_dir_name(country_source, config.country_tile_size);
+                if PathBuf::from(&index_dir).exists() {
+                    panic!("Country index directory already exists: {}. Load this index (fast) or delete directory to re-generate index (slow)", index_dir);
+                }
+            }
+            None => {
+                panic!("Country CSV file not specified");
+            }
+        }
+    }
+    if config.should_load_country_index() {
+        match &config.country_data {
+            Some(country_source) => {
+                AreaMappingManager::country().validate_index_files(country_source, config.country_tile_size);
+            }
+            None => {
+                panic!("Country index directory not specified");
+            }
+        }
+    }
 }
 
 pub(crate) fn validate_optional_file(path_buf: &Option<PathBuf>, label: &str) {
@@ -210,7 +227,7 @@ fn run_processing_chain(config: &Config, data: &mut HandlerData) {//TODO use bit
         if config.should_load_country_index() {
             info!("Loading spatial country index...");
             stopwatch.start();
-            let mapping = AreaMappingManager::country().load_index(&config.country_index.clone().unwrap()).expect("Failed to load index");
+            let mapping = AreaMappingManager::country().load_index(&config.country_data).expect("Failed to load index");
             let area_handler = AreaHandler::new(mapping);
             info!("Loading spatial country index done, time: {}", stopwatch);
             stopwatch.reset();
@@ -219,11 +236,11 @@ fn run_processing_chain(config: &Config, data: &mut HandlerData) {//TODO use bit
         if config.should_build_country_index() {
             info!("Creating spatial country index with country-tile-size={}...", config.country_tile_size);
             stopwatch.start();
-            let mapping = AreaMappingManager::country().build_index(&config.country_csv.clone().unwrap(), config.country_tile_size).expect("Area handler failed to load CSV file");
+            let mapping = AreaMappingManager::country().build_index(&config.country_data.clone().unwrap(), config.country_tile_size).expect("Area handler failed to load CSV file");
             let area_handler = AreaHandler::new(mapping);
             info!("Creating spatial country index for {} countries and country-tile-size={} done, time: {}", area_handler.mapping.id.len(), config.country_tile_size, stopwatch);
-            info!("The persisted index files {}.*.csv can be loaded in subsequent runs which reduces the processing time",
-                AreaMappingManager::country().get_index_base_name(&config.country_csv.clone().unwrap(), config.country_tile_size));
+            info!("The country index files were saved to {} and can be loaded in subsequent runs to reduce processing time",
+                AreaMappingManager::country().get_index_dir_name(&config.country_data.clone().unwrap(), config.country_tile_size));
             stopwatch.reset();
             handler_chain = handler_chain.add(area_handler);
         }
@@ -275,8 +292,7 @@ pub struct Config {
     pub with_node_filtering: bool,
     pub remove_metadata: bool,
 
-    pub country_index: Option<String>,
-    pub country_csv: Option<PathBuf>,
+    pub country_data: Option<PathBuf>,
     pub country_tile_size: f64,
 
     pub elevation_tiffs: Vec<String>,
@@ -292,19 +308,42 @@ pub struct Config {
     pub print_node_ids: HashSet<i64>,
     pub print_way_ids: HashSet<i64>,
 
-    pub statistics_level: u8,
-    pub debug: u8,
+    pub verbosity: u8,
+    pub loglevel: u8,
+    pub quiet: bool,
 }
 
 impl Config {
-    pub(crate) fn should_enrich_country(&self) -> bool {
-        self.country_csv.is_some() || self.country_index.is_some()
+    pub fn should_enrich_elevation(&self) -> bool {
+        self.elevation_tiffs.len() > 0
     }
-    pub(crate) fn should_load_country_index(&self) -> bool {
-        self.country_index.is_some()
+    pub fn should_enrich_country(&self) -> bool {
+        self.country_data.is_some()
     }
-    pub(crate) fn should_build_country_index(&self) -> bool {
-        self.country_csv.is_some() && self.country_index.is_none()
+    pub fn should_load_country_index(&self) -> bool {
+        self.country_data.clone().unwrap().is_dir()
     }
+    pub fn should_build_country_index(&self) -> bool {
+        self.country_data.clone().unwrap().is_file()
+    }
+    pub fn get_summary_level(&self) -> u8 {
+        if self.quiet {
+            return 0;
+        }
+        self.verbosity + 1
+    }
+    pub fn get_log_level(&self) -> LevelFilter {
+        if self.quiet {
+            return LevelFilter::Off;
+        }
+        if self.loglevel == 13 {
+            return LevelFilter::Trace;
+        }
+        if self.loglevel > 2 {
+            return LevelFilter::Debug;
+        }
+        LevelFilter::Info
+    }
+
 
 }

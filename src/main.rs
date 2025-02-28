@@ -16,7 +16,7 @@ fn main() {
 }
 
 fn print_statistics(config: &Config, handler_data: HandlerData) {
-    if config.statistics_level > 0 {
+    if config.get_summary_level() > 0 {
         println!("{}", handler_data.summary(&config));
     }
 }
@@ -33,18 +33,15 @@ pub struct Args {
     #[arg(short = 'o', long, value_name = "FILE")]
     pub(crate) output_pbf: Option<PathBuf>,
 
-    /// Base name of country index consisting of files <basename>.index.csv, <basename>.index.csv, <basename>.area.csv and <basename>.name.csv.
-    /// If specified, the pre-computed country index is loaded, --country_csv and --country_tile_size are ignored.
-    /// If neither country_index nor country_csv are specified, no area mapping is performed, no country tags added.
+    /// File or directory with data for country enrichment:
+    /// If a country CSV file with border geometries is specified, a country index is computed and saved to an index directory.
+    /// If an index directory of a previous run is specified, the pre-computed index is loaded, which is much faster.
+    /// In this case, --country-tile-size is ignored.
+    /// If neither of the two entries is made, no country enrichment is carried out and no country codes are added to nodes.
     #[arg(short = 'c', long, value_name = "FILE")]
-    pub(crate) country_index: Option<String>,
+    pub(crate) country_data: Option<PathBuf>,
 
-    /// CSV File with border geometries for country mapping.
-    /// If neither country_index nor country_csv are specified, no area mapping is performed, no country tags added.
-    #[arg(short = 'C', long, value_name = "FILE")]
-    pub(crate) country_csv: Option<PathBuf>,
-
-    /// Tile size for the country index grid
+    /// Tile size for the country index grid in decimal degrees. Only relevant for country index computation, see --country-data.
     #[arg(long, default_value = "1.0")]
     pub(crate) country_tile_size: f64,
 
@@ -52,35 +49,48 @@ pub struct Args {
     #[arg(short = 'e', long, value_name = "PATTERN", num_args = 1..)]
     pub(crate) elevation_tiffs: Vec<String>,
 
+    /// Split ways at elevation changes.
+    #[arg(short = 'w', long)]
+    pub elevation_way_splitting: bool,
+
+    /// Resolution for elevation way splitting in direction longitude
+    #[arg(long, default_value = "0.001")]
+    pub elevation_resolution_lon: f64,
+
+    /// Resolution for elevation way splitting in direction latitude
+    #[arg(long, default_value = "0.001")]
+    pub elevation_resolution_lat: f64,
+
+    /// Threshold for elevation way splitting
+    #[arg(long, default_value = "10.0")]
+    pub elevation_threshold: f64,
+
     /// Size of the elevation buffer for each elevation tiff file. This is the number of nodes that are buffered in memory before their elevation is read from the elevation tiff file in a batch.
     #[arg(short = 'b', long, default_value = "1000000")]
     pub elevation_batch_size: usize,
 
     /// Total number of nodes that are buffered in all elevation file buffers. When the number is reached, the largest buffer is flushed.
-    #[arg(short = 'B', long, default_value = "50000000")]
+    #[arg(short = 't', long, default_value = "50000000")]
     pub elevation_total_buffer_size: usize,
 
-    /// Split ways at elevation changes.
-    #[arg(short = 's', long)]
-    pub elevation_way_splitting: bool,
+    /// Do NOT overwrite original elevation data with the value from an elevation tiff.
+    #[arg(long)]
+    pub elevation_keep_original_value: bool,
 
-    /// Turn debugging information on.
-    #[arg(short = 'd', long, action = clap::ArgAction::Count)]
-    pub debug: u8,
+    /// Print node with id=<ID> at beginning and end of processing pipeline. Can be added multiple times.
+    #[arg(short = 'N', long, value_name = "ID")]
+    pub print_node: Vec<i64>,
 
-    /// Print node with id=<ID> at beginning and end of processing pipeline.
-    #[arg(short = 'n', long, value_name = "ID")]
-    pub print_node_ids: Vec<i64>,
+    /// Print way with id=<ID> at beginning and end of processing pipeline. Can be added multiple times.
+    #[arg(short = 'W', long, value_name = "ID")]
+    pub print_way: Vec<i64>,
 
-    /// Print way with id=<ID> at beginning and end of processing pipeline.
-    #[arg(short = 'w', long, value_name = "ID")]
-    pub print_way_ids: Vec<i64>,
-
-    /// Print relation with id=<ID> at beginning and end of processing pipeline.
-    #[arg(short = 'r', long, value_name = "ID")]
-    pub print_relation_ids: Vec<i64>,
+    /// Print relation with id=<ID> at beginning and end of processing pipeline. Can be added multiple times.
+    #[arg(short = 'R', long, value_name = "ID")]
+    pub print_relation: Vec<i64>,
 
     /// Suppress node filtering. This means, that ALL nodes, ways, relations are handled by thy processing pass.
+    /// Not recommended for openrouteservice graph building
     #[arg(long)]
     pub suppress_node_filtering: bool,
 
@@ -88,25 +98,18 @@ pub struct Args {
     #[arg(long)]
     pub keep_metadata: bool,
 
-    /// Do NOT overwrite original elevation data with the value from an elevation tiff.
-    #[arg(long)]
-    pub keep_original_elevation: bool,
+    /// Can be added multiple times to increase verbosity:
+    /// v More summary information is printed
+    /// vv debug information is printed
+    #[arg(short = 'v', long, action = clap::ArgAction::Count)]
+    pub verbose: u8,
 
-    /// Resolution for way splitting in direction longitude
-    #[arg(long, default_value = "0.001")]
-    pub resolution_lon: f64,
+    /// No output to stdout. This overrules --verbose
+    #[arg(short = 'q', long)]
+    pub quiet: bool,
 
-    /// Resolution for way splitting in direction latitude
-    #[arg(long, default_value = "0.001")]
-    pub resolution_lat: f64,
-
-    /// Elevation threshold defining when to introduce intermediate nodes
-    #[arg(long, default_value = "10.0")]
-    pub elevation_threshold: f64,
-
-    /// Print statistics. Can be added multiple times to increase verbosity.
-    #[arg(short = 'S', long, action = clap::ArgAction::Count)]
-    pub stat: u8,
+    #[arg(short = '@', long, hide = true, action = clap::ArgAction::Count)]
+    pub loglevel: u8,
 
     //todo add custom filter options
 }
@@ -119,8 +122,7 @@ impl Args {
             with_node_filtering: ! self.suppress_node_filtering,
             remove_metadata: ! self.keep_metadata,
 
-            country_index: self.country_index,
-            country_csv: self.country_csv,
+            country_data: self.country_data,
             country_tile_size: self.country_tile_size,
 
             elevation_tiffs: self.elevation_tiffs,
@@ -128,16 +130,17 @@ impl Args {
             elevation_total_buffer_size: self.elevation_total_buffer_size,
             elevation_way_splitting: self.elevation_way_splitting,
             elevation_threshold: self.elevation_threshold,
-            resolution_lon: self.resolution_lon,
-            resolution_lat: self.resolution_lat,
-            keep_original_elevation: self.keep_original_elevation,
+            resolution_lon: self.elevation_resolution_lon,
+            resolution_lat: self.elevation_resolution_lat,
+            keep_original_elevation: self.elevation_keep_original_value,
 
-            print_node_ids: HashSet::from_iter(self.print_node_ids),
-            print_way_ids: HashSet::from_iter(self.print_way_ids),
-            print_relation_ids: HashSet::from_iter(self.print_relation_ids),
+            print_node_ids: HashSet::from_iter(self.print_node),
+            print_way_ids: HashSet::from_iter(self.print_way),
+            print_relation_ids: HashSet::from_iter(self.print_relation),
 
-            statistics_level: self.stat,
-            debug: self.debug,
+            verbosity: self.verbose,
+            quiet: self.quiet,
+            loglevel: self.loglevel,
         }
     }
 }

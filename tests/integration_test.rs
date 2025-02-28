@@ -8,8 +8,7 @@ fn base_config() -> Config {
     let mut config = Config {
         input_pbf: PathBuf::from("test/baarle_small.pbf"),
         output_pbf: None,
-        country_index: None,
-        country_csv: None,
+        country_data: None,
         country_tile_size: 0.4,
         elevation_tiffs: vec![],
         elevation_batch_size: 10000,
@@ -24,8 +23,9 @@ fn base_config() -> Config {
         resolution_lon: 0.01,
         resolution_lat: 0.01,
         elevation_threshold: 10.0,
-        statistics_level: 2,
-        debug: 2,
+        verbosity: 2u8,
+        loglevel: 0,
+        quiet: false,
     };
     config.print_way_ids.insert(7216689i64);
     config.print_node_ids.insert(1);
@@ -72,7 +72,7 @@ fn run_minimal_write() {
 fn run_all() {
     let mut config = base_config();
     config.output_pbf = Some(PathBuf::from("target/tmp/output-integration-test-run_all.pbf"));
-    config.country_csv = Some(PathBuf::from("test/mapping_test.csv"));
+    config.country_data = Some(PathBuf::from("test/mapping_test.csv"));
     config.elevation_tiffs = vec!["test/*.tif".to_string()];
     config.elevation_batch_size = 100000;
     config.elevation_total_buffer_size = 500000;
@@ -96,7 +96,7 @@ fn run_all() {
 #[test]
 fn run_country() {
     let mut config = base_config();
-    config.country_csv = Some(PathBuf::from("test/mapping_test.csv"));
+    config.country_data = Some(PathBuf::from("test/mapping_test.csv"));
     rusty_routes_transformer::init(&config);
     let data = rusty_routes_transformer::run(&config);
     println!("{}", data.summary(&config));

@@ -1,7 +1,9 @@
+use fs::create_dir;
 use std::collections::BTreeMap;
 use std::error::Error;
+use std::fs;
 use std::fs::File;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::str::FromStr;
 use std::string::String;
 
@@ -146,79 +148,78 @@ impl AreaMappingManager {
             area_file_suffix: String::from("area.csv"),
         }
     }
-    pub(crate) fn validate_index_files(&self, optional_base_name: &Option<String>){
-        match optional_base_name {
-            Some(base_name) => {
-                self.validate_index_file(base_name, &self.info_file_suffix, "country index info file");
-                self.validate_index_file(base_name, &self.key_file_suffix, "country index country-key file");
-                self.validate_index_file(base_name, &self.name_file_suffix, "country index country-name file");
-                self.validate_index_file(base_name, &self.index_file_suffix, "country index index file");
-                self.validate_index_file(base_name, &self.area_file_suffix, "country index area file");
-            }
-            None => {}
-        }
+    pub(crate) fn validate_index_files(&mut self, base_path: &PathBuf, tile_size: f64) {
+        self.validate_index_file(base_path, &self.info_file_suffix, "country index info file");
+        self.validate_index_file(base_path, &self.key_file_suffix, "country index country-key file");
+        self.validate_index_file(base_path, &self.name_file_suffix, "country index country-name file");
+        self.validate_index_file(base_path, &self.index_file_suffix, "country index index file");
+        self.validate_index_file(base_path, &self.area_file_suffix, "country index area file");
     }
-    fn validate_index_file(&self, base_name: &String, suffix: &str, label: &str) {
-        let path_buf = self.create_index_file_path_buf(base_name, suffix);
+    fn validate_index_file(&self, path_buf: &PathBuf, suffix: &str, label: &str) {
+        let path_buf = path_buf.join(suffix);
         validate_file(&path_buf, label);
     }
     fn create_index_file_path_buf(&self, base_name: &String, suffix: &str) -> PathBuf {
-        let mut key_path_buf = PathBuf::from(base_name);
-        key_path_buf.set_extension(suffix);
-        key_path_buf
+        PathBuf::from(base_name).join(suffix)
     }
-    pub(crate) fn save_area_records(&mut self, path_buf: &PathBuf, mapping: &Mapping)  {
+    pub(crate) fn get_index_dir_name(&mut self, source_path_buf: &PathBuf, tile_size: f64) -> String {
+        let source_base_name = source_path_buf.file_stem().to_owned().unwrap_or_default().to_str().unwrap_or_default();
+        format!("{}_idx_{:.2}", source_base_name, tile_size).replace(".", "_")
+    }
+
+
+    pub(crate) fn save_area_records(&mut self, path_buf: &PathBuf, mapping: &Mapping) {
         let tile_size = mapping.tile_size;
-        let index_base_name = self.get_index_base_name(path_buf, tile_size);
-        let mut file_name = index_base_name.to_string() + "." + &*self.info_file_suffix;
-        let file = File::create(file_name.clone()).unwrap();
+        let index_dir_name = self.get_index_dir_name(path_buf, tile_size);
+        create_dir(&index_dir_name).expect(format!("failed to create index directory {}", index_dir_name).as_str());
+        let mut file_path: PathBuf = Path::new(&index_dir_name).join(self.info_file_suffix.clone());
+        let file = File::create(file_path.clone()).expect("failed to create file");
         let _ = serde_yaml::to_writer(file, &mapping.meta_info());
-        debug!("Saved {}", file_name );
+        debug!("Saved {:?}", file_path);
 
-        file_name = index_base_name.to_string() + "." + &*self.key_file_suffix;
-        let mut wtr = WriterBuilder::new().delimiter(b';').from_path(file_name.clone()).expect("failed to open writer");
-        wtr.write_record(&["area_idx", "area_key"]).expect("failed to write headers");
+        file_path = Path::new(&index_dir_name).join(self.key_file_suffix.clone());
+        let mut wtr = WriterBuilder::new().delimiter(b';').from_path(file_path.clone()).expect("failed to open writer");
+        wtr.write_record(&["area_idx", "area_key"]).expect(format!("failed to write headers to {:?}", file_path).as_str());
+        let rec_fail_msg = format!("failed to write record to {:?}", file_path);
         for (key, value) in mapping.id.iter() {
-            wtr.write_record(&[key.to_string(), value.to_string()]).expect("failed to write");
+            wtr.write_record(&[key.to_string(), value.to_string()]).expect(rec_fail_msg.as_str());
         }
         wtr.flush().expect("failed to flush");
-        debug!("Saved {} with {} entries", file_name , mapping.id.len());
+        debug!("Saved {:?} with {} entries", file_path , mapping.id.len());
 
-        file_name = index_base_name.to_string() + "." + &*self.name_file_suffix;
-        let mut wtr = WriterBuilder::new().delimiter(b';').from_path(file_name.clone()).expect("failed to open writer");
-        wtr.write_record(&["area_idx", "area_name"]).expect("failed to write headers");
+        file_path = Path::new(&index_dir_name).join(self.name_file_suffix.clone());
+        let mut wtr = WriterBuilder::new().delimiter(b';').from_path(file_path.clone()).expect("failed to open writer");
+        wtr.write_record(&["area_idx", "area_name"]).expect(format!("failed to write headers to {:?}", file_path).as_str());
+        let rec_fail_msg = format!("failed to write record to {:?}", file_path);
         for (key, value) in mapping.name.iter() {
-            wtr.write_record(&[key.to_string(), value.to_string()]).expect("failed to write");
+            wtr.write_record(&[key.to_string(), value.to_string()]).expect(rec_fail_msg.as_str());
         }
         wtr.flush().expect("failed to flush");
-        debug!("Saved {} with {} entries", file_name, mapping.name.len());
+        debug!("Saved {:?} with {} entries", file_path, mapping.name.len());
 
-        file_name = index_base_name.to_string() + "." + &*self.index_file_suffix;
-        let mut wtr = WriterBuilder::new().delimiter(b';').from_path(file_name.clone()).expect("failed to open writer");
-        wtr.write_record(&["grid_idx", "area_idx"]).expect("failed to write headers");
+        file_path = Path::new(&index_dir_name).join(self.index_file_suffix.clone());
+        let mut wtr = WriterBuilder::new().delimiter(b';').from_path(file_path.clone()).expect("failed to open writer");
+        wtr.write_record(&["grid_idx", "area_idx"]).expect(format!("failed to write headers to {:?}", file_path).as_str());
+        let rec_fail_msg = format!("failed to write record to {:?}", file_path);
         let mut count = 0;
         for id in 0..mapping.grid_size {
             if mapping.index[id] > 0 {
                 count += 1;
-                wtr.write_record(&[id.to_string(), mapping.index[id].to_string()]).expect("failed to write");
+                wtr.write_record(&[id.to_string(), mapping.index[id].to_string()]).expect(rec_fail_msg.as_str());
             }
         }
         wtr.flush().expect("failed to flush");
-        debug!("Saved {} with {} entries", file_name, count);
+        debug!("Saved {:?} with {} entries", file_path, count);
 
-        file_name = index_base_name.to_string() + "." + &*self.area_file_suffix;
-        let mut wtr = WriterBuilder::new().delimiter(b';').from_path(file_name.clone()).expect("failed to open writer");
-        wtr.write_record(&["grid_idx", "area_idx", "intersect_geom"]).expect("failed to write headers");
+        file_path = Path::new(&index_dir_name).join(self.area_file_suffix.clone());
+        let mut wtr = WriterBuilder::new().delimiter(b';').from_path(file_path.clone()).expect("failed to open writer");
+        wtr.write_record(&["grid_idx", "area_idx", "intersect_geom"]).expect(format!("failed to write headers to {:?}", file_path).as_str());
+        let rec_fail_msg = format!("failed to write record to {:?}", file_path);
         for (key, values) in mapping.area.iter() {
-            wtr.write_record(&[key.to_string(), values.id.to_string(), values.geo.wkt_string()]).expect("failed to write");
+            wtr.write_record(&[key.to_string(), values.id.to_string(), values.geo.wkt_string()]).expect(rec_fail_msg.as_str());
         }
         wtr.flush().expect("failed to flush");
-        debug!("Saved {} with {} entries", file_name, mapping.area.len());
-    }
-
-    pub(crate) fn get_index_base_name(&mut self, source_path_buf: &PathBuf, tile_size: f64) -> String {
-        let source_base_name = source_path_buf.file_stem().to_owned().unwrap_or_default().to_str().unwrap_or_default();
-        format!("{}_{:.2}", source_base_name, tile_size).replace(".", "_")
+        debug!("Saved {:?} with {} entries", file_path, mapping.area.len());
     }
 
     pub(crate) fn build_index(&mut self, path_buf: &PathBuf, tile_size: f64) -> Result<Mapping, Box<dyn Error>> {
@@ -249,12 +250,13 @@ impl AreaMappingManager {
         Ok(mapping)
     }
 
-    pub(crate) fn load_index(&mut self, base_name: &String) -> Result<Mapping, Box<dyn Error>> {
-        let mut mapping = self.load_index_info_file(base_name).expect("failed to load info file");
-        self.load_index_key_file(base_name, &mut mapping).expect("failed to load key file");
-        self.load_index_name_file(base_name, &mut mapping).expect("failed to load name file");
-        self.load_index_index_file(base_name, &mut mapping).expect("failed to load index file");
-        self.load_index_area_file(base_name, &mut mapping).expect("failed to load area file");
+    pub(crate) fn load_index(&mut self, index_path: &Option<PathBuf>) -> Result<Mapping, Box<dyn Error>> {
+        let base_name = index_path.as_ref().unwrap().file_stem().unwrap().to_str().unwrap().to_string();
+        let mut mapping = self.load_index_info_file(&base_name).expect("failed to load info file");
+        self.load_index_key_file(&base_name, &mut mapping).expect("failed to load key file");
+        self.load_index_name_file(&base_name, &mut mapping).expect("failed to load name file");
+        self.load_index_index_file(&base_name, &mut mapping).expect("failed to load index file");
+        self.load_index_area_file(&base_name, &mut mapping).expect("failed to load area file");
         Ok(mapping)
     }
     fn load_index_info_file(&mut self, base_name: &String)  -> Result<Mapping, Box<dyn Error>>{
@@ -396,11 +398,16 @@ impl Handler for AreaHandler {
         data.country_not_found_node_count = self.country_not_found_node_count;
         data.country_found_node_count = self.country_found_node_count;
         data.multiple_country_found_node_count = self.multiple_country_found_node_count;
-        data.other.insert("mapping".to_string(), format!("index:{} area:{} id:{} name:{}",
+        data.other.insert("country-mapping".to_string(), format!("tile_size:{} grid_size:{} num_tiles_lon:{} num_tiles_lat:{} id:{} name:{} index:{} area:{}",
+                                                         &self.mapping.tile_size,
+                                                         &self.mapping.grid_size,
+                                                         &self.mapping.num_tiles_lon,
+                                                         &self.mapping.num_tiles_lat,
+                                                         &self.mapping.id.len(),
+                                                         &self.mapping.name.len(),
                                                          &self.mapping.index.len(),
                                                          &self.mapping.area.len(),
-                                                         &self.mapping.id.len(),
-                                                         &self.mapping.name.len(), ));
+        ));
     }
 }
 
