@@ -1,23 +1,30 @@
 use std::collections::BTreeMap;
 use std::error::Error;
 use std::fs::File;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::str::FromStr;
 use std::string::String;
 
 use btreemultimap::BTreeMultiMap;
+use clap::builder::OsStr;
 use csv::{ReaderBuilder, WriterBuilder};
 use geo::{BoundingRect, Contains, Coord, coord, Intersects, MultiPolygon, Rect, HasDimensions};
 use geo::BooleanOps;
 use osm_io::osm::model::node::Node;
 use osm_io::osm::model::tag::Tag;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use wkt::{Geometry, ToWkt};
 use wkt::Wkt;
 
 use crate::handler::{Handler, HandlerData};
+use crate::validate_file;
 
 const AREA_ID_MULTIPLE: u16 = u16::MAX;
+const INFO_FILE_SUFFIX: &str = "info.yml";
+const KEY_FILE_SUFFIX: &str = "key.csv";
+const NAME_FILE_SUFFIX: &str  = "name.csv";
+const INDEX_FILE_SUFFIX: &str  = "index.csv";
+const AREA_FILE_SUFFIX: &str  = "area.csv";
 
 pub struct Tile {
     bbox: Rect<f64>,
@@ -31,7 +38,13 @@ pub(crate) struct AreaHandler {
     country_found_node_count: u64,
     multiple_country_found_node_count: u64,
 }
-
+#[derive(Serialize, Deserialize)]
+struct MappingMetainfo {
+    tile_size: f64,
+    num_tiles_lon: i64,
+    num_tiles_lat: i64,
+    grid_size: i64,
+}
 pub(crate) struct Mapping {
     pub tile_size: f64,
     pub grid_size: usize,
@@ -59,7 +72,14 @@ impl Mapping {
             name: BTreeMap::new(),
         }
     }
-
+    pub(crate) fn meta_info(&self) -> MappingMetainfo {
+        MappingMetainfo {
+            tile_size: self.tile_size,
+            num_tiles_lon: self.num_tiles_lon as i64,
+            num_tiles_lat: self.num_tiles_lat as i64,
+            grid_size: self.grid_size as i64,
+        }
+    }
 }
 impl Default for Mapping {
     fn default() -> Self {
@@ -79,6 +99,30 @@ pub fn wkt_string_to_multipolygon(wkt_string: &str) -> Result<MultiPolygon<f64>,
         Geometry::Polygon(p) => Ok(p.into()),
         _ => Err("Unsupported geometry type".into()),
     }
+}
+
+pub(crate) fn validate_index_files(optional_base_name: &Option<String>){
+    match optional_base_name {
+        Some(base_name) => {
+            validate_index_file(base_name, INFO_FILE_SUFFIX, "country index info file");
+            validate_index_file(base_name, KEY_FILE_SUFFIX, "country index country-key file");
+            validate_index_file(base_name, NAME_FILE_SUFFIX, "country index country-name file");
+            validate_index_file(base_name, INDEX_FILE_SUFFIX, "country index index file");
+            validate_index_file(base_name, AREA_FILE_SUFFIX, "country index area file");
+        }
+        None => {}
+    }
+}
+
+fn validate_index_file(base_name: &String, suffix: &str, label: &str) {
+    let path_buf = create_index_file_path_buf(base_name, suffix);
+    validate_file(&path_buf, label);
+}
+
+fn create_index_file_path_buf(base_name: &String, suffix: &str) -> PathBuf {
+    let mut key_path_buf = PathBuf::from(base_name);
+    key_path_buf.set_extension(suffix);
+    key_path_buf
 }
 
 impl Default for AreaHandler {
@@ -111,10 +155,10 @@ impl AreaHandler {
         }
     }
 
-    pub fn build_index(&mut self, path_buf: PathBuf) -> Result<(), Box<dyn Error>> {
+    pub(crate) fn build_index(&mut self, path_buf: PathBuf) -> Result<(), Box<dyn Error>> {
         #[derive(Debug, Deserialize)]
         struct Record {
-            id: String,
+            key: String,
             name: String,
             geo: String,
         }
@@ -128,10 +172,10 @@ impl AreaHandler {
             let converted = wkt_string_to_multipolygon(record.geo.as_str());
             match converted {
                 Ok (mp) => {
-                    self.add_area(index, &record.id, &record.name, &mp);
+                    self.add_area(index, &record.key, &record.name, &mp);
                 }
                 Err(_) => {
-                    log::warn!("Area CSV file contains row with unsupported geometry! ID: {}, Name: {}", record.id, record.name);
+                    log::warn!("Area CSV file contains row with unsupported geometry! ID: {}, Name: {}", record.key, record.name);
                 }
             }
             index = index + 1;
@@ -141,6 +185,88 @@ impl AreaHandler {
         Ok(())
     }
 
+    pub(crate) fn load_index(&mut self, base_name: &String) -> Result<(), Box<dyn Error>> {
+        self.load_index_info_file(base_name);
+        self.load_index_key_file(base_name);
+        self.load_index_name_file(base_name);
+        self.load_index_index_file(base_name);
+        self.load_index_area_file(base_name);
+        Ok(())
+    }
+
+    fn load_index_info_file(&mut self, base_name: &String) {
+        let path_buf = create_index_file_path_buf(base_name, INFO_FILE_SUFFIX);
+        let meta_info: MappingMetainfo = serde_yaml::from_reader(File::open(path_buf.clone()).unwrap()).unwrap();
+        self.mapping = Mapping::new(meta_info.tile_size);
+    }
+
+    fn load_index_key_file(&mut self, base_name: &String) -> Result<(), Box<dyn Error>> {
+        #[derive(Debug, Deserialize)]
+        struct Record {
+            area_idx: u16,
+            area_key: String,
+        }
+        let path_buf = create_index_file_path_buf(base_name, KEY_FILE_SUFFIX);
+        let file =  File::open(path_buf.clone())?;
+        let mut rdr = ReaderBuilder::new().delimiter(b';').from_reader(file);
+        log::debug!("Loading key file: {}", path_buf.to_str().unwrap_or_default());
+        for result in rdr.deserialize() {
+            let record: Record = result?;
+            self.mapping.id.insert(record.area_idx, record.area_key);
+        }
+        Ok(())
+    }
+    fn load_index_name_file(&mut self, base_name: &String) -> Result<(), Box<dyn Error>> {
+        #[derive(Debug, Deserialize)]
+        struct Record {
+            area_idx: u16,
+            area_name: String,
+        }
+        let path_buf = create_index_file_path_buf(base_name, NAME_FILE_SUFFIX);
+        let file =  File::open(path_buf.clone())?;
+        let mut rdr = ReaderBuilder::new().delimiter(b';').from_reader(file);
+        log::debug!("Loading name file: {}", path_buf.to_str().unwrap_or_default());
+        for result in rdr.deserialize() {
+            let record: Record = result?;
+            self.mapping.name.insert(record.area_idx, record.area_name);
+        }
+        Ok(())
+    }
+    fn load_index_index_file(&mut self, base_name: &String) -> Result<(), Box<dyn Error>> {
+        #[derive(Debug, Deserialize)]
+        struct Record {
+            grid_idx: usize,
+            area_idx: u16,
+        }
+        let path_buf = create_index_file_path_buf(base_name, INDEX_FILE_SUFFIX);
+        let file =  File::open(path_buf.clone())?;
+        let mut rdr = ReaderBuilder::new().delimiter(b';').from_reader(file);
+        log::debug!("Loading index file: {}", path_buf.to_str().unwrap_or_default());
+        for result in rdr.deserialize() {
+            let record: Record = result?;
+            self.mapping.index[record.grid_idx] = record.area_idx;
+        }
+        Ok(())
+    }
+
+    fn load_index_area_file(&mut self, base_name: &String) -> Result<(), Box<dyn Error>> {
+        #[derive(Debug, Deserialize)]
+        struct Record {
+            grid_idx: u32,
+            area_idx: u16,
+            intersect_geom: String,
+        }
+        let path_buf = create_index_file_path_buf(base_name, AREA_FILE_SUFFIX);
+        let file =  File::open(path_buf.clone())?;
+        let mut rdr = ReaderBuilder::new().delimiter(b';').from_reader(file);
+        log::debug!("Loading area file: {}", path_buf.to_str().unwrap_or_default());
+        for result in rdr.deserialize() {
+            let record: Record = result?;
+            self.mapping.area.insert(record.grid_idx, AreaIntersect{id: record.area_idx, geo: wkt_string_to_multipolygon(record.intersect_geom.as_str()).unwrap()});
+        }
+
+        Ok(())
+    }
 
     fn add_area(&mut self, country_index: u16, country_csv_id: &String, name: &String, area_geometry: &MultiPolygon) {
         self.mapping.id.insert(country_index, country_csv_id.to_string());
@@ -168,26 +294,34 @@ impl AreaHandler {
         }
     }
 
-    fn save_area_records(&self, name: &str, mapping: &Mapping) {
+    fn save_area_records(&self, name: &str, mapping: &Mapping)  {
+        let mut name = format!("{}_{:.2}", name, mapping.tile_size).replace(".", "_");
+        let mut file_name = name.to_string() + "." + INFO_FILE_SUFFIX;
+        let file = File::create(file_name.clone()).unwrap();
+        serde_yaml::to_writer(file, &self.mapping.meta_info());
+        log::debug!("Saved {}", file_name );
 
-        let mut file_name = name.to_string() + "_id.csv";
+        file_name = name.to_string() + "." + KEY_FILE_SUFFIX;
         let mut wtr = WriterBuilder::new().delimiter(b';').from_path(file_name.clone()).expect("failed to open writer");
+        wtr.write_record(&["area_idx", "area_key"]).expect("failed to write headers");
         for (key, value) in mapping.id.iter() {
             wtr.write_record(&[key.to_string(), value.to_string()]).expect("failed to write");
         }
         wtr.flush().expect("failed to flush");
         log::debug!("Saved {} with {} entries", file_name , mapping.id.len());
 
-        file_name = name.to_string() + "_name.csv";
+        file_name = name.to_string() + "." + NAME_FILE_SUFFIX;
         let mut wtr = WriterBuilder::new().delimiter(b';').from_path(file_name.clone()).expect("failed to open writer");
+        wtr.write_record(&["area_idx", "area_name"]).expect("failed to write headers");
         for (key, value) in mapping.name.iter() {
             wtr.write_record(&[key.to_string(), value.to_string()]).expect("failed to write");
         }
         wtr.flush().expect("failed to flush");
         log::debug!("Saved {} with {} entries", file_name, mapping.name.len());
 
-        file_name = name.to_string() + "_index.csv";
+        file_name = name.to_string() + "." + INDEX_FILE_SUFFIX;
         let mut wtr = WriterBuilder::new().delimiter(b';').from_path(file_name.clone()).expect("failed to open writer");
+        wtr.write_record(&["grid_idx", "area_idx"]).expect("failed to write headers");
         let mut count = 0;
         for id in 0..self.mapping.grid_size {
             if mapping.index[id] > 0 {
@@ -198,14 +332,16 @@ impl AreaHandler {
         wtr.flush().expect("failed to flush");
         log::debug!("Saved {} with {} entries", file_name, count);
 
-        file_name = name.to_string() + "_area.csv";
+        file_name = name.to_string() + "." + AREA_FILE_SUFFIX;
         let mut wtr = WriterBuilder::new().delimiter(b';').from_path(file_name.clone()).expect("failed to open writer");
+        wtr.write_record(&["grid_idx", "area_idx", "intersect_geom"]).expect("failed to write headers");
         for (key, values) in mapping.area.iter() {
             wtr.write_record(&[key.to_string(), values.id.to_string(), values.geo.wkt_string()]).expect("failed to write");
         }
         wtr.flush().expect("failed to flush");
         log::debug!("Saved {} with {} entries", file_name, mapping.area.len());
     }
+
     fn handle_node(&mut self, node: &mut Node) {
         let mut result_vec: Vec<String> = Vec::new();
         if node.coordinate().lat() >= 90.0 || node.coordinate().lat() <= -90.0 {

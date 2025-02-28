@@ -292,9 +292,9 @@ accepted |{filt_node:+13} |{a_node_ct:>13} |{filt_ways:+13} |{a_way_cnt:>13} |{f
 Country enrichment:
 -------------------
 Country detections total: {country_detections:>13}
-Country found for         {country_found_node_count:>13} nodes ({country_found_percentage:.2}%)
-Country not found for     {country_not_found_node_count:>13} nodes ({country_not_found_percentage:.2}%)
->1 country found for      {multiple_country_found_node_count:>13} nodes ({multiple_country_found_percentage:.2}%)
+Country found for         {country_found_node_count:>13} nodes ({country_found_percentage:3.2}%)
+Country not found for     {country_not_found_node_count:>13} nodes ({country_not_found_percentage:3.2}%)
+>1 country found for      {multiple_country_found_node_count:>13} nodes ({multiple_country_found_percentage:3.2}%)
 ").as_str());
             }
             None => {}

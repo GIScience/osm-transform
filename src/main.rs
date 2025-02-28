@@ -33,9 +33,20 @@ pub struct Args {
     #[arg(short = 'o', long, value_name = "FILE")]
     pub(crate) output_pbf: Option<PathBuf>,
 
-    /// CSV File with border geometries for country mapping. If not specified, no area mapping is performed, no country tags added.
+    /// Base name of country index consisting of files <basename>.index.csv, <basename>.index.csv, <basename>.area.csv and <basename>.name.csv.
+    /// If specified, the pre-computed country index is loaded, --country_csv and --country_tile_size are ignored.
+    /// If neither country_index nor country_csv are specified, no area mapping is performed, no country tags added.
     #[arg(short = 'c', long, value_name = "FILE")]
+    pub(crate) country_index: Option<String>,
+
+    /// CSV File with border geometries for country mapping.
+    /// If neither country_index nor country_csv are specified, no area mapping is performed, no country tags added.
+    #[arg(short = 'C', long, value_name = "FILE")]
     pub(crate) country_csv: Option<PathBuf>,
+
+    /// Tile size for the country index grid
+    #[arg(long, default_value = "1.0")]
+    pub(crate) country_tile_size: f64,
 
     /// Elevation GeoTiff Files (glob patterns allowed) to enrich nodes with elevation data.
     #[arg(short = 'e', long, value_name = "PATTERN", num_args = 1..)]
@@ -97,34 +108,36 @@ pub struct Args {
     #[arg(short = 'S', long, action = clap::ArgAction::Count)]
     pub stat: u8,
 
-    /// Tile size for the country index grid
-    #[arg(long, default_value = "1.0")]
-    pub country_tile_size: f64,
-
     //todo add custom filter options
 }
 impl Args {
     pub fn to_config(self) -> Config {
         Config {
             input_pbf: self.input_pbf,
-            country_csv: self.country_csv,
             output_pbf: self.output_pbf,
+
+            with_node_filtering: ! self.suppress_node_filtering,
+            remove_metadata: ! self.keep_metadata,
+
+            country_index: self.country_index,
+            country_csv: self.country_csv,
+            country_tile_size: self.country_tile_size,
+
             elevation_tiffs: self.elevation_tiffs,
             elevation_batch_size: self.elevation_batch_size,
             elevation_total_buffer_size: self.elevation_total_buffer_size,
             elevation_way_splitting: self.elevation_way_splitting,
-            debug: self.debug,
-            with_node_filtering: ! self.suppress_node_filtering,
+            elevation_threshold: self.elevation_threshold,
+            resolution_lon: self.resolution_lon,
+            resolution_lat: self.resolution_lat,
+            keep_original_elevation: self.keep_original_elevation,
+
             print_node_ids: HashSet::from_iter(self.print_node_ids),
             print_way_ids: HashSet::from_iter(self.print_way_ids),
             print_relation_ids: HashSet::from_iter(self.print_relation_ids),
-            remove_metadata: ! self.keep_metadata,
-            keep_original_elevation: self.keep_original_elevation,
-            resolution_lon: self.resolution_lon,
-            resolution_lat: self.resolution_lat,
-            elevation_threshold: self.elevation_threshold,
+
             statistics_level: self.stat,
-            country_tile_size: self.country_tile_size,
+            debug: self.debug,
         }
     }
 }

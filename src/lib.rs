@@ -58,9 +58,22 @@ pub fn init(config: &Config) {
 pub fn validate(config: &Config) {
     validate_file(&config.input_pbf, "Input file");
     validate_country_tile_size(&config.country_tile_size);
+    validate_optional_file(&config.country_csv, "Country CSV file");
+    area::validate_index_files(&config.country_index);
 }
 
-fn validate_file(path_buf: &PathBuf, label: &str) {
+pub(crate) fn validate_optional_file(path_buf: &Option<PathBuf>, label: &str) {
+    match path_buf {
+        Some(path_buf) => {
+            validate_file(path_buf, label);
+        }
+        None => {
+            debug!("{} not specified", label);
+        }
+    }
+}
+
+pub(crate) fn validate_file(path_buf: &PathBuf, label: &str) {
     if !path_buf.exists() {
         panic!("{} does not exist: {}", label, path_buf.display());
     }
@@ -78,7 +91,7 @@ fn validate_file(path_buf: &PathBuf, label: &str) {
             match fs::metadata(&absolute_path) {
                 Ok(metadata) => {
                     let file_size = metadata.len();
-                    info!("Found valid {}: {}, size: {} bytes", label.to_lowercase(), absolute_path.display(), file_size);
+                    debug!("Found valid {}: {}, size: {} bytes", label.to_lowercase(), absolute_path.display(), file_size);
                 }
                 Err(e) => {
                     warn!("Failed to get metadata for {}: {}", label.to_lowercase(), e);
@@ -99,7 +112,6 @@ fn validate_country_tile_size(country_tile_size: &f64) {
         panic!("Country tile size must be a divisor of 180.0");
     }
 }
-
 
 pub fn run(config: &Config) -> HandlerData {
     let mut stopwatch_total = StopWatch::new();
@@ -168,7 +180,7 @@ fn run_processing_chain(config: &Config, data: &mut HandlerData) {//TODO use bit
             geotiff_manager,
             config.elevation_batch_size,
             config.elevation_total_buffer_size,
-            data.no_elevation_node_ids.clone(),
+            data.no_elevation_node_ids.clone(),//todo avoid cloning - pass HandlerData to fn where needed
             config.elevation_way_splitting,
             config.keep_original_elevation,
             config.resolution_lon,
@@ -191,20 +203,41 @@ fn run_processing_chain(config: &Config, data: &mut HandlerData) {//TODO use bit
         stopwatch.reset();
     }
 
-    match &config.country_csv {//todo move after elevation handling
-        Some(path_buf) => {
+    if should_enrich_country(config) {
+
+        if should_load_country_index(config) {
+            info!("Loading spatial country index...");
+            stopwatch.start();
+            let mut area_handler = AreaHandler::new(config.country_tile_size);
+            area_handler.load_index(&config.country_index.clone().unwrap()).expect("Area handler failed to load index file");
+            info!("Loading spatial country index done, time: {}", stopwatch);
+            stopwatch.reset();
+            handler_chain = handler_chain.add(area_handler);
+        }
+        if should_build_country_index(config) {
             info!("Creating spatial country index with country-tile-size={}...", config.country_tile_size);
             stopwatch.start();
             let mut area_handler = AreaHandler::new(config.country_tile_size);
-            area_handler.build_index(path_buf.clone()).expect("Area handler failed to load CSV file");
-            debug!("Loaded: {} areas", area_handler.mapping.id.len());
-            info!("Creating spatial country index done, time: {}", stopwatch);
+            area_handler.build_index(config.country_csv.clone().unwrap()).expect("Area handler failed to load CSV file");
+            info!("Creating spatial country index for {} countries and country-tile-size={}done, time: {}", area_handler.mapping.id.len(), config.country_tile_size, stopwatch);
             stopwatch.reset();
-
             handler_chain = handler_chain.add(area_handler);
         }
-        None => (),
     }
+    // match &config.country_csv {
+    //     Some(path_buf) => {
+    //         info!("Creating spatial country index with country-tile-size={}...", config.country_tile_size);
+    //         stopwatch.start();
+    //         let mut area_handler = AreaHandler::new(config.country_tile_size);
+    //         area_handler.build_index(path_buf.clone()).expect("Area handler failed to load CSV file");
+    //         debug!("Loaded: {} areas", area_handler.mapping.id.len());
+    //         info!("Creating spatial country index done, time: {}", stopwatch);
+    //         stopwatch.reset();
+    //
+    //         handler_chain = handler_chain.add(area_handler);
+    //     }
+    //     None => (),
+    // }
 
     handler_chain = handler_chain.add(TagFilterByKey::new(
         OsmElementTypeSelection::all(),
@@ -244,25 +277,42 @@ fn run_processing_chain(config: &Config, data: &mut HandlerData) {//TODO use bit
     stopwatch.reset();
 }
 
+
+fn should_enrich_country(config: &Config) -> bool {
+    config.country_csv.is_some() || config.country_index.is_some()
+}
+fn should_load_country_index(config: &Config) -> bool {
+    config.country_index.is_some()
+}
+fn should_build_country_index(config: &Config) -> bool {
+    config.country_csv.is_some() && config.country_index.is_none()
+}
+
 #[derive(Debug, Default)]
 pub struct Config {
     pub input_pbf: PathBuf,
-    pub country_csv: Option<PathBuf>,
     pub output_pbf: Option<PathBuf>,
-    pub elevation_tiffs: Vec<String>,
+
     pub with_node_filtering: bool,
-    pub debug: u8,
-    pub print_node_ids: HashSet<i64>,
-    pub print_way_ids: HashSet<i64>,
-    pub print_relation_ids: HashSet<i64>,
     pub remove_metadata: bool,
+
+    pub country_index: Option<String>,
+    pub country_csv: Option<PathBuf>,
+    pub country_tile_size: f64,
+
+    pub elevation_tiffs: Vec<String>,
     pub elevation_batch_size: usize,
     pub elevation_total_buffer_size: usize,
     pub elevation_way_splitting: bool,
+    pub elevation_threshold: f64,
     pub resolution_lon: f64,
     pub resolution_lat: f64,
-    pub elevation_threshold: f64,
-    pub statistics_level: u8,
-    pub country_tile_size: f64,
     pub keep_original_elevation: bool,
+
+    pub print_relation_ids: HashSet<i64>,
+    pub print_node_ids: HashSet<i64>,
+    pub print_way_ids: HashSet<i64>,
+
+    pub statistics_level: u8,
+    pub debug: u8,
 }
