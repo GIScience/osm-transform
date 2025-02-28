@@ -9,7 +9,7 @@ use btreemultimap::BTreeMultiMap;
 use csv::{ReaderBuilder, WriterBuilder};
 use geo::{BoundingRect, Contains, Coord, coord, Intersects, MultiPolygon, Rect, HasDimensions};
 use geo::BooleanOps;
-use log::{debug, info, log_enabled, trace, warn};
+use log::{debug, log_enabled, trace, warn};
 use log::Level::Trace;
 use osm_io::osm::model::node::Node;
 use osm_io::osm::model::tag::Tag;

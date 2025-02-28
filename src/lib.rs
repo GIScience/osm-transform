@@ -46,7 +46,9 @@ pub fn init(config: &Config) {
             2 => log_level = LevelFilter::Debug,
             _ => log_level = LevelFilter::Trace,
         }
-        let stdout = ConsoleAppender::builder().build();
+        let stdout = ConsoleAppender::builder()
+            .encoder(Box::new(log4rs::encode::pattern::PatternEncoder::new("{d(%Y-%m-%d %H:%M:%S%.3f %Z)(utc)} - {l:5} - {m}{n}")))
+            .build();
         let config = log4rs::Config::builder()
             .appender(Appender::builder().build("stdout", Box::new(stdout)))
             .logger(Logger::builder().build("rusty_routes_transformer", log_level))
