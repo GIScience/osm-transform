@@ -205,7 +205,6 @@ fn run_processing_chain(config: &Config, data: &mut HandlerData) {//TODO use bit
     }
 
     if should_enrich_country(config) {
-
         if should_load_country_index(config) {
             info!("Loading spatial country index...");
             stopwatch.start();
@@ -225,20 +224,6 @@ fn run_processing_chain(config: &Config, data: &mut HandlerData) {//TODO use bit
             handler_chain = handler_chain.add(area_handler);
         }
     }
-    // match &config.country_csv {
-    //     Some(path_buf) => {
-    //         info!("Creating spatial country index with country-tile-size={}...", config.country_tile_size);
-    //         stopwatch.start();
-    //         let mut area_handler = AreaHandler::new(config.country_tile_size);
-    //         area_handler.build_index(path_buf.clone()).expect("Area handler failed to load CSV file");
-    //         debug!("Loaded: {} areas", area_handler.mapping.id.len());
-    //         info!("Creating spatial country index done, time: {}", stopwatch);
-    //         stopwatch.reset();
-    //
-    //         handler_chain = handler_chain.add(area_handler);
-    //     }
-    //     None => (),
-    // }
 
     handler_chain = handler_chain.add(TagFilterByKey::new(
         OsmElementTypeSelection::all(),
