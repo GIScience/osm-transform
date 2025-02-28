@@ -19,7 +19,7 @@ use log::{info, debug, LevelFilter, log_enabled, warn};
 use log::Level::Trace;
 use regex::Regex;
 use crate::io::process_with_handler;
-use area::AreaHandler;
+use area::{AreaHandler, AreaMappingManager};
 use ElementCountResultType::{AcceptedCount, InputCount, OutputCount};
 use crate::handler::{HandlerChain, HandlerData, OsmElementTypeSelection};
 use crate::handler::collect::ReferencedNodeIdCollector;
@@ -60,7 +60,7 @@ pub fn validate(config: &Config) {
     validate_file(&config.input_pbf, "Input file");
     validate_country_tile_size(&config.country_tile_size);
     validate_optional_file(&config.country_csv, "Country CSV file");
-    area::validate_index_files(&config.country_index);
+    AreaMappingManager::country().validate_index_files(&config.country_index);
 }
 
 pub(crate) fn validate_optional_file(path_buf: &Option<PathBuf>, label: &str) {
@@ -204,22 +204,24 @@ fn run_processing_chain(config: &Config, data: &mut HandlerData) {//TODO use bit
         stopwatch.reset();
     }
 
-    if should_enrich_country(config) {
-        if should_load_country_index(config) {
+    if config.should_enrich_country() {
+        if config.should_load_country_index() {
             info!("Loading spatial country index...");
             stopwatch.start();
-            let mut area_handler = AreaHandler::new(config.country_tile_size);
-            area_handler.load_index(&config.country_index.clone().unwrap()).expect("Area handler failed to load index file");
+            let mapping = AreaMappingManager::country().load_index(&config.country_index.clone().unwrap()).expect("Failed to load index");
+            let area_handler = AreaHandler::new(mapping);
             info!("Loading spatial country index done, time: {}", stopwatch);
             stopwatch.reset();
             handler_chain = handler_chain.add(area_handler);
         }
-        if should_build_country_index(config) {
+        if config.should_build_country_index() {
             info!("Creating spatial country index with country-tile-size={}...", config.country_tile_size);
             stopwatch.start();
-            let mut area_handler = AreaHandler::new(config.country_tile_size);
-            area_handler.build_index(config.country_csv.clone().unwrap()).expect("Area handler failed to load CSV file");
-            info!("Creating spatial country index for {} countries and country-tile-size={}done, time: {}", area_handler.mapping.id.len(), config.country_tile_size, stopwatch);
+            let mapping = AreaMappingManager::country().build_index(&config.country_csv.clone().unwrap(), config.country_tile_size).expect("Area handler failed to load CSV file");
+            let area_handler = AreaHandler::new(mapping);
+            info!("Creating spatial country index for {} countries and country-tile-size={} done, time: {}", area_handler.mapping.id.len(), config.country_tile_size, stopwatch);
+            info!("The persisted index files {}.*.csv can be loaded in subsequent runs which reduces the processing time",
+                AreaMappingManager::country().get_index_base_name(&config.country_csv.clone().unwrap(), config.country_tile_size));
             stopwatch.reset();
             handler_chain = handler_chain.add(area_handler);
         }
@@ -263,17 +265,6 @@ fn run_processing_chain(config: &Config, data: &mut HandlerData) {//TODO use bit
     stopwatch.reset();
 }
 
-
-fn should_enrich_country(config: &Config) -> bool {
-    config.country_csv.is_some() || config.country_index.is_some()
-}
-fn should_load_country_index(config: &Config) -> bool {
-    config.country_index.is_some()
-}
-fn should_build_country_index(config: &Config) -> bool {
-    config.country_csv.is_some() && config.country_index.is_none()
-}
-
 #[derive(Debug, Default)]
 pub struct Config {
     pub input_pbf: PathBuf,
@@ -301,4 +292,17 @@ pub struct Config {
 
     pub statistics_level: u8,
     pub debug: u8,
+}
+
+impl Config {
+    pub(crate) fn should_enrich_country(&self) -> bool {
+        self.country_csv.is_some() || self.country_index.is_some()
+    }
+    pub(crate) fn should_load_country_index(&self) -> bool {
+        self.country_index.is_some()
+    }
+    pub(crate) fn should_build_country_index(&self) -> bool {
+        self.country_csv.is_some() && self.country_index.is_none()
+    }
+
 }

@@ -288,8 +288,7 @@ accepted |{filt_node:+13} |{a_node_ct:>13} |{filt_ways:+13} |{a_way_cnt:>13} |{f
             return formatted_statistics
         }
 
-        match &config.country_csv {
-            Some(_) => {
+        if config.should_enrich_country() {
                 formatted_statistics.push_str(format!("
 Country enrichment:
 -------------------
@@ -298,8 +297,6 @@ Country found for         {country_found_node_count:>13} nodes ({country_found_p
 Country not found for     {country_not_found_node_count:>13} nodes ({country_not_found_percentage:3.2}%)
 >1 country found for      {multiple_country_found_node_count:>13} nodes ({multiple_country_found_percentage:3.2}%)
 ").as_str());
-            }
-            None => {}
         }
 
         if &config.elevation_tiffs.len() > &0 {
@@ -338,12 +335,6 @@ left  {unsplitted_way_count:>13} ways unsplitted ({unsplitted_way_percentage:.2}
         self.nodes.clear();
         self.ways.clear();
         self.relations.clear();
-    }
-    pub(crate) fn clear_intermediate_results(&mut self) {
-        self.accept_node_ids.clear();
-        //todo self.way_ids.clear();
-        //todo self.relation_ids.clear();
-        self.no_elevation_node_ids.clear();
     }
     pub(crate) fn clear_counts(&mut self) {
         self.input_node_count = 0;

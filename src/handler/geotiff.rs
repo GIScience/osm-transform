@@ -373,7 +373,7 @@ impl BufferingElevationEnricher {
             resolution_lon,
             resolution_lat,
             elevation_way_splitting,
-            keep_original_elevation: false,
+            keep_original_elevation,
             elevation_threshold,
             ele_lookups_successful: 0,
             ele_lookups_failed: 0,
