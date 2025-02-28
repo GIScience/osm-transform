@@ -34,7 +34,6 @@ pub struct Tile {
 
 pub(crate) struct AreaHandler {
     pub(crate) mapping: Mapping,
-    grid: Vec<Tile>,
     country_not_found_node_count: u64,
     country_found_node_count: u64,
     multiple_country_found_node_count: u64,
@@ -51,6 +50,7 @@ pub(crate) struct Mapping {
     pub grid_size: usize,
     pub num_tiles_lon: usize,
     pub num_tiles_lat: usize,
+    pub grid: Vec<Tile>,
     pub index: Vec<u16>,
     pub area: BTreeMultiMap<u32, AreaIntersect>,
     pub id: BTreeMap<u16, String>,
@@ -62,18 +62,31 @@ impl Mapping {
         let num_tiles_lon = (360.0 / tile_size).ceil() as usize;
         let num_tiles_lat = (180.0 / tile_size).ceil() as usize;
         let grid_size = num_tiles_lon * num_tiles_lat;
+        let mut grid: Vec<Tile> = Vec::new();
+        for tile_number_lat in 0..num_tiles_lat {
+            for tile_number_lon in 0..num_tiles_lon {
+                let box_lon = tile_number_lon as f64 * tile_size - 180.0;
+                let box_lat = tile_number_lat as f64 * tile_size - 90.0;
+                let bbox = Rect::new(coord! {x: box_lon, y: box_lat},
+                                     coord! {x: box_lon + tile_size, y: box_lat + tile_size}, );
+                let poly = bbox.to_polygon().into();
+                grid.push(Tile { bbox, poly });
+            }
+        }
+
         Self {
             tile_size,
             grid_size,
             num_tiles_lon,
             num_tiles_lat,
+            grid,
             index: vec![0; grid_size],
             area: BTreeMultiMap::new(),
             id: BTreeMap::new(),
             name: BTreeMap::new(),
         }
     }
-    pub(crate) fn meta_info(&self) -> MappingMetainfo {
+        pub(crate) fn meta_info(&self) -> MappingMetainfo {
         MappingMetainfo {
             tile_size: self.tile_size,
             num_tiles_lon: self.num_tiles_lon as i64,
@@ -134,22 +147,8 @@ impl Default for AreaHandler {
 
 impl AreaHandler {
     pub(crate) fn new(tile_size: f64) -> Self {
-        let mapping = Mapping::new(tile_size);
-        let mut grid: Vec<Tile> = Vec::new();
-        for tile_number_lat in 0..mapping.num_tiles_lat {
-            for tile_number_lon in 0..mapping.num_tiles_lon {
-                let box_lon = tile_number_lon as f64 * mapping.tile_size - 180.0;
-                let box_lat = tile_number_lat as f64 * mapping.tile_size - 90.0;
-                let bbox = Rect::new(coord! {x: box_lon, y: box_lat},
-                                     coord! {x: box_lon + mapping.tile_size, y: box_lat + mapping.tile_size}, );
-                let poly = bbox.to_polygon().into();
-                grid.push(Tile { bbox, poly });
-            }
-        }
-
         Self {
-            mapping,
-            grid,
+            mapping: Mapping::new(tile_size),
             country_not_found_node_count: 0,
             country_found_node_count: 0,
             multiple_country_found_node_count: 0,
@@ -275,13 +274,13 @@ impl AreaHandler {
         let area_bbox = &area_geometry.bounding_rect().unwrap();
         let mut _intersecting_grid_tiles = 0;
         for grid_id in 0..self.mapping.grid_size {
-            let tile_bbox = &self.grid[grid_id].bbox;
+            let tile_bbox = &self.mapping.grid[grid_id].bbox;
             if tile_bbox.intersects(area_bbox) && tile_bbox.intersects(area_geometry) {
                 _intersecting_grid_tiles += 1;
                 if area_geometry.contains(tile_bbox) && self.mapping.index[grid_id] == 0 {
                     self.mapping.index[grid_id] = country_index;
                 } else {
-                    let tile_poly = &self.grid[grid_id].poly;
+                    let tile_poly = &self.mapping.grid[grid_id].poly;
                     let intersect = area_geometry.intersection(tile_poly);
                     if !intersect.is_empty() {
                         if self.mapping.index[grid_id] != 0 && self.mapping.index[grid_id] != AREA_ID_MULTIPLE {
