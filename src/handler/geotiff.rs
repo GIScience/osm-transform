@@ -508,7 +508,7 @@ impl BufferingElevationEnricher {
                         }
                     }
                     Some(buffer_vec) => {
-                        if buffer_vec.len() > self.max_buffer_len {
+                        if buffer_vec.len() >= self.max_buffer_len {
                             self.handle_and_flush_buffer(buffer_name) //elevation setzen, zrückgeben
                         } else {
                             self.flush_largest_buffers_when_total_max_reached()
