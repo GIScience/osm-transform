@@ -1,4 +1,5 @@
 use std::collections::HashSet;
+use std::fs;
 use std::path::PathBuf;
 use osm_io::osm::model::element::Element;
 use osm_io::osm::pbf::reader::Reader;
@@ -20,10 +21,10 @@ fn base_config() -> Config {
         print_node_ids: HashSet::new(),
         print_way_ids: HashSet::new(),
         print_relation_ids: HashSet::new(),
-        resolution_lon: 0.01,
-        resolution_lat: 0.01,
-        elevation_threshold: 10.0,
-        verbosity: 2u8,
+        resolution_lon: 0.0001,
+        resolution_lat: 0.0001,
+        elevation_threshold: 1.0,
+        verbosity: 3u8,
         loglevel: 0,
         quiet: false,
     };
@@ -38,8 +39,8 @@ const BAARLE_WAY_COUNT: u64 = 463u64;
 const FILTERED_NODE_COUNT: u64 = 299u64;
 const FILTERED_RELATION_COUNT: u64 = 29u64;
 const FILTERED_WAY_COUNT: u64 = 51u64;
-const SPLIT_NODE_COUNT: u64 = 4241u64;
-const FILTERED_SPLIT_NODE_COUNT: u64 = 576u64;
+const SPLIT_NODE_COUNT: u64 = 3973u64;
+const FILTERED_SPLIT_NODE_COUNT: u64 = 308u64;
 
 #[test]
 fn run_minimal() {
@@ -70,17 +71,17 @@ fn run_minimal_write() {
 }
 #[test]
 fn run_all() {
+    fs::remove_dir_all("mapping_test_idx_0_40");
     let mut config = base_config();
     config.output_pbf = Some(PathBuf::from("target/tmp/output-integration-test-run_all.pbf"));
     config.country_data = Some(PathBuf::from("test/mapping_test.csv"));
+    config.country_tile_size = 0.4;
     config.elevation_tiffs = vec!["test/*.tif".to_string()];
     config.elevation_batch_size = 100000;
     config.elevation_total_buffer_size = 500000;
     config.with_node_filtering = true;
     config.remove_metadata = true;
     config.elevation_way_splitting = true;
-    config.resolution_lon= 0.0001;
-    config.resolution_lat= 0.0001;
     rusty_routes_transformer::init(&config);
     let data = rusty_routes_transformer::run(&config);
     println!("{}", data.summary(&config));
@@ -95,8 +96,10 @@ fn run_all() {
 }
 #[test]
 fn run_country() {
+    fs::remove_dir_all("mapping_test_idx_0_40");
     let mut config = base_config();
     config.country_data = Some(PathBuf::from("test/mapping_test.csv"));
+    config.country_tile_size = 0.4;
     rusty_routes_transformer::init(&config);
     let data = rusty_routes_transformer::run(&config);
     println!("{}", data.summary(&config));
@@ -156,8 +159,6 @@ fn run_elevation_way_splitting() {
     let mut config = base_config();
     config.elevation_tiffs = vec!["test/*.tif".to_string()];
     config.elevation_way_splitting = true;
-    config.resolution_lon= 0.0001;
-    config.resolution_lat= 0.0001;
     rusty_routes_transformer::init(&config);
     let data = rusty_routes_transformer::run(&config);
     println!("{}", data.summary(&config));
@@ -173,8 +174,6 @@ fn run_elevation_way_splitting_write() {
     let mut config = base_config();
     config.elevation_tiffs = vec!["test/*.tif".to_string()];
     config.elevation_way_splitting = true;
-    config.resolution_lon= 0.0001;
-    config.resolution_lat= 0.0001;
     config.output_pbf = Some(PathBuf::from("target/tmp/output-integration-test-run_elevation_way_splitting_write.pbf"));
     rusty_routes_transformer::init(&config);
     let data = rusty_routes_transformer::run(&config);
