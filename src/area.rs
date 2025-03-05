@@ -251,78 +251,86 @@ impl AreaMappingManager {
     }
 
     pub(crate) fn load_index(&mut self, index_path: &Option<PathBuf>) -> Result<Mapping, Box<dyn Error>> {
-        let base_name = index_path.as_ref().unwrap().file_stem().unwrap().to_str().unwrap().to_string();
-        let mut mapping = self.load_index_info_file(&base_name).expect("failed to load info file");
-        self.load_index_key_file(&base_name, &mut mapping).expect("failed to load key file");
-        self.load_index_name_file(&base_name, &mut mapping).expect("failed to load name file");
-        self.load_index_index_file(&base_name, &mut mapping).expect("failed to load index file");
-        self.load_index_area_file(&base_name, &mut mapping).expect("failed to load area file");
-        Ok(mapping)
+        match index_path {
+            Some(base_name) => {
+                let mut mapping = self.load_index_info_file(base_name).expect("failed to load info file");
+                self.load_index_key_file(base_name, &mut mapping).expect("failed to load key file");
+                self.load_index_name_file(base_name, &mut mapping).expect("failed to load name file");
+                self.load_index_index_file(base_name, &mut mapping).expect("failed to load index file");
+                self.load_index_area_file(base_name, &mut mapping).expect("failed to load area file");
+                Ok(mapping)
+
+            },
+            None => Err("No index path provided".into())
+        }
     }
-    fn load_index_info_file(&mut self, base_name: &String)  -> Result<Mapping, Box<dyn Error>>{
-        let path_buf = self.create_index_file_path_buf(base_name, &*self.info_file_suffix);
+    fn load_index_info_file(&mut self, base_name: &PathBuf) -> Result<Mapping, Box<dyn Error>>{
+        let path_buf = base_name.join(&*self.info_file_suffix);
+        if !path_buf.exists() {
+            return Err("info file not found".into());
+        }
         let meta_info: MappingMetainfo = serde_yaml::from_reader(File::open(path_buf.clone()).unwrap()).unwrap();
         Ok(Mapping::new(meta_info.tile_size))
     }
-    fn load_index_key_file(&mut self, base_name: &String, mapping: &mut Mapping) -> Result<(), Box<dyn Error>> {
+    fn load_index_key_file(&mut self, base_name: &PathBuf, mapping: &mut Mapping) -> Result<(), Box<dyn Error>> {
         #[derive(Debug, Deserialize)]
         struct Record {
             area_idx: u16,
             area_key: String,
         }
-        let path_buf = self.create_index_file_path_buf(base_name, &*self.key_file_suffix);
+        let path_buf = base_name.join(&*self.key_file_suffix);
         let file =  File::open(path_buf.clone())?;
         let mut rdr = ReaderBuilder::new().delimiter(b';').from_reader(file);
-        debug!("Loading key file: {}", path_buf.to_str().unwrap_or_default());
+        trace!("Loading key file: {}", path_buf.to_str().unwrap_or_default());
         for result in rdr.deserialize() {
             let record: Record = result?;
             mapping.id.insert(record.area_idx, record.area_key);
         }
         Ok(())
     }
-    fn load_index_name_file(&mut self, base_name: &String, mapping: &mut Mapping) -> Result<(), Box<dyn Error>> {
+    fn load_index_name_file(&mut self, base_name: &PathBuf, mapping: &mut Mapping) -> Result<(), Box<dyn Error>> {
         #[derive(Debug, Deserialize)]
         struct Record {
             area_idx: u16,
             area_name: String,
         }
-        let path_buf = self.create_index_file_path_buf(base_name, &*self.name_file_suffix);
+        let path_buf = base_name.join(&*self.name_file_suffix);
         let file =  File::open(path_buf.clone())?;
         let mut rdr = ReaderBuilder::new().delimiter(b';').from_reader(file);
-        debug!("Loading name file: {}", path_buf.to_str().unwrap_or_default());
+        trace!("Loading name file: {}", path_buf.to_str().unwrap_or_default());
         for result in rdr.deserialize() {
             let record: Record = result?;
             mapping.name.insert(record.area_idx, record.area_name);
         }
         Ok(())
     }
-    fn load_index_index_file(&mut self, base_name: &String, mapping: &mut Mapping) -> Result<(), Box<dyn Error>> {
+    fn load_index_index_file(&mut self, base_name: &PathBuf, mapping: &mut Mapping) -> Result<(), Box<dyn Error>> {
         #[derive(Debug, Deserialize)]
         struct Record {
             grid_idx: usize,
             area_idx: u16,
         }
-        let path_buf = self.create_index_file_path_buf(base_name, &*self.index_file_suffix);
+        let path_buf = base_name.join(&*self.index_file_suffix);
         let file =  File::open(path_buf.clone())?;
         let mut rdr = ReaderBuilder::new().delimiter(b';').from_reader(file);
-        debug!("Loading index file: {}", path_buf.to_str().unwrap_or_default());
+        trace!("Loading index file: {}", path_buf.to_str().unwrap_or_default());
         for result in rdr.deserialize() {
             let record: Record = result?;
             mapping.index[record.grid_idx] = record.area_idx;
         }
         Ok(())
     }
-    fn load_index_area_file(&mut self, base_name: &String, mapping: &mut Mapping) -> Result<(), Box<dyn Error>> {
+    fn load_index_area_file(&mut self, base_name: &PathBuf, mapping: &mut Mapping) -> Result<(), Box<dyn Error>> {
         #[derive(Debug, Deserialize)]
         struct Record {
             grid_idx: u32,
             area_idx: u16,
             intersect_geom: String,
         }
-        let path_buf = self.create_index_file_path_buf(base_name, &*self.area_file_suffix);
+        let path_buf = base_name.join(&*self.area_file_suffix);
         let file =  File::open(path_buf.clone())?;
         let mut rdr = ReaderBuilder::new().delimiter(b';').from_reader(file);
-        debug!("Loading area file: {}", path_buf.to_str().unwrap_or_default());
+        trace!("Loading area file: {}", path_buf.to_str().unwrap_or_default());
         for result in rdr.deserialize() {
             let record: Record = result?;
             mapping.area.insert(record.grid_idx, AreaIntersect{id: record.area_idx, geo: wkt_string_to_multipolygon(record.intersect_geom.as_str()).unwrap()});

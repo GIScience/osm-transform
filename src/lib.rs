@@ -13,9 +13,10 @@ use std::fs;
 use std::fs::File;
 use std::path::PathBuf;
 use benchmark_rs::stopwatch::StopWatch;
+use glob::glob;
 use log4rs::append::console::ConsoleAppender;
 use log4rs::config::{Appender, Logger, Root};
-use log::{info, debug, LevelFilter, log_enabled, warn};
+use log::{info, debug, LevelFilter, log_enabled, warn, error};
 use log::Level::Trace;
 use regex::Regex;
 use crate::io::process_with_handler;
@@ -56,6 +57,37 @@ pub fn init(config: &Config) {
 pub fn validate(config: &Config) {
     validate_file(&config.input_pbf, "Input file");
     validate_country_tile_size(&config.country_tile_size);
+    validate_country_data(config);
+    validate_elevation_data(config);
+}
+
+fn validate_elevation_data(config: &Config) {
+    for files_pattern in config.elevation_tiffs.clone() {
+        let mut counter = 0;
+        match glob(files_pattern.as_str()) {
+            Ok(paths) => {
+                for entry in paths {
+                    match entry {
+                        Ok(path) => {
+                            validate_file(&path, "Elevation GeoTiff file");
+                            counter += 1;
+                        }
+                        Err(e) => error!("Error reading path: {:?}", e),
+                    }
+                }
+            }
+            Err(e) => error!("Failed to read glob pattern: {:?}", e),
+        }
+        if counter == 0 {
+            std::panic!("No geotiff files found for glob pattern {}", files_pattern);
+        }
+    }
+}
+
+fn validate_country_data(config: &Config) {
+    if ! config.should_enrich_country() {
+        return;
+    }
     if config.should_build_country_index() {
         match &config.country_data {
             Some(country_source) => {
@@ -69,8 +101,7 @@ pub fn validate(config: &Config) {
                 panic!("Country CSV file not specified");
             }
         }
-    }
-    if config.should_load_country_index() {
+    } else if config.should_load_country_index() {
         match &config.country_data {
             Some(country_source) => {
                 AreaMappingManager::country().validate_index_files(country_source, config.country_tile_size);
@@ -79,6 +110,8 @@ pub fn validate(config: &Config) {
                 panic!("Country index directory not specified");
             }
         }
+    } else {
+        panic!("No valid country data source specified");
     }
 }
 
@@ -111,7 +144,7 @@ pub(crate) fn validate_file(path_buf: &PathBuf, label: &str) {
             match fs::metadata(&absolute_path) {
                 Ok(metadata) => {
                     let file_size = metadata.len();
-                    debug!("Found valid {}: {}, size: {} bytes", label.to_lowercase(), absolute_path.display(), file_size);
+                    debug!("Found readable {}: {}, size: {} bytes", label.to_lowercase(), absolute_path.display(), file_size);
                 }
                 Err(e) => {
                     warn!("Failed to get metadata for {}: {}", label.to_lowercase(), e);
@@ -192,7 +225,7 @@ fn run_processing_chain(config: &Config, data: &mut HandlerData) {//TODO use bit
 
     let mut stopwatch = StopWatch::new();
 
-    if &config.elevation_tiffs.len() > &0 {
+    if config.should_enrich_elevation() {
         stopwatch.start();
         info!("Creating spatial elevation index...");
         let geotiff_manager: GeoTiffManager = GeoTiffManager::with_file_patterns(config.elevation_tiffs.clone());
@@ -232,8 +265,7 @@ fn run_processing_chain(config: &Config, data: &mut HandlerData) {//TODO use bit
             info!("Loading spatial country index done, time: {}", stopwatch);
             stopwatch.reset();
             handler_chain = handler_chain.add(area_handler);
-        }
-        if config.should_build_country_index() {
+        } else if config.should_build_country_index() {
             info!("Creating spatial country index with country-tile-size={}...", config.country_tile_size);
             stopwatch.start();
             let mapping = AreaMappingManager::country().build_index(&config.country_data.clone().unwrap(), config.country_tile_size).expect("Area handler failed to load CSV file");
@@ -243,6 +275,8 @@ fn run_processing_chain(config: &Config, data: &mut HandlerData) {//TODO use bit
                 AreaMappingManager::country().get_index_dir_name(&config.country_data.clone().unwrap(), config.country_tile_size));
             stopwatch.reset();
             handler_chain = handler_chain.add(area_handler);
+        } else {
+            panic!("No valid country data source specified");
         }
     }
 
@@ -321,10 +355,16 @@ impl Config {
         self.country_data.is_some()
     }
     pub fn should_load_country_index(&self) -> bool {
-        self.country_data.clone().unwrap().is_dir()
+        match &self.country_data {
+            None => {false}
+            Some(cd) => {cd.is_dir()}
+        }
     }
     pub fn should_build_country_index(&self) -> bool {
-        self.country_data.clone().unwrap().is_file()
+        match &self.country_data {
+            None => {false}
+            Some(cd) => {cd.is_file()}
+        }
     }
     pub fn get_summary_level(&self) -> u8 {
         if self.quiet {

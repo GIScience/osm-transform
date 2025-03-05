@@ -77,6 +77,15 @@ pub struct Args {
     #[arg(long)]
     pub elevation_keep_original_value: bool,
 
+    /// Do NOT remove nodes that are not referenced by accepted ways or relations.
+    /// Not recommended for openrouteservice graph building
+    #[arg(long)]
+    pub suppress_node_filtering: bool,
+
+    /// Do NOT remove metadata 'version', 'timestamp', 'changeset', 'uid', 'user'
+    #[arg(long)]
+    pub keep_metadata: bool,
+
     /// Print node with id=<ID> at beginning and end of processing pipeline. Can be added multiple times.
     #[arg(short = 'N', long, value_name = "ID")]
     pub print_node: Vec<i64>,
@@ -89,18 +98,7 @@ pub struct Args {
     #[arg(short = 'R', long, value_name = "ID")]
     pub print_relation: Vec<i64>,
 
-    /// Suppress node filtering. This means, that ALL nodes, ways, relations are handled by thy processing pass.
-    /// Not recommended for openrouteservice graph building
-    #[arg(long)]
-    pub suppress_node_filtering: bool,
-
-    /// Do NOT remove metadata 'version', 'timestamp', 'changeset', 'uid', 'user'
-    #[arg(long)]
-    pub keep_metadata: bool,
-
-    /// Can be added multiple times to increase verbosity:
-    /// v More summary information is printed
-    /// vv debug information is printed
+    /// Can be added multiple times to get more detailed summery
     #[arg(short = 'v', long, action = clap::ArgAction::Count)]
     pub verbose: u8,
 

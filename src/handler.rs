@@ -240,6 +240,7 @@ other = {other}"#)
         let elevation_flush_count = self.elevation_flush_count;
         let elevation_total_buffered_nodes_max_reached_count = self.elevation_total_buffered_nodes_max_reached_count;
         let total_processing_time = Self::format_duration(&self.total_processing_time);
+
         // derived values
         let filt_node = (i_node_ct as i64 - a_node_ct as i64) * -1;
         let filt_ways = (i_way_cnt as i64 - a_way_cnt as i64) * -1;
@@ -1069,7 +1070,7 @@ pub(crate) mod tests {
         data.accept_node_ids.set(2usize, true);
         let chain = HandlerChain::default()
             .add(ElementCounter::new(ElementCountResultType::InputCount))
-            .add(NodeIdFilter {})
+            .add(IdFilter {handle_types: OsmElementTypeSelection::node_only()})
             .add(ElementCounter::new(ElementCountResultType::OutputCount));
 
         handle_test_nodes_and_verify_result(chain, &mut data);

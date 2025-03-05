@@ -199,7 +199,7 @@ impl GeoTiffManager {
     fn index_geotiff(&mut self, path: PathBuf, geotiff: GeoTiff) {
         if self.index.get_geotiff_by_id(path.to_str().unwrap()).is_none() {
             self.index.add_geotiff(geotiff, path.to_str().unwrap());
-            debug!("Successfully indexed geotiff file {:?}", path);
+            trace!("Successfully indexed geotiff file {:?}", path);
         }
     }
 
