@@ -347,12 +347,13 @@ Elevation not relevant for  {elevation_not_relevant_node_count:>13} nodes ({elev
                               addd_node: i64, addd_ways: i64, addd_rels: i64,
                               input_abs_path: String, input_file_size: u64)
                               -> String {
+        let version = format!("{} v{}", env!("CARGO_PKG_NAME"), env!("CARGO_PKG_VERSION"));
         format!("
 Summary:
 ========
 
 Processing of file {input_abs_path} ({input_file_size} bytes)
-completed in {total_processing_time}.
+with {version} completed in {total_processing_time}
 
 Element counts at specific processing stages:
 ---------------------------------------------

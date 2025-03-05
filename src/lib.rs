@@ -167,6 +167,7 @@ fn validate_country_tile_size(country_tile_size: &f64) {
 }
 
 pub fn run(config: &Config) -> HandlerData {
+    info!("{} v{}", env!("CARGO_PKG_NAME"), env!("CARGO_PKG_VERSION"));
     let mut stopwatch_total = StopWatch::new();
     stopwatch_total.start();
     let mut data = HandlerData::default();
