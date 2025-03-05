@@ -147,7 +147,7 @@ impl Handler for TagFilterByKey {
 
 
 pub(crate) struct AllElementsFilter {
-    pub handle_types: OsmElementTypeSelection,
+    pub(crate) handle_types: OsmElementTypeSelection,
 }
 impl Handler for AllElementsFilter {
     fn name(&self) -> String {
@@ -162,15 +162,19 @@ impl Handler for AllElementsFilter {
 }
 
 
-pub(crate) struct NodeIdFilter {}
-impl NodeIdFilter {}
+pub(crate) struct IdFilter {
+    pub(crate) handle_types: OsmElementTypeSelection,
+}
+impl IdFilter {}
 
-impl Handler for NodeIdFilter {
+impl Handler for IdFilter {
     fn name(&self) -> String {
         "NodeIdFilter".to_string()
     }
     fn handle(&mut self, data: &mut HandlerData) {
-        data.nodes.retain(|node| data.accept_node_ids.get(node.id() as usize) == Some(true));
+        if self.handle_types.node { data.nodes.retain(|node| data.accept_node_ids.get(node.id() as usize) == Some(true)); }
+        if self.handle_types.way { data.ways.retain(|way| data.accept_way_ids.get(way.id() as usize) == Some(true)); }
+        if self.handle_types.relation { data.relations.retain(|relation| data.accept_relation_ids.get(relation.id() as usize) == Some(true)); }
     }
 }
 

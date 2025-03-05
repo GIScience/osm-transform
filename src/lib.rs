@@ -23,8 +23,8 @@ use crate::io::process_with_handler;
 use area::{AreaHandler, AreaMappingManager};
 use ElementCountResultType::{AcceptedCount, InputCount, OutputCount};
 use crate::handler::{HandlerChain, HandlerData, OsmElementTypeSelection};
-use crate::handler::collect::ReferencedNodeIdCollector;
-use crate::handler::filter::{AllElementsFilter, ComplexElementsFilter, FilterType, NodeIdFilter, TagFilterByKey};
+use crate::handler::collect::{IdCollector, MinMaxIdCollector, ReferencedNodeIdCollector};
+use crate::handler::filter::{AllElementsFilter, ComplexElementsFilter, FilterType, IdFilter, TagFilterByKey};
 use crate::handler::geotiff::{BufferingElevationEnricher, GeoTiffManager};
 use crate::handler::info::{ElementCountResultType, ElementCounter, ElementPrinter};
 use crate::handler::modify::MetadataRemover;
@@ -195,7 +195,9 @@ fn run_filter_chain(config: &Config, data: &mut HandlerData){
     if &config.elevation_tiffs.len() > &0 {
         handler_chain = handler_chain.add(SkipElevationNodeCollector::default())
     }
-    //todo add IdCollector{handle_types: OsmElementTypeSelection::way_relation()}
+
+    handler_chain = handler_chain.add(IdCollector{handle_types: OsmElementTypeSelection::way_relation()});
+
     let _ = process_with_handler(config, &mut handler_chain, data, info_msg).expect("Extraction of referenced node ids failed");
     handler_chain.close_handlers(data);
     info!("{} done, time: {}", info_msg, stopwatch_run_filter_chain);
@@ -211,16 +213,19 @@ fn run_processing_chain(config: &Config, data: &mut HandlerData) {//TODO use bit
             .with_way_ids(config.print_way_ids.clone())
             .with_relation_ids(config.print_relation_ids.clone()));
 
-    handler_chain = handler_chain.add(ComplexElementsFilter::ors_default());//todo remove when bitvec filters are used
-
     if config.with_node_filtering {
-        handler_chain = handler_chain.add(NodeIdFilter { });
+        handler_chain = handler_chain.add(IdFilter{handle_types: OsmElementTypeSelection::all()});
+    } else {
+        handler_chain = handler_chain.add(IdFilter{handle_types: OsmElementTypeSelection::way_relation()});
     }
 
     if config.remove_metadata {
         handler_chain = handler_chain.add(MetadataRemover::default())
     }
 
+    if config.get_summary_level() > 2 {
+        handler_chain = handler_chain.add(MinMaxIdCollector::new(OsmElementTypeSelection::all()));
+    }
     handler_chain = handler_chain.add(ElementCounter::new(AcceptedCount));//todo needed? let writers count?
 
     let mut stopwatch = StopWatch::new();

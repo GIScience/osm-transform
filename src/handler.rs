@@ -58,6 +58,7 @@ impl OsmElementTypeSelection {
     pub(crate) fn node_only() -> Self { Self { node: true, way: false, relation: false } }
     pub(crate) fn way_only() -> Self { Self { node: false, way: true, relation: false } }
     pub(crate) fn relation_only() -> Self { Self { node: false, way: false, relation: true } }
+    pub(crate) fn way_relation() -> Self { Self { node: false, way: true, relation: true } }
     pub(crate) fn none() -> Self { Self { node: false, way: false, relation: false } }
 }
 
@@ -72,8 +73,8 @@ pub struct HandlerData {
     /// Intermediate filter results created by the handlers in the first pass
     /// and consumed by filters in the second pass.
     pub accept_node_ids: BitVec,
-    //todo add: pub accept_way_ids: BitVec,
-    //todo add: pub accept_relation_ids: BitVec,
+    pub accept_way_ids: BitVec,
+    pub accept_relation_ids: BitVec,
     pub no_elevation_node_ids: BitVec,
     
     /// InputCount
@@ -121,6 +122,8 @@ impl HandlerData {
             relations: vec![],
 
             accept_node_ids: BitVec::from_elem(nbits, false),
+            accept_way_ids: BitVec::from_elem(nbits, false),
+            accept_relation_ids: BitVec::from_elem(nbits, false),
             no_elevation_node_ids: BitVec::from_elem(nbits, false),
 
             input_node_count: 0,
@@ -276,6 +279,9 @@ other = {other}"#)
                 addd_node, addd_ways, addd_rels,
                 input_abs_path, input_file_size).as_str());
         }
+        if config.get_summary_level() > 2 {
+            formatted_statistics.push_str(self.min_max_ids_summary(config).as_str());
+        }
         if config.get_summary_level() > 1 && config.should_enrich_country() {
             formatted_statistics.push_str(Self::country_enrichment_summary(config,
                 country_not_found_node_count, country_found_node_count, multiple_country_found_node_count,
@@ -376,6 +382,29 @@ Country not found for     {country_not_found_node_count:>13} nodes ({country_not
 ")
     }
 
+    fn min_max_ids_summary(&self, _config: &Config) -> String {
+        let min_pos_no_id = self.other.get("min_pos_node_id").cloned().unwrap_or("none".to_string());
+        let max_pos_no_id = self.other.get("max_pos_node_id").cloned().unwrap_or("none".to_string());
+        let min_neg_no_id = self.other.get("min_neg_node_id").cloned().unwrap_or("none".to_string());
+        let max_neg_no_id = self.other.get("max_neg_node_id").cloned().unwrap_or("none".to_string());
+        let min_pos_wa_id = self.other.get("min_pos_way_id").cloned().unwrap_or("none".to_string());
+        let max_pos_wa_id = self.other.get("max_pos_way_id").cloned().unwrap_or("none".to_string());
+        let min_neg_wa_id = self.other.get("min_neg_way_id").cloned().unwrap_or("none".to_string());
+        let max_neg_wa_id = self.other.get("max_neg_way_id").cloned().unwrap_or("none".to_string());
+        let min_pos_re_id = self.other.get("min_pos_relation_id").cloned().unwrap_or("none".to_string());
+        let max_pos_re_id = self.other.get("max_pos_relation_id").cloned().unwrap_or("none".to_string());
+        let min_neg_re_id = self.other.get("min_neg_relation_id").cloned().unwrap_or("none".to_string());
+        let max_neg_re_id = self.other.get("max_neg_relation_id").cloned().unwrap_or("none".to_string());
+        format!("
+Detected min/max IDs:
+---------------------
+         |     min       |        max
+---------+---------------+-----------------
+node     | {min_pos_no_id:>13} | {max_pos_no_id:>13}
+way      | {min_pos_wa_id:>13} | {max_pos_wa_id:>13}
+relation | {min_pos_re_id:>13} | {max_pos_re_id:>13}
+")
+    }
     pub(crate) fn clear_elements(&mut self) {
         self.nodes.clear();
         self.ways.clear();
@@ -1087,7 +1116,7 @@ pub(crate) mod tests {
 
         let chain2 = HandlerChain::default()
             .add(ElementCounter::new(ElementCountResultType::InputCount))
-            .add(NodeIdFilter {})
+            .add(IdFilter {handle_types: OsmElementTypeSelection::node_only()})
             .add(ElementCounter::new(ElementCountResultType::OutputCount));
 
         chain1.process(simple_way_element(23, vec![1, 2], vec![("who", "kasper")]), &mut data);
