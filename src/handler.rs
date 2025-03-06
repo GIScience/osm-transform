@@ -10,7 +10,7 @@ pub(crate) mod skip_ele;
 use std::collections::HashMap;
 use std::time::Duration;
 use bit_vec::BitVec;
-use log::{log_enabled, trace};
+use log::{info, log_enabled, trace};
 use osm_io::osm::model::element::Element;
 use osm_io::osm::model::node::Node;
 use osm_io::osm::model::relation::Relation;
@@ -181,7 +181,7 @@ impl HandlerData {
         let elevation_buffer_flush_count_buffer_max_reached = self.elevation_flush_count;
         let elevation_buffer_flush_count_total_max_reached = self.elevation_total_buffered_nodes_max_reached_count;
         let total_processing_time = Self::format_duration(&self.total_processing_time);
-        let other = self.other.iter().map(|(k, v)| format!("\n    {} = {}", k, v)).collect::<Vec<String>>().join("\n");
+        let other = self.other.iter().map(|(k, v)| format!("\n    {} = {}", k, v)).collect::<Vec<String>>().join("");
             format!(r#"input_node_count = {input_node_count}
 input_way_count = {input_way_count}
 input_relation_count = {input_relation_count}

@@ -627,7 +627,7 @@ impl BufferingElevationEnricher {
     }
 
     fn handle_and_flush_nodes(&mut self, elements: Vec<Node> ) -> Vec<Node> {
-        debug!("{}: handle_and_flush_nodes called", self.name());//found
+        if log_enabled!(Trace) { trace!("{}: handle_and_flush_nodes called", self.name()); }
         let mut result = self.handle_nodes(elements);
 
         let buffers: Vec<String> = self.nodes_for_geotiffs.iter()

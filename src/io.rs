@@ -22,6 +22,7 @@ pub(crate) fn process_with_handler(config: &Config, handler_chain: &mut HandlerC
         }
         handler_chain.process(element, data);
     }
+    info!("{} - flushing handlers...", info_msg);
     handler_chain.flush_handlers(data);
     Ok(())
 }
