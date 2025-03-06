@@ -16,7 +16,7 @@ use osm_io::osm::model::node::Node;
 use osm_io::osm::model::relation::Relation;
 use osm_io::osm::model::way::Way;
 use crate::Config;
-use chrono::NaiveTime;
+use chrono::{NaiveTime, Timelike};
 use log::Level::Trace;
 
 pub(crate) const HIGHEST_NODE_ID: i64 = 50_000_000_000;
@@ -213,10 +213,15 @@ other = {other}"#)
     }
     fn format_duration(duration: &Duration) -> String {
         let seconds = duration.as_secs();
-        let nanoseconds = duration.subsec_nanos() % 1_000_000_000;
+        let millis = duration.subsec_millis();
+        let seconds_in_a_day = 24 * 60 * 60;
+        let days = seconds / seconds_in_a_day;
+        let wrapped_seconds = seconds % seconds_in_a_day;
 
-        let time = NaiveTime::from_num_seconds_from_midnight_opt(seconds as u32, nanoseconds).unwrap();
-        time.format("%H:%M:%S.%3f").to_string()
+        let time = NaiveTime::from_num_seconds_from_midnight_opt(wrapped_seconds as u32, 0)
+            .expect("Invalid time calculation");
+
+        format!("{}d {:02}h {:02}m {:02}.{:03}s", days, time.hour(), time.minute(), time.second(), millis)
     }
 
     pub fn summary(&self, config: &Config) -> String {
@@ -1390,5 +1395,24 @@ pub(crate) mod tests {
         assert_eq!("node#1, way#1, way#2, relation#1, relation#2", &data.other.get("TestOnlyOrderRecorder initial").unwrap().clone());
         assert_eq!("node#1, way#2, relation#2",                    &data.other.get("TestOnlyOrderRecorder final").unwrap().clone());
     }
-
+    #[test]
+    fn test_handler_data_format_duration_less_than_a_day() {
+        let more_than_a_day = Duration::new(2*60*60 + 3*60 + 4, 567 * 1_000_000);
+        assert_eq!("0d 02h 03m 04.567s", HandlerData::format_duration(&more_than_a_day));
+    }
+    #[test]
+    fn test_handler_data_format_duration_less_than_a_second() {
+        let more_than_a_day = Duration::new(0, 567 * 1_000_000);
+        assert_eq!("0d 00h 00m 00.567s", HandlerData::format_duration(&more_than_a_day));
+    }
+    #[test]
+    fn test_handler_data_format_duration_more_than_a_day() {
+        let more_than_a_day = Duration::new(1*60*60*24 + 2*60*60 + 3*60 + 4, 567 * 1_000_000);
+        assert_eq!("1d 02h 03m 04.567s", HandlerData::format_duration(&more_than_a_day));
+    }
+    #[test]
+    fn test_handler_data_format_duration_more_than_a_year() {
+        let more_than_a_day = Duration::new(400*60*60*24+2, 34 * 1_000_000);
+        assert_eq!("400d 00h 00m 02.034s", HandlerData::format_duration(&more_than_a_day));
+    }
 }
