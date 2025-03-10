@@ -19,7 +19,9 @@ use crate::Config;
 use chrono::{NaiveTime, Timelike};
 use log::Level::Trace;
 
-pub(crate) const HIGHEST_NODE_ID: i64 = 50_000_000_000;
+pub(crate) const HIGHEST_NODE_ID: i64     = 50_000_000_000;
+pub(crate) const HIGHEST_WAY_ID: i64      = 10_000_000_000;
+pub(crate) const HIGHEST_RELATION_ID: i64 =     50_000_000;
 
 pub fn format_element_id(element: &Element) -> String {
     match &element {
@@ -113,18 +115,18 @@ pub struct HandlerData {
 }
 impl HandlerData {
     pub(crate) fn default() -> Self {
-        Self::with_capacity(HIGHEST_NODE_ID as usize)
+        Self::with_capacity(HIGHEST_NODE_ID as usize, HIGHEST_WAY_ID as usize, HIGHEST_RELATION_ID as usize)
     }
-    pub(crate) fn with_capacity(nbits: usize) -> Self {
+    pub(crate) fn with_capacity(nbits_node: usize, nbits_way: usize, nbits_relation: usize) -> Self {
         HandlerData {
             nodes: vec![],
             ways: vec![],
             relations: vec![],
 
-            accept_node_ids: BitVec::from_elem(nbits, false),
-            accept_way_ids: BitVec::from_elem(nbits, false),
-            accept_relation_ids: BitVec::from_elem(nbits, false),
-            no_elevation_node_ids: BitVec::from_elem(nbits, false),
+            accept_node_ids: BitVec::from_elem(nbits_node, false),
+            accept_way_ids: BitVec::from_elem(nbits_way, false),
+            accept_relation_ids: BitVec::from_elem(nbits_relation, false),
+            no_elevation_node_ids: BitVec::from_elem(nbits_node, false),
 
             input_node_count: 0,
             input_way_count: 0,
