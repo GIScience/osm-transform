@@ -1,9 +1,12 @@
-use std::collections::HashSet;
-use std::fs;
-use std::path::PathBuf;
 use osm_io::osm::model::element::Element;
 use osm_io::osm::pbf::reader::Reader;
 use rusty_routes_transformer::Config;
+use std::collections::HashSet;
+use std::path::PathBuf;
+use std::{fs, panic};
+use std::fs::File;
+use std::io::Write;
+use std::os::unix::fs::PermissionsExt;
 
 fn base_config() -> Config {
     let mut config = Config {
@@ -207,4 +210,76 @@ fn check_pbf(path: &str, expected_node: Option<i64>) {
     if let Some(_expected_node) = expected_node {
         assert!(node_found);
     }
+}
+
+#[test]
+fn fail_validation_if_input_file_does_not_exist() {
+    let mut config = base_config();
+    config.input_pbf = PathBuf::from("test/does_not_exist.pbf");
+    validate_and_expect_error(config);
+}
+#[test] fn fail_validation_if_input_file_is_empty() {
+    let mut config = base_config();
+    config.input_pbf =  PathBuf::from("target/tmp/empty_test_input.pbf");
+    test_with_file(&PathBuf::from("target/tmp/empty_test_input.pbf"), "simulated empty input file", validate_and_expect_error, config );
+}
+#[test] fn fail_validation_if_input_file_is_not_readable() {
+    let mut config = base_config();
+    config.input_pbf = PathBuf::from("target/tmp/readonly_input.pbf");
+    let path_buf = PathBuf::from("target/tmp/readonly_input.pbf");
+    let mut input_file = File::create(&path_buf).expect("could not create simulated input file");
+    input_file.write_all("content".as_bytes()).expect("could not write to simulated input file");
+    fs::set_permissions(&path_buf, fs::Permissions::from_mode(0o333)).expect("could not set permissions on simulated input file");
+    validate_and_expect_error(config);
+    fs::remove_file(path_buf).expect("removing simulated input file failed");
+}
+#[test] fn fail_validation_if_output_file_already_exists() {
+    let mut config = base_config();
+    config.input_pbf = PathBuf::from("target/tmp/test_output.pbf");
+    test_with_file(&PathBuf::from("target/tmp/test_output.pbf"), "simulated pre-existing output file", validate_and_expect_error, config );
+}
+#[test]
+fn fail_validation_if_output_file_in_readonly_directory() {
+    let mut config = base_config();
+    config.output_pbf = Some(PathBuf::from("test_dir_readonly/output.pbf"));
+    test_with_readonly_dir(&PathBuf::from("test_dir_readonly"), "simulated pre-existing readonly output directory", validate_and_expect_error, config );
+}
+
+#[test]
+fn fail_validation_if_country_index_directory_already_exists() {
+    let mut config = base_config();
+    config.country_data = Some(PathBuf::from("test/mapping_test.csv"));
+    config.country_tile_size = 2.0;
+    test_with_dir(&PathBuf::from("mapping_test_idx_2_00"), "simulated pre-existing country index directory", validate_and_expect_error, config );
+}
+
+
+fn test_with_file(path_buf: &PathBuf, label: &str, test_fn: fn(Config), config: Config) {
+    let msg = format!("{}: {}", label, path_buf.to_str().unwrap());
+    File::create(path_buf).expect(&msg);
+    test_fn(config);
+    fs::remove_file(path_buf).expect(&msg);
+}
+
+fn test_with_dir(path_buf: &PathBuf, label: &str, test_fn: fn(Config), config: Config) {
+    let msg = format!("{}: {}", label, path_buf.to_str().unwrap());
+    fs::create_dir(path_buf).expect(&msg);
+    test_fn(config);
+    fs::remove_dir_all(path_buf).expect(&msg);
+}
+
+fn test_with_readonly_dir(path_buf: &PathBuf, label: &str, test_fn: fn(Config), config: Config) {
+    let msg = format!("{}: {}", label, path_buf.to_str().unwrap());
+    fs::create_dir(path_buf).expect(&msg);
+    fs::set_permissions(path_buf, fs::Permissions::from_mode(0o444)).expect(&msg);
+    test_fn(config);
+    fs::remove_dir_all(path_buf).expect(&msg);
+}
+
+fn validate_and_expect_error(config: Config) {
+    let result = panic::catch_unwind(|| {
+        rusty_routes_transformer::init(&config);
+        rusty_routes_transformer::validate(&config);
+    });
+    assert!(result.is_err());
 }
