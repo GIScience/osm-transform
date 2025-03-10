@@ -56,9 +56,30 @@ pub fn init(config: &Config) {
 
 pub fn validate(config: &Config) {
     validate_file(&config.input_pbf, "Input file");
+    validate_file_writable(&config.output_pbf, "Output file");
     validate_country_tile_size(&config.country_tile_size);
     validate_country_data(config);
     validate_elevation_data(config);
+}
+
+fn validate_file_writable(path_buf: &Option<PathBuf>, label: &str) {
+    match path_buf {
+        None => {}
+        Some(path_buf) => {
+            if path_buf.exists() {
+                panic!("{} already exists: {}", label, path_buf.display());
+            } else {
+                match File::create(path_buf) {
+                    Ok(_) => {
+                        fs::remove_file(path_buf).expect("Failed to remove test file");
+                    }
+                    Err(e) => {
+                        panic!("{} {} cannot not be created: {}", label, path_buf.display(), e);
+                    }
+                }
+            }
+        }
+    }
 }
 
 fn validate_elevation_data(config: &Config) {
@@ -93,8 +114,17 @@ fn validate_country_data(config: &Config) {
             Some(country_source) => {
                 validate_file(country_source, "Country CSV file");
                 let index_dir = AreaMappingManager::country().get_index_dir_name(country_source, config.country_tile_size);
-                if PathBuf::from(&index_dir).exists() {
+                let path_buf = PathBuf::from(&index_dir);
+                if path_buf.exists() {
                     panic!("Country index directory already exists: {}. Load this index (fast) or delete directory to re-generate index (slow)", index_dir);
+                }
+                match File::create(&path_buf) {
+                    Ok(_) => {
+                        fs::remove_file(&path_buf).expect("Failed to remove test directory");
+                    }
+                    Err(e) => {
+                        panic!("Country index directory {} cannot be created: {}", &index_dir, e);
+                    }
                 }
             }
             None => {
