@@ -22,3 +22,5 @@ Cargo.lock
 *_area.csv
 *_id.csv
 *_name.csv
+
+.idea/

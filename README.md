@@ -54,11 +54,14 @@ You can run the executable with the same options as described above for running 
 
 ### Build docker image
 
-Run docker build and tag the image with e.g. `rrt:latest`:
+Run docker build and tag the image with e.g. `local/osm-transform:latest`:
 ```shell
-docker rmi rrt:latest # if you have an old image
-docker build -t rrt:latest .
+docker rmi local/osm-transform:latest # if you have an old image
+docker build -t local/osm-transform:latest .
 ```
+
+If you don't want to build a docker image yourself, you can use the prebuilt image from docker hub: ```heigit/osm-transform:latest```.
+In the other examples in this README, add replace `local/osm-transform:latest` with `heigit/osm-transform:latest`.
 
 ### Run docker image
 
@@ -66,7 +69,7 @@ When running the docker image, you can add all command line options for the rust
 E.g. you can get help by running the following command:
 
 ```shell
-docker run --rm rrt:latest -h
+docker run --rm local/osm-transform:latest -h
 ```
 
 In all other use cases than getting help, you want to process an input file and potentially enrich the data with 
@@ -82,9 +85,9 @@ docker run --rm \
     -v ~/data/countries:/app/countries \
     -v ~/data/elevation:/app/elevation \
     -v .:/app/out \
-    rrt:latest \
+    local/osm-transform:latest \
     -i /app/osm/heidelberg.test.pbf \
-    -o /app/out/heidelberg.rrt.pbf \
+    -o /app/out/heidelberg.ot.pbf \
     -c /app/countries/world_borders_idx_0_40 \
     -e '/app/elevation/*/*.tif' \
     -vvv
