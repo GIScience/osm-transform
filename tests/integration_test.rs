@@ -253,6 +253,13 @@ fn fail_validation_if_country_index_directory_already_exists() {
     test_with_dir(&PathBuf::from("mapping_test_idx_2_00"), "simulated pre-existing country index directory", validate_and_expect_error, config );
 }
 
+#[test]
+fn fail_validation_if_country_index_directory_is_not_readable() {
+    let mut config = base_config();
+    config.country_data = Some(PathBuf::from("target/tmp/mapping_test_idx_2_00"));
+    config.country_tile_size = 2.0;
+    test_with_not_readable_dir(&PathBuf::from("target/tmp/mapping_test_idx_2_00"), "simulated pre-existing country index directory", validate_and_expect_error, config );
+}
 
 fn test_with_file(path_buf: &PathBuf, label: &str, test_fn: fn(Config), config: Config) {
     let msg = format!("{}: {}", label, path_buf.to_str().unwrap());
@@ -273,6 +280,14 @@ fn test_with_readonly_dir(path_buf: &PathBuf, label: &str, test_fn: fn(Config), 
     fs::create_dir(path_buf).expect(&msg);
     fs::set_permissions(path_buf, fs::Permissions::from_mode(0o444)).expect(&msg);
     test_fn(config);
+    fs::remove_dir_all(path_buf).expect(&msg);
+}
+fn test_with_not_readable_dir(path_buf: &PathBuf, label: &str, test_fn: fn(Config), config: Config) {
+    let msg = format!("{}: {}", label, path_buf.to_str().unwrap());
+    fs::create_dir(path_buf).expect(&msg);
+    fs::set_permissions(path_buf, fs::Permissions::from_mode(0o333)).expect(&msg);
+    test_fn(config);
+    fs::set_permissions(path_buf, fs::Permissions::from_mode(0o444)).expect(&msg);
     fs::remove_dir_all(path_buf).expect(&msg);
 }
 
