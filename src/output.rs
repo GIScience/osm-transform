@@ -6,6 +6,7 @@ use osm_io::osm::model::element::Element;
 use osm_io::osm::pbf;
 use osm_io::osm::pbf::compression_type::CompressionType;
 use osm_io::osm::pbf::file_info::FileInfo;
+use crate::get_application_name_with_version;
 use crate::handler::{Handler, HandlerData, format_element_id};
 
 pub struct SimpleOutputHandler {
@@ -16,7 +17,7 @@ pub struct SimpleOutputHandler {
 impl SimpleOutputHandler {
     pub fn new(output_path: PathBuf) -> Self {
         let mut file_info = FileInfo::default();
-        file_info.with_writingprogram_str("rusty-routes-transformer");
+        file_info.with_writingprogram_str(get_application_name_with_version().as_str());
         Self {
             writer: pbf::writer::Writer::from_file_info(output_path, file_info, CompressionType::Zlib).expect("Failed to create output writer"),
         }
@@ -62,9 +63,9 @@ pub struct SplittingOutputHandler {
 impl SplittingOutputHandler {
     pub fn new(output_path: PathBuf) -> Self {
         let mut file_info_node = FileInfo::default();
-        file_info_node.with_writingprogram_str("rusty-routes-transformer");
+        file_info_node.with_writingprogram_str(get_application_name_with_version().as_str());
         let mut file_info_way_relation = FileInfo::default();
-        file_info_way_relation.with_writingprogram_str("rusty-routes-transformer");
+        file_info_way_relation.with_writingprogram_str(get_application_name_with_version().as_str());
 
         let base_name = output_path.as_os_str().to_str().unwrap();
         let ways_relations_path = PathBuf::from(format!("{}_ways_relations.pbf", base_name));

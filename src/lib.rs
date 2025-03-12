@@ -184,9 +184,11 @@ fn validate_country_tile_size(country_tile_size: &f64) {
         panic!("Country tile size must be a divisor of 180.0");
     }
 }
-
+pub fn get_application_name_with_version() -> String {
+    format!("{}_v{}", env!("CARGO_PKG_NAME"), env!("CARGO_PKG_VERSION"))
+}
 pub fn run(config: &Config) -> HandlerData {
-    info!("{} v{}", env!("CARGO_PKG_NAME"), env!("CARGO_PKG_VERSION"));
+    info!("{}", get_application_name_with_version());
     let mut stopwatch_total = StopWatch::new();
     stopwatch_total.start();
     let mut data = HandlerData::default();

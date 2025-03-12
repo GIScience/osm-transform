@@ -15,7 +15,7 @@ use osm_io::osm::model::element::Element;
 use osm_io::osm::model::node::Node;
 use osm_io::osm::model::relation::Relation;
 use osm_io::osm::model::way::Way;
-use crate::Config;
+use crate::{get_application_name_with_version, Config};
 use chrono::{NaiveTime, Timelike};
 use log::Level::Trace;
 
@@ -352,7 +352,7 @@ Elevation not relevant for  {elevation_not_relevant_node_count:>13} nodes ({elev
                               addd_node: i64, addd_ways: i64, addd_rels: i64,
                               input_abs_path: String, input_file_size: u64)
                               -> String {
-        let version = format!("{} v{}", env!("CARGO_PKG_NAME"), env!("CARGO_PKG_VERSION"));
+        let version = get_application_name_with_version();
         format!("
 Summary:
 ========
