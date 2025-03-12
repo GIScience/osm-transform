@@ -148,7 +148,7 @@ impl AreaMappingManager {
             area_file_suffix: String::from("area.csv"),
         }
     }
-    pub(crate) fn validate_index_files(&mut self, base_path: &PathBuf, tile_size: f64) {
+    pub(crate) fn validate_index_files(&mut self, base_path: &PathBuf) {
         self.validate_index_file(base_path, &self.info_file_suffix, "country index info file");
         self.validate_index_file(base_path, &self.key_file_suffix, "country index country-key file");
         self.validate_index_file(base_path, &self.name_file_suffix, "country index country-name file");

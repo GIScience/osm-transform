@@ -134,7 +134,7 @@ fn validate_country_data(config: &Config) {
     } else if config.should_load_country_index() {
         match &config.country_data {
             Some(country_source) => {
-                AreaMappingManager::country().validate_index_files(country_source, config.country_tile_size);
+                AreaMappingManager::country().validate_index_files(country_source);
             }
             None => {
                 panic!("Country index directory not specified");
