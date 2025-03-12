@@ -74,7 +74,7 @@ fn run_minimal_write() {
 }
 #[test]
 fn run_all() {
-    fs::remove_dir_all("mapping_test_idx_0_40");
+    let _ = fs::remove_dir_all("mapping_test_idx_0_40");
     let mut config = base_config();
     config.output_pbf = Some(PathBuf::from("target/tmp/output-integration-test-run_all.pbf"));
     config.country_data = Some(PathBuf::from("test/mapping_test.csv"));
@@ -99,7 +99,7 @@ fn run_all() {
 }
 #[test]
 fn run_country() {
-    fs::remove_dir_all("mapping_test_idx_0_40");
+    let _ = fs::remove_dir_all("mapping_test_idx_0_40");
     let mut config = base_config();
     config.country_data = Some(PathBuf::from("test/mapping_test.csv"));
     config.country_tile_size = 0.4;
