@@ -2,7 +2,7 @@ use log::{log_enabled, trace};
 use log::Level::Trace;
 use osm_io::osm::model::way::Way;
 
-use crate::handler::{HandlerData, Handler};
+use crate::handler::{Handler, HandlerData};
 
 pub(crate) struct SkipElevationNodeCollector {
     no_elevation_keys: Vec<String>,
@@ -48,7 +48,8 @@ impl Handler for SkipElevationNodeCollector {
 mod test {
     use crate::handler::{Handler, HandlerData};
     use crate::handler::skip_ele::SkipElevationNodeCollector;
-    use crate::handler::tests::{simple_way};
+    use crate::test::simple_way;
+
     const TUNNEL: (&str, &str) = ("tunnel", "avalanche_protector");
     const BRIDGE: (&str, &str) = ("bridge", "yes");
     const INDOOR: (&str, &str) = ("bridge", "yes");

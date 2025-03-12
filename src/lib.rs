@@ -16,12 +16,18 @@ use benchmark_rs::stopwatch::StopWatch;
 use glob::glob;
 use log4rs::append::console::ConsoleAppender;
 use log4rs::config::{Appender, Logger, Root};
-use log::{info, debug, LevelFilter, log_enabled, warn, error};
+use log::{debug, error, info, log_enabled, warn, LevelFilter};
 use log::Level::Trace;
 use regex::Regex;
 use crate::io::process_with_handler;
 use area::{AreaHandler, AreaMappingManager};
 use ElementCountResultType::{AcceptedCount, InputCount, OutputCount};
+use osm_io::osm::model::relation::{Member, MemberData, Relation};
+use osm_io::osm::model::tag::Tag;
+use osm_io::osm::model::element::Element;
+use osm_io::osm::model::coordinate::Coordinate;
+use osm_io::osm::model::node::Node;
+use osm_io::osm::model::way::Way;
 use crate::handler::{HandlerChain, HandlerData, OsmElementTypeSelection};
 use crate::handler::collect::{IdCollector, MinMaxIdCollector, ReferencedNodeIdCollector};
 use crate::handler::filter::{AllElementsFilter, ComplexElementsFilter, FilterType, IdFilter, TagFilterByKey};
@@ -29,6 +35,7 @@ use crate::handler::geotiff::{BufferingElevationEnricher, GeoTiffManager};
 use crate::handler::info::{ElementCountResultType, ElementCounter, ElementPrinter};
 use crate::handler::modify::MetadataRemover;
 use crate::handler::skip_ele::SkipElevationNodeCollector;
+use crate::handler::tests::MemberType;
 use crate::output::{SimpleOutputHandler, SplittingOutputHandler};
 
 // Initialize only once to prevent integration tests from trying
@@ -411,4 +418,73 @@ impl Config {
     }
 
 
+}
+
+#[cfg(test)]
+pub(crate) mod test {
+    use osm_io::osm::model::coordinate::Coordinate;
+    use osm_io::osm::model::element::Element;
+    use osm_io::osm::model::node::Node;
+    use osm_io::osm::model::relation::{Member, MemberData, Relation};
+    use osm_io::osm::model::tag::Tag;
+    use osm_io::osm::model::way::Way;
+    use crate::handler::HandlerData;
+    use crate::handler::tests::MemberType;
+
+    pub(crate) fn simple_node_element(id: i64, tags: Vec<(&str, &str)>) -> Element {
+        let tags_obj = tags.iter().map(|(k, v)| Tag::new(k.to_string(), v.to_string())).collect();
+        node_element(id, 1, Coordinate::new(1.0f64, 1.1f64), 1, 1, 1, "a".to_string(), true, tags_obj)
+    }
+
+    pub(crate) fn simple_node(id: i64, tags: Vec<(&str, &str)>) -> Node {
+        let tags_obj = tags.iter().map(|(k, v)| Tag::new(k.to_string(), v.to_string())).collect();
+        Node::new(id, 1, Coordinate::new(1.0f64, 1.1f64), 1, 1, 1, "a".to_string(), true, tags_obj)
+    }
+
+    pub(crate) fn simple_way_element(id: i64, refs: Vec<i64>, tags: Vec<(&str, &str)>) -> Element {
+        let tags_obj = tags.iter().map(|(k, v)| Tag::new(k.to_string(), v.to_string())).collect();
+        way_element(id, 1, 1, 1, 1, "a_user".to_string(), true, refs, tags_obj)
+    }
+
+    pub(crate) fn simple_way(id: i64, refs: Vec<i64>, tags: Vec<(&str, &str)>) -> Way {
+        let tags_obj = tags.iter().map(|&(k, v)| Tag::new(String::from(k), String::from(v))).collect();
+        Way::new(id, 1, 1, 1, 1, String::from("a_user"), true, refs, tags_obj)
+    }
+
+    pub(crate) fn simple_relation_element(id: i64, members: Vec<(MemberType, i64, &str)>, tags: Vec<(&str, &str)>) -> Element {
+        Element::Relation { relation: simple_relation(id, members, tags) }
+    }
+
+    pub(crate) fn simple_relation(id: i64, members: Vec<(MemberType, i64, &str)>, tags: Vec<(&str, &str)>) -> Relation {
+        let members_obj = members.iter().map(|(t, id, role)| {
+            match t {
+                MemberType::Node => { Member::Node { member: MemberData::new(id.clone(), role.to_string()) } }
+                MemberType::Way => { Member::Way { member: MemberData::new(id.clone(), role.to_string()) } }
+                MemberType::Relation => { Member::Relation { member: MemberData::new(id.clone(), role.to_string()) } }
+            }
+        }).collect();
+        let tags_obj = tags.iter().map(|(k, v)| Tag::new(k.to_string(), v.to_string())).collect();
+        Relation::new(id, 1, 1, 1, 1, "a_user".to_string(), true, members_obj, tags_obj)
+    }
+
+    pub(crate) fn node_element(id: i64, version: i32, coordinate: Coordinate, timestamp: i64, changeset: i64, uid: i32, user: String, visible: bool, tags: Vec<Tag>) -> Element {
+        Element::Node { node: Node::new(id, version, coordinate, timestamp, changeset, uid, user, visible, tags) }
+    }
+
+    pub(crate) fn way_element(id: i64, version: i32, timestamp: i64, changeset: i64, uid: i32, user: String, visible: bool, refs: Vec<i64>, tags: Vec<Tag>) -> Element {
+        Element::Way { way: Way::new(id, version, timestamp, changeset, uid, user, visible, refs, tags) }
+    }
+
+    pub(crate) fn as_node_element(node: Node) -> Element {
+        Element::Node { node: node }
+    }
+
+    pub(crate) fn as_way_element(way: Way) -> Element {
+        Element::Way { way: way }
+    }
+    pub(crate) fn default_handler_data_with_nodes(nodes: Vec<Node>) -> HandlerData {
+        let mut handler_data = HandlerData::default();
+        handler_data.nodes = nodes;
+        handler_data
+    }
 }

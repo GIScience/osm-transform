@@ -281,12 +281,7 @@ mod test {
     use regex::Regex;
     use crate::handler::filter::{ComplexElementsFilter, FilterType, TagFilterByKey, TagKeyBasedOsmElementsFilter};
     use crate::handler::{Handler, HandlerData, OsmElementTypeSelection};
-
-    fn default_handler_data_with_nodes(nodes: Vec<Node>) -> HandlerData {
-        let mut handler_data = HandlerData::default();
-        handler_data.nodes = nodes;
-        handler_data
-    }
+    use crate::test::default_handler_data_with_nodes;
 
     #[test]
     fn test_tag_filter_by_key_handle_result_with_remove_matching() {

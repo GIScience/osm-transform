@@ -539,10 +539,8 @@ impl HandlerChain {
 pub(crate) mod tests {
     use std::ops::Add;
     use bit_vec::BitVec;
-    use osm_io::osm::model::coordinate::Coordinate;
-    use osm_io::osm::model::element::Element;
     use osm_io::osm::model::node::Node;
-    use osm_io::osm::model::relation::{Member, MemberData, Relation};
+    use osm_io::osm::model::relation::Relation;
     use osm_io::osm::model::tag::Tag;
     use osm_io::osm::model::way::Way;
     use regex::Regex;
@@ -553,56 +551,15 @@ pub(crate) mod tests {
     use crate::handler::info::*;
     use std::collections::BTreeMap;
     use crate::handler::collect::ReferencedNodeIdCollector;
+    use crate::test::*;
 
     fn existing_tag() -> String { "EXISTING_TAG".to_string() }
     #[allow(dead_code)]
     fn missing_tag() -> String { "MISSING_TAG".to_string() }
     #[allow(dead_code)]
     pub enum MemberType { Node, Way, Relation }
-    pub fn simple_node_element(id: i64, tags: Vec<(&str, &str)>) -> Element {
-        let tags_obj = tags.iter().map(|(k, v)| Tag::new(k.to_string(), v.to_string())).collect();
-        node_element(id, 1, Coordinate::new(1.0f64, 1.1f64), 1, 1, 1, "a".to_string(), true, tags_obj)
-    }
-    pub fn simple_node(id: i64, tags: Vec<(&str, &str)>) -> Node {
-        let tags_obj = tags.iter().map(|(k, v)| Tag::new(k.to_string(), v.to_string())).collect();
-        Node::new(id, 1, Coordinate::new(1.0f64, 1.1f64), 1, 1, 1, "a".to_string(), true, tags_obj)
-    }
-    pub fn simple_way_element(id: i64, refs: Vec<i64>, tags: Vec<(&str, &str)>) -> Element {
-        let tags_obj = tags.iter().map(|(k, v)| Tag::new(k.to_string(), v.to_string())).collect();
-        way_element(id, 1, 1, 1, 1, "a_user".to_string(), true, refs, tags_obj)
-    }
-    pub fn simple_way(id: i64, refs: Vec<i64>, tags: Vec<(&str, &str)>) -> Way {
-        let tags_obj = tags.iter().map(|&(k, v)| Tag::new(String::from(k), String::from(v))).collect();
-        Way::new(id, 1, 1, 1, 1, String::from("a_user"), true, refs, tags_obj)
-    }
-    pub fn simple_relation_element(id: i64, members: Vec<(MemberType, i64, &str)>, tags: Vec<(&str, &str)>) -> Element {
-        Element::Relation { relation: simple_relation(id, members, tags) }
-    }
-    pub fn simple_relation(id: i64, members: Vec<(MemberType, i64, &str)>, tags: Vec<(&str, &str)>) -> Relation {
-        let members_obj = members.iter().map(|(t, id, role)| {
-            match t {
-                MemberType::Node => { Member::Node { member: MemberData::new(id.clone(), role.to_string()) } }
-                MemberType::Way => { Member::Way { member: MemberData::new(id.clone(), role.to_string()) } }
-                MemberType::Relation => { Member::Relation { member: MemberData::new(id.clone(), role.to_string()) } }
-            }
-        }).collect();
-        let tags_obj = tags.iter().map(|(k, v)| Tag::new(k.to_string(), v.to_string())).collect();
-        Relation::new(id, 1, 1, 1, 1, "a_user".to_string(), true, members_obj, tags_obj)
-    }
-    pub fn node_element(id: i64, version: i32, coordinate: Coordinate, timestamp: i64, changeset: i64, uid: i32, user: String, visible: bool, tags: Vec<Tag>) -> Element {
-        Element::Node { node: Node::new(id, version, coordinate, timestamp, changeset, uid, user, visible, tags) }
-    }
-    pub fn way_element(id: i64, version: i32, timestamp: i64, changeset: i64, uid: i32, user: String, visible: bool, refs: Vec<i64>, tags: Vec<Tag>) -> Element {
-        Element::Way { way: Way::new(id, version, timestamp, changeset, uid, user, visible, refs, tags) }
-    }
     pub fn copy_node_with_new_id(node: &Node, new_id: i64) -> Node {
         Node::new(new_id, node.version(), node.coordinate().clone(), node.timestamp(), node.changeset(), node.uid(), node.user().clone(), node.visible(), node.tags().clone())
-    }
-    pub fn as_node_element(node: Node) -> Element {
-        Element::Node { node: node }
-    }
-    pub fn as_way_element(way: Way) -> Element {
-        Element::Way { way: way }
     }
 
     pub fn node_without_ele_from_location(id: i64, location: LocationWithElevation, tags: Vec<(&str, &str)>) -> Node {

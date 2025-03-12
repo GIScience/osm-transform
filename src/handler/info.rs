@@ -5,7 +5,7 @@ use osm_io::osm::model::node::Node;
 use osm_io::osm::model::relation::Relation;
 use osm_io::osm::model::way::Way;
 
-use crate::handler::{HandlerData, OsmElementTypeSelection, Handler};
+use crate::handler::{Handler, HandlerData, OsmElementTypeSelection};
 
 pub(crate) struct ElementCounter {
     pub result_type: ElementCountResultType,
@@ -191,7 +191,7 @@ impl Handler for ElementPrinter {
 #[cfg(test)]
 mod test {
     use crate::handler::info::ElementPrinter;
-    use crate::handler::tests::{simple_node};
+    use crate::test::simple_node;
 
     #[test]
     fn element_printer(){

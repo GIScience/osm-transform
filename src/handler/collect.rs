@@ -1,8 +1,8 @@
 use bit_vec::BitVec;
 use log::warn;
-use osm_io::osm::model::relation::{Member};
+use osm_io::osm::model::relation::Member;
 
-use crate::handler::{HandlerData, Handler, OsmElementTypeSelection};
+use crate::handler::{Handler, HandlerData, OsmElementTypeSelection};
 
 pub(crate) struct ReferencedNodeIdCollector {
     count_unique: usize,
