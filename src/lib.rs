@@ -35,7 +35,6 @@ use crate::handler::geotiff::{BufferingElevationEnricher, GeoTiffManager};
 use crate::handler::info::{ElementCountResultType, ElementCounter, ElementPrinter};
 use crate::handler::modify::MetadataRemover;
 use crate::handler::skip_ele::SkipElevationNodeCollector;
-use crate::handler::tests::MemberType;
 use crate::output::{SimpleOutputHandler, SplittingOutputHandler};
 
 // Initialize only once to prevent integration tests from trying

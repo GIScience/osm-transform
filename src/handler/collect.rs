@@ -93,18 +93,18 @@ impl Handler for IdCollector {
 
 pub(crate) struct MinMaxIdCollector {
     pub(crate) handle_types: OsmElementTypeSelection,
-    pub(crate) min_pos_node_id: i64,
-    pub(crate) max_pos_node_id: i64,
-    pub(crate) min_neg_node_id: i64,
-    pub(crate) max_neg_node_id: i64,
-    pub(crate) min_pos_way_id: i64,
-    pub(crate) max_pos_way_id: i64,
-    pub(crate) min_neg_way_id: i64,
-    pub(crate) max_neg_way_id: i64,
-    pub(crate) min_pos_relation_id: i64,
-    pub(crate) max_pos_relation_id: i64,
-    pub(crate) min_neg_relation_id: i64,
-    pub(crate) max_neg_relation_id: i64,
+    min_pos_node_id: i64,
+    max_pos_node_id: i64,
+    min_neg_node_id: i64,
+    max_neg_node_id: i64,
+    min_pos_way_id: i64,
+    max_pos_way_id: i64,
+    min_neg_way_id: i64,
+    max_neg_way_id: i64,
+    min_pos_relation_id: i64,
+    max_pos_relation_id: i64,
+    min_neg_relation_id: i64,
+    max_neg_relation_id: i64,
 }
 impl MinMaxIdCollector {
     pub(crate) fn new(handle_types: OsmElementTypeSelection) -> Self {
@@ -112,19 +112,39 @@ impl MinMaxIdCollector {
             handle_types,
             min_pos_node_id: i64::MAX,
             max_pos_node_id: i64::MIN,
-            min_neg_node_id: 0,
-            max_neg_node_id: 0,
+            min_neg_node_id:i64::MAX,
+            max_neg_node_id: i64::MIN,
             min_pos_way_id: i64::MAX,
             max_pos_way_id: i64::MIN,
-            min_neg_way_id: 0,
-            max_neg_way_id: 0,
+            min_neg_way_id: i64::MAX,
+            max_neg_way_id: i64::MIN,
             min_pos_relation_id: i64::MAX,
             max_pos_relation_id: i64::MIN,
-            min_neg_relation_id: 0,
-            max_neg_relation_id: 0,
+            min_neg_relation_id: i64::MAX,
+            max_neg_relation_id: i64::MIN,
         }
     }
+    pub(crate) fn get_min_pos_node_id(&self) -> Option<i64> { if self.min_pos_node_id == i64::MAX { None } else { Some(self.min_pos_node_id) } }
+    pub(crate) fn get_max_pos_node_id(&self) -> Option<i64> { if self.max_pos_node_id == i64::MIN { None } else { Some(self.max_pos_node_id) } }
+    pub(crate) fn get_min_neg_node_id(&self) -> Option<i64> { if self.min_neg_node_id == i64::MAX { None } else { Some(self.min_neg_node_id) } }
+    pub(crate) fn get_max_neg_node_id(&self) -> Option<i64> { if self.max_neg_node_id == i64::MIN { None } else { Some(self.max_neg_node_id) } }
+    pub(crate) fn get_min_pos_way_id(&self) -> Option<i64> { if self.min_pos_way_id == i64::MAX { None } else { Some(self.min_pos_way_id) } }
+    pub(crate) fn get_max_pos_way_id(&self) -> Option<i64> { if self.max_pos_way_id == i64::MIN { None } else { Some(self.max_pos_way_id) } }
+    pub(crate) fn get_min_neg_way_id(&self) -> Option<i64> { if self.min_neg_way_id == i64::MAX { None } else { Some(self.min_neg_way_id) } }
+    pub(crate) fn get_max_neg_way_id(&self) -> Option<i64> { if self.max_neg_way_id == i64::MIN { None } else { Some(self.max_neg_way_id) } }
+    pub(crate) fn get_min_pos_relation_id(&self) -> Option<i64> { if self.min_pos_relation_id == i64::MAX { None } else { Some(self.min_pos_relation_id) } }
+    pub(crate) fn get_max_pos_relation_id(&self) -> Option<i64> { if self.max_pos_relation_id == i64::MIN { None } else { Some(self.max_pos_relation_id) } }
+    pub(crate) fn get_min_neg_relation_id(&self) -> Option<i64> { if self.min_neg_relation_id == i64::MAX { None } else { Some(self.min_neg_relation_id) } }
+    pub(crate) fn get_max_neg_relation_id(&self) -> Option<i64> { if self.max_neg_relation_id == i64::MIN { None } else { Some(self.max_neg_relation_id) } }
+    fn get_value_as_string(val: &Option<i64>) -> String {
+        match val {
+            Some(val) => val.to_string(),
+            None => "None".to_string()
+        }
+    }
+
 }
+
 impl Handler for MinMaxIdCollector {
     fn name(&self) -> String {
         "MinMaxIdCollector".to_string()
@@ -171,33 +191,34 @@ impl Handler for MinMaxIdCollector {
 
     fn close(&mut self, data: &mut HandlerData) {
         if self.handle_types.node {
-            data.other.insert("min_pos_node_id".to_string(), format!("{}", self.min_pos_node_id));
-            data.other.insert("max_pos_node_id".to_string(), format!("{}", self.max_pos_node_id));
-            data.other.insert("min_neg_node_id".to_string(), format!("{}", self.min_neg_node_id));
-            data.other.insert("max_neg_node_id".to_string(), format!("{}", self.max_neg_node_id));
+            data.other.insert("min_pos_node_id".to_string(), format!("{}", Self::get_value_as_string(&self.get_min_pos_node_id())));
+            data.other.insert("max_pos_node_id".to_string(), format!("{}", Self::get_value_as_string(&self.get_max_pos_node_id())));
+            data.other.insert("min_neg_node_id".to_string(), format!("{}", Self::get_value_as_string(&self.get_min_neg_node_id())));
+            data.other.insert("max_neg_node_id".to_string(), format!("{}", Self::get_value_as_string(&self.get_max_neg_node_id())));
         }
         if self.handle_types.way {
-            data.other.insert("min_pos_way_id".to_string(), format!("{}", self.min_pos_way_id));
-            data.other.insert("max_pos_way_id".to_string(), format!("{}", self.max_pos_way_id));
-            data.other.insert("min_neg_way_id".to_string(), format!("{}", self.min_neg_way_id));
-            data.other.insert("max_neg_way_id".to_string(), format!("{}", self.max_neg_way_id));
+            data.other.insert("min_pos_way_id".to_string(), format!("{}", Self::get_value_as_string(&self.get_min_pos_way_id())));
+            data.other.insert("max_pos_way_id".to_string(), format!("{}", Self::get_value_as_string(&self.get_max_pos_way_id())));
+            data.other.insert("min_neg_way_id".to_string(), format!("{}", Self::get_value_as_string(&self.get_min_neg_way_id())));
+            data.other.insert("max_neg_way_id".to_string(), format!("{}", Self::get_value_as_string(&self.get_max_neg_way_id())));
         }
         if self.handle_types.relation {
-            data.other.insert("min_pos_relation_id".to_string(), format!("{}", self.min_pos_relation_id));
-            data.other.insert("max_pos_relation_id".to_string(), format!("{}", self.max_pos_relation_id));
-            data.other.insert("min_neg_relation_id".to_string(), format!("{}", self.min_neg_relation_id));
-            data.other.insert("max_neg_relation_id".to_string(), format!("{}", self.max_neg_relation_id));
+            data.other.insert("min_pos_relation_id".to_string(), format!("{}", Self::get_value_as_string(&self.get_min_pos_relation_id())));
+            data.other.insert("max_pos_relation_id".to_string(), format!("{}", Self::get_value_as_string(&self.get_max_pos_relation_id())));
+            data.other.insert("min_neg_relation_id".to_string(), format!("{}", Self::get_value_as_string(&self.get_min_neg_relation_id())));
+            data.other.insert("max_neg_relation_id".to_string(), format!("{}", Self::get_value_as_string(&self.get_max_neg_relation_id())));
         }
     }
 }
 
 #[cfg(test)]
 mod test {
-    use crate::handler::{HIGHEST_NODE_ID, Handler, HandlerData};
-    use crate::handler::tests::{simple_node, simple_way, TestOnlyIdCollector};
+    use crate::handler::{Handler, HandlerData, HIGHEST_NODE_ID};
+    use crate::handler::tests::TestOnlyIdCollector;
+    use crate::test::*;
 
     #[test]
-    fn node_id_collector(){
+    fn test_node_id_collector(){
         let mut collector = TestOnlyIdCollector::new(10);
         let mut data = HandlerData::default();
         data.nodes.push(simple_node(2, vec![]));
@@ -206,16 +227,18 @@ mod test {
         assert_eq!(false, data.accept_node_ids.get(1).unwrap_or(false));
         assert_eq!(true, data.accept_node_ids.get(2).unwrap_or(false));
     }
+
     #[test]
     #[should_panic(expected = "index out of bounds: 12 >= 10")]
-    fn node_id_collector_out_of_bounds(){
+    fn test_node_id_collector_out_of_bounds(){
         let mut collector = TestOnlyIdCollector::new(10);
         let mut data = HandlerData::default();
         data.ways.push(simple_way(12, vec![], vec![]));
         collector.handle(&mut data);
     }
+
     #[test]
-    fn node_id_collector_out_of_bounds_real(){
+    fn test_node_id_collector_out_of_bounds_real(){
         let mut collector = TestOnlyIdCollector::new(HIGHEST_NODE_ID as usize);
         let mut data = HandlerData::default();
         data.nodes.push(simple_node(1, vec![]));
@@ -231,4 +254,128 @@ mod test {
         assert_eq!(true, data.accept_node_ids.get(11414456780).unwrap_or(false));
     }
 
+    #[test]
+    fn test_min_max_id_collector() {
+        let mut collector = super::MinMaxIdCollector::new(super::OsmElementTypeSelection::all());
+        let mut data = HandlerData::default();
+        data.nodes.push(simple_node(1, vec![]));
+        data.nodes.push(simple_node(2, vec![]));
+        data.nodes.push(simple_node(-1, vec![]));
+        data.nodes.push(simple_node(-2, vec![]));
+        data.ways.push(simple_way(1, vec![], vec![]));
+        data.ways.push(simple_way(2, vec![], vec![]));
+        data.ways.push(simple_way(-1, vec![], vec![]));
+        data.ways.push(simple_way(-2, vec![], vec![]));
+        data.relations.push(simple_relation(1, vec![], vec![]));
+        data.relations.push(simple_relation(2, vec![], vec![]));
+        data.relations.push(simple_relation(-1, vec![], vec![]));
+        data.relations.push(simple_relation(-2, vec![], vec![]));
+
+        collector.handle(&mut data);
+        data.clear_elements();
+        collector.close(&mut data);
+
+        assert_eq!(Some(1 ), collector.get_min_pos_node_id());
+        assert_eq!(Some(2 ), collector.get_max_pos_node_id());
+        assert_eq!(Some(-2), collector.get_min_neg_node_id());
+        assert_eq!(Some(-1), collector.get_max_neg_node_id());
+        assert_eq!(Some(1 ), collector.get_min_pos_way_id());
+        assert_eq!(Some(2 ), collector.get_max_pos_way_id());
+        assert_eq!(Some(-2), collector.get_min_neg_way_id());
+        assert_eq!(Some(-1), collector.get_max_neg_way_id());
+        assert_eq!(Some(1 ), collector.get_min_pos_relation_id());
+        assert_eq!(Some(2 ), collector.get_max_pos_relation_id());
+        assert_eq!(Some(-2), collector.get_min_neg_relation_id());
+        assert_eq!(Some(-1), collector.get_max_neg_relation_id());
+
+        assert_eq!("1", data.other.get("min_pos_node_id").unwrap());
+        assert_eq!("2", data.other.get("max_pos_node_id").unwrap());
+        assert_eq!("-2", data.other.get("min_neg_node_id").unwrap());
+        assert_eq!("-1", data.other.get("max_neg_node_id").unwrap());
+        assert_eq!("1", data.other.get("min_pos_way_id").unwrap());
+        assert_eq!("2", data.other.get("max_pos_way_id").unwrap());
+        assert_eq!("-2", data.other.get("min_neg_way_id").unwrap());
+        assert_eq!("-1", data.other.get("max_neg_way_id").unwrap());
+        assert_eq!("1", data.other.get("min_pos_relation_id").unwrap());
+        assert_eq!("2", data.other.get("max_pos_relation_id").unwrap());
+        assert_eq!("-2", data.other.get("min_neg_relation_id").unwrap());
+        assert_eq!("-1", data.other.get("max_neg_relation_id").unwrap());
+    }
+    #[test]
+    fn test_min_max_id_collector_only_one_id_received() {
+        let mut collector = super::MinMaxIdCollector::new(super::OsmElementTypeSelection::all());
+        let mut data = HandlerData::default();
+        data.nodes.push(simple_node(2, vec![]));
+        data.nodes.push(simple_node(-2, vec![]));
+        data.ways.push(simple_way(2, vec![], vec![]));
+        data.ways.push(simple_way(-2, vec![], vec![]));
+        data.relations.push(simple_relation(2, vec![], vec![]));
+        data.relations.push(simple_relation(-2, vec![], vec![]));
+
+        collector.handle(&mut data);
+        data.clear_elements();
+        collector.close(&mut data);
+
+        assert_eq!(Some(2 ), collector.get_min_pos_node_id());
+        assert_eq!(Some(2 ), collector.get_max_pos_node_id());
+        assert_eq!(Some(-2), collector.get_min_neg_node_id());
+        assert_eq!(Some(-2), collector.get_max_neg_node_id());
+        assert_eq!(Some(2 ), collector.get_min_pos_way_id());
+        assert_eq!(Some(2 ), collector.get_max_pos_way_id());
+        assert_eq!(Some(-2), collector.get_min_neg_way_id());
+        assert_eq!(Some(-2), collector.get_max_neg_way_id());
+        assert_eq!(Some(2 ), collector.get_min_pos_relation_id());
+        assert_eq!(Some(2 ), collector.get_max_pos_relation_id());
+        assert_eq!(Some(-2), collector.get_min_neg_relation_id());
+        assert_eq!(Some(-2), collector.get_max_neg_relation_id());
+
+        assert_eq!("2", data.other.get("min_pos_node_id").unwrap());
+        assert_eq!("2", data.other.get("max_pos_node_id").unwrap());
+        assert_eq!("-2", data.other.get("min_neg_node_id").unwrap());
+        assert_eq!("-2", data.other.get("max_neg_node_id").unwrap());
+        assert_eq!("2", data.other.get("min_pos_way_id").unwrap());
+        assert_eq!("2", data.other.get("max_pos_way_id").unwrap());
+        assert_eq!("-2", data.other.get("min_neg_way_id").unwrap());
+        assert_eq!("-2", data.other.get("max_neg_way_id").unwrap());
+        assert_eq!("2", data.other.get("min_pos_relation_id").unwrap());
+        assert_eq!("2", data.other.get("max_pos_relation_id").unwrap());
+        assert_eq!("-2", data.other.get("min_neg_relation_id").unwrap());
+        assert_eq!("-2", data.other.get("max_neg_relation_id").unwrap());
+    }
+
+    #[test]
+    fn test_min_max_id_collector_no_id_received() {
+        let mut collector = super::MinMaxIdCollector::new(super::OsmElementTypeSelection::all());
+        let mut data = HandlerData::default();
+
+        collector.handle(&mut data);
+        data.clear_elements();
+        collector.close(&mut data);
+
+        assert_eq!(None, collector.get_min_pos_node_id());
+        assert_eq!(None, collector.get_max_pos_node_id());
+        assert_eq!(None, collector.get_min_neg_node_id());
+        assert_eq!(None, collector.get_max_neg_node_id());
+        assert_eq!(None, collector.get_min_pos_way_id());
+        assert_eq!(None, collector.get_max_pos_way_id());
+        assert_eq!(None, collector.get_min_neg_way_id());
+        assert_eq!(None, collector.get_max_neg_way_id());
+        assert_eq!(None, collector.get_min_pos_relation_id());
+        assert_eq!(None, collector.get_max_pos_relation_id());
+        assert_eq!(None, collector.get_min_neg_relation_id());
+        assert_eq!(None, collector.get_max_neg_relation_id());
+
+        assert_eq!("None", data.other.get("min_pos_node_id").unwrap());
+        assert_eq!("None", data.other.get("max_pos_node_id").unwrap());
+        assert_eq!("None", data.other.get("min_neg_node_id").unwrap());
+        assert_eq!("None", data.other.get("max_neg_node_id").unwrap());
+        assert_eq!("None", data.other.get("min_pos_way_id").unwrap());
+        assert_eq!("None", data.other.get("max_pos_way_id").unwrap());
+        assert_eq!("None", data.other.get("min_neg_way_id").unwrap());
+        assert_eq!("None", data.other.get("max_neg_way_id").unwrap());
+        assert_eq!("None", data.other.get("min_pos_relation_id").unwrap());
+        assert_eq!("None", data.other.get("max_pos_relation_id").unwrap());
+        assert_eq!("None", data.other.get("min_neg_relation_id").unwrap());
+        assert_eq!("None", data.other.get("max_neg_relation_id").unwrap());
+    }
 }

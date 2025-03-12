@@ -401,11 +401,12 @@ Country not found for     {country_not_found_node_count:>13} nodes ({country_not
         format!("
 Detected min/max IDs:
 ---------------------
-         |     min       |        max
----------+---------------+-----------------
-node     | {min_pos_no_id:>13} | {max_pos_no_id:>13}
-way      | {min_pos_wa_id:>13} | {max_pos_wa_id:>13}
-relation | {min_pos_re_id:>13} | {max_pos_re_id:>13}
+         |            negative           |            positive
+         |     min       |        max    |     min       |        max
+---------+---------------+---------------+---------------+-----------------
+node     | {min_neg_no_id:>13} | {max_neg_no_id:>13} | {min_pos_no_id:>13} | {max_pos_no_id:>13}
+way      | {min_neg_wa_id:>13} | {max_neg_wa_id:>13} | {min_pos_wa_id:>13} | {max_pos_wa_id:>13}
+relation | {min_neg_re_id:>13} | {max_neg_re_id:>13} | {min_pos_re_id:>13} | {max_pos_re_id:>13}
 ")
     }
     pub(crate) fn clear_elements(&mut self) {
@@ -1369,4 +1370,23 @@ pub(crate) mod tests {
         let more_than_a_day = Duration::new(400*60*60*24+2, 34 * 1_000_000);
         assert_eq!("400d 00h 00m 02.034s", HandlerData::format_duration(&more_than_a_day));
     }
+
+    #[test]
+    fn test_handler_data_summary_min_max() {
+        let mut handler_data = HandlerData::default();
+        handler_data.other.insert("min_pos_node_id".to_string(), "123".to_string());
+        handler_data.other.insert("max_pos_node_id".to_string(), "432".to_string());
+        handler_data.other.insert("min_neg_node_id".to_string(), "None".to_string());
+        handler_data.other.insert("max_neg_node_id".to_string(), "None".to_string());
+        handler_data.other.insert("min_pos_way_id".to_string(), "None".to_string());
+        handler_data.other.insert("max_pos_way_id".to_string(), "None".to_string());
+        handler_data.other.insert("min_neg_way_id".to_string(), "-4324234".to_string());
+        handler_data.other.insert("max_neg_way_id".to_string(), "-35".to_string());
+        handler_data.other.insert("min_pos_relation_id".to_string(), "3456".to_string());
+        handler_data.other.insert("max_pos_relation_id".to_string(), "6543".to_string());
+        handler_data.other.insert("min_neg_relation_id".to_string(), "-65436543".to_string());
+        handler_data.other.insert("max_neg_relation_id".to_string(), "-34563456".to_string());
+        println!("{}", handler_data.min_max_ids_summary(&Config::default()));
+    }
+
 }
