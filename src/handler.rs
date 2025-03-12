@@ -10,7 +10,7 @@ pub(crate) mod skip_ele;
 use std::collections::HashMap;
 use std::time::Duration;
 use bit_vec::BitVec;
-use log::{info, log_enabled, trace};
+use log::{log_enabled, trace};
 use osm_io::osm::model::element::Element;
 use osm_io::osm::model::node::Node;
 use osm_io::osm::model::relation::Relation;
@@ -152,11 +152,6 @@ impl HandlerData {
             total_processing_time: Duration::from_secs(0),
             other: hashmap! {},
         }
-    }
-    pub(crate) fn with_nodes(&self, nodes: Vec<Node>) -> Self {
-        let mut handler_data = Self::default();
-        handler_data.nodes = nodes;
-        handler_data
     }
 
     pub(crate) fn format_multi_line(&self) -> String {

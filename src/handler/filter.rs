@@ -282,6 +282,12 @@ mod test {
     use crate::handler::filter::{ComplexElementsFilter, FilterType, TagFilterByKey, TagKeyBasedOsmElementsFilter};
     use crate::handler::{Handler, HandlerData, OsmElementTypeSelection};
 
+    fn default_handler_data_with_nodes(nodes: Vec<Node>) -> HandlerData {
+        let mut handler_data = HandlerData::default();
+        handler_data.nodes = nodes;
+        handler_data
+    }
+
     #[test]
     fn test_tag_filter_by_key_handle_result_with_remove_matching() {
         let mut tag_filter = TagFilterByKey::new(
@@ -289,7 +295,7 @@ mod test {
             Regex::new(".*bad.*").unwrap(),
             FilterType::RemoveMatching);
 
-        let mut data = HandlerData::default().with_nodes(vec![Node::new(1, 1, Coordinate::new(1.0f64, 1.1f64), 1, 1, 1, "a".to_string(), true,
+        let mut data = default_handler_data_with_nodes(vec![Node::new(1, 1, Coordinate::new(1.0f64, 1.1f64), 1, 1, 1, "a".to_string(), true,
                                                                         vec![
                                                                  Tag::new("bad".to_string(), "hotzenplotz".to_string()),
                                                                  Tag::new("good".to_string(), "kasper".to_string()),
@@ -305,6 +311,7 @@ mod test {
         assert_eq!(node.tags()[1].k(), &"more-good");
         assert_eq!(node.tags()[1].v(), &"grandma");
     }
+
     #[test]
     fn test_tag_filter_by_key_flush_with_remove_matching() {
         let mut tag_filter = TagFilterByKey::new(
@@ -312,7 +319,7 @@ mod test {
             Regex::new(".*bad.*").unwrap(),
             FilterType::RemoveMatching);
 
-        let mut data = HandlerData::default().with_nodes(vec![Node::new(1, 1, Coordinate::new(1.0f64, 1.1f64), 1, 1, 1, "a".to_string(), true,
+        let mut data = default_handler_data_with_nodes(vec![Node::new(1, 1, Coordinate::new(1.0f64, 1.1f64), 1, 1, 1, "a".to_string(), true,
                                                                         vec![
                                                                  Tag::new("bad".to_string(), "hotzenplotz".to_string()),
                                                                  Tag::new("good".to_string(), "kasper".to_string()),
@@ -336,7 +343,7 @@ mod test {
             Regex::new("(.*:)?source(:.*)?|(.*:)?note(:.*)?|url|created_by|fixme|wikipedia").unwrap(),
             FilterType::RemoveMatching);
 
-        let mut data = HandlerData::default().with_nodes(vec![Node::new(1, 1, Coordinate::new(1.0f64, 1.1f64), 1, 1, 1, "a".to_string(), true,
+        let mut data = default_handler_data_with_nodes(vec![Node::new(1, 1, Coordinate::new(1.0f64, 1.1f64), 1, 1, 1, "a".to_string(), true,
                                                                         vec![
                                                                  Tag::new("closed:source".to_string(), "bad".to_string()),
                                                                  Tag::new("source".to_string(), "bad".to_string()),
@@ -364,7 +371,7 @@ mod test {
             Regex::new("(.*:)?source(:.*)?|(.*:)?note(:.*)?|url|created_by|fixme|wikipedia").unwrap(),
             FilterType::RemoveMatching);
 
-        let mut data = HandlerData::default().with_nodes(vec![Node::new(1, 1, Coordinate::new(1.0f64, 1.1f64), 1, 1, 1, "a".to_string(), true,
+        let mut data = default_handler_data_with_nodes(vec![Node::new(1, 1, Coordinate::new(1.0f64, 1.1f64), 1, 1, 1, "a".to_string(), true,
                                                                         vec![
                                                                  Tag::new("closed:source".to_string(), "bad".to_string()),
                                                                  Tag::new("source".to_string(), "bad".to_string()),
@@ -392,7 +399,7 @@ mod test {
             OsmElementTypeSelection::all(),
             Regex::new(".*good.*").unwrap(),
             FilterType::AcceptMatching);
-        let mut data = HandlerData::default().with_nodes(vec![Node::new(1, 1, Coordinate::new(1.0f64, 1.1f64), 1, 1, 1, "a".to_string(), true,
+        let mut data = default_handler_data_with_nodes(vec![Node::new(1, 1, Coordinate::new(1.0f64, 1.1f64), 1, 1, 1, "a".to_string(), true,
                                                                         vec![
                                                                  Tag::new("bad".to_string(), "hotzenplotz".to_string()),
                                                                  Tag::new("good".to_string(), "kasper".to_string()),
@@ -416,7 +423,7 @@ mod test {
             Regex::new(".*").unwrap(),
             FilterType::RemoveMatching);
 
-        let mut data = HandlerData::default().with_nodes(vec![Node::new(1, 1, Coordinate::new(1.0f64, 1.1f64), 1, 1, 1, "a".to_string(), true,
+        let mut data = default_handler_data_with_nodes(vec![Node::new(1, 1, Coordinate::new(1.0f64, 1.1f64), 1, 1, 1, "a".to_string(), true,
                                                                         vec![
                                                                  Tag::new("a".to_string(), "1".to_string()),
                                                                  Tag::new("b".to_string(), "2".to_string()),
@@ -433,7 +440,7 @@ mod test {
             Regex::new(".*").unwrap(),
             FilterType::RemoveMatching);
 
-        let mut data = HandlerData::default().with_nodes(vec![Node::new(1, 1, Coordinate::new(1.0f64, 1.1f64), 1, 1, 1, "a".to_string(), true,
+        let mut data = default_handler_data_with_nodes(vec![Node::new(1, 1, Coordinate::new(1.0f64, 1.1f64), 1, 1, 1, "a".to_string(), true,
                                                                         vec![
                                                                  Tag::new("a".to_string(), "1".to_string()),
                                                                  Tag::new("b".to_string(), "2".to_string()),
