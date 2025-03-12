@@ -55,7 +55,7 @@ pub fn init(config: &Config) {
 }
 
 pub fn validate(config: &Config) {
-    validate_file(&config.input_pbf, "Input file");
+    if config.input_pbf.is_some() { validate_file(&config.input_pbf.clone().unwrap(), "Input file"); }
     validate_file_writable(&config.output_pbf, "Output file");
     validate_country_tile_size(&config.country_tile_size);
     validate_country_data(config);
@@ -198,10 +198,6 @@ pub fn run(config: &Config) -> HandlerData {
 }
 
 fn run_filter_chain(config: &Config, data: &mut HandlerData){
-    let mut stopwatch_run_filter_chain = StopWatch::new();
-    stopwatch_run_filter_chain.start();
-    let info_msg = "1.Pass: Filtering pbf elements";
-    info!("{}...", info_msg);
     let mut handler_chain = HandlerChain::default()
         .add(ElementCounter::new(InputCount))//todo needed? let io count?
         .add(AllElementsFilter{handle_types: OsmElementTypeSelection::node_only()})
@@ -217,14 +213,11 @@ fn run_filter_chain(config: &Config, data: &mut HandlerData){
     }
 
     handler_chain = handler_chain.add(IdCollector{handle_types: OsmElementTypeSelection::way_relation()});
-
-    let _ = process_with_handler(config, &mut handler_chain, data, info_msg).expect("Extraction of referenced node ids failed");
-    handler_chain.close_handlers(data);
-    info!("{} done, time: {}", info_msg, stopwatch_run_filter_chain);
-    stopwatch_run_filter_chain.stop();
+    let info_msg = "1.Pass: Filtering pbf elements";
+    run_chain(config, data, &mut handler_chain, info_msg);
 }
 
-fn run_processing_chain(config: &Config, data: &mut HandlerData) {//TODO use bitvec filters also for ways and relations
+fn run_processing_chain(config: &Config, data: &mut HandlerData) {
     data.clear_non_input_counts();
     let mut handler_chain = HandlerChain::default()
         .add(ElementCounter::new(InputCount))
@@ -317,35 +310,39 @@ fn run_processing_chain(config: &Config, data: &mut HandlerData) {//TODO use bit
         .with_way_ids(config.print_way_ids.clone())
         .with_relation_ids(config.print_relation_ids.clone()));
 
-    match &config.output_pbf {
-        Some(path_buf) => {
-            if config.elevation_way_splitting == true {
-                let mut output_handler = SplittingOutputHandler::new(path_buf.clone());
-                output_handler.init();
-                handler_chain = handler_chain.add(output_handler);
-            } else {
-                let mut output_handler = SimpleOutputHandler::new(path_buf.clone());
-                output_handler.init();
-                handler_chain = handler_chain.add(output_handler);
-            }
+    if config.should_write_pbf_file() {
+        if config.elevation_way_splitting == true {
+            let mut output_handler = SplittingOutputHandler::new(config.output_pbf.clone().unwrap());
+            output_handler.init();
+            handler_chain = handler_chain.add(output_handler);
+        } else {
+            let mut output_handler = SimpleOutputHandler::new(config.output_pbf.clone().unwrap());
+            output_handler.init();
+            handler_chain = handler_chain.add(output_handler);
         }
-        None => {}
     }
 
     let info_msg = "2.Pass: Processing pbf elements";
+    run_chain(config, data, &mut handler_chain, info_msg);
+    debug!("{} HandlerData:\n{}", info_msg, data.format_multi_line());
+}
+
+fn run_chain(config: &Config, data: &mut HandlerData, mut handler_chain: &mut HandlerChain, info_msg: &str) {
+    if !config.should_run_chain() {
+        return;
+    }
     info!("{}...", info_msg);
-    stopwatch.reset();
+    let mut stopwatch = StopWatch::new();
     stopwatch.start();
-    let _ = process_with_handler(config, &mut handler_chain, data, info_msg).expect("2.Pass: Processing pbf elements failed");
+    let _ = process_with_handler(config, &mut handler_chain, data, info_msg).expect("Extraction of referenced node ids failed");
     handler_chain.close_handlers(data);
     info!("{} done, time: {}", info_msg, stopwatch);
-    debug!("{} HandlerData:\n{}", info_msg, data.format_multi_line());
-    stopwatch.reset();
+    stopwatch.stop();
 }
 
 #[derive(Debug, Default)]
 pub struct Config {
-    pub input_pbf: PathBuf,
+    pub input_pbf: Option<PathBuf>,
     pub output_pbf: Option<PathBuf>,
 
     pub with_node_filtering: bool,
@@ -373,6 +370,12 @@ pub struct Config {
 }
 
 impl Config {
+    pub fn should_run_chain(&self) -> bool {
+        self.input_pbf.is_some()
+    }
+    pub fn should_write_pbf_file(&self) -> bool {
+        self.should_run_chain() && self.output_pbf.is_some()
+    }
     pub fn should_enrich_elevation(&self) -> bool {
         self.elevation_tiffs.len() > 0
     }

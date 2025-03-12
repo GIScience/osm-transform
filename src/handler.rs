@@ -265,9 +265,12 @@ other = {other}"#)
         let unsplitted_way_count = o_way_cnt - splitted_way_count;
         let splitted_way_percentage = (splitted_way_count as f64 / a_way_cnt as f64) * 100.0;
         let unsplitted_way_percentage = (unsplitted_way_count as f64 / a_way_cnt as f64) * 100.0;
+        if config.input_pbf.is_none(){
+            return "No input file specified, pbf processing was skipped".to_string();
+        }
 
-        let input_abs_path = config.input_pbf.canonicalize().unwrap().display().to_string();
-        let input_file_size = config.input_pbf.metadata().unwrap().len();
+        let input_abs_path = config.input_pbf.clone().unwrap().canonicalize().unwrap().display().to_string();
+        let input_file_size = config.input_pbf.clone().unwrap().metadata().unwrap().len();
 
         let mut formatted_statistics: String = "".to_string();
 

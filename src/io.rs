@@ -1,14 +1,18 @@
 
 use anyhow;
-use log::info;
+use log::{debug, info};
 use osm_io::osm::pbf;
 use crate::Config;
 use crate::handler::{HandlerChain, HandlerData};
 
 pub(crate) fn process_with_handler(config: &Config, handler_chain: &mut HandlerChain, data: &mut HandlerData, info_msg: &str) -> Result<(), anyhow::Error> {
+    if config.input_pbf.is_none() {
+        debug!("No input file specified, skipping processing");
+        return Ok(());
+    }
     let total_count = data.input_element_count();
     data.clear_counts();
-    let reader = pbf::reader::Reader::new(&config.input_pbf)?;
+    let reader = pbf::reader::Reader::new(&config.input_pbf.clone().unwrap())?;
     let mut count: i64 = 0;
     for element in reader.elements()? {
         count += 1;

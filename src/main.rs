@@ -27,7 +27,7 @@ fn print_statistics(config: &Config, handler_data: HandlerData) {
 pub struct Args {
     /// PBF file to preprocess.
     #[arg(short = 'i', long, value_name = "FILE")]
-    pub(crate) input_pbf: PathBuf,
+    pub(crate) input_pbf: Option<PathBuf>,
 
     /// Result PBF file. Will be overwritten if existing! If not specified, no output is written to a file. But can still be useful in combination with id-logging.
     #[arg(short = 'o', long, value_name = "FILE")]

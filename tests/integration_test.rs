@@ -10,7 +10,7 @@ use std::os::unix::fs::PermissionsExt;
 
 fn base_config() -> Config {
     let mut config = Config {
-        input_pbf: PathBuf::from("test/baarle_small.pbf"),
+        input_pbf: Some(PathBuf::from("test/baarle_small.pbf")),
         output_pbf: None,
         country_data: None,
         country_tile_size: 0.4,
@@ -215,17 +215,17 @@ fn check_pbf(path: &str, expected_node: Option<i64>) {
 #[test]
 fn fail_validation_if_input_file_does_not_exist() {
     let mut config = base_config();
-    config.input_pbf = PathBuf::from("test/does_not_exist.pbf");
+    config.input_pbf = Some(PathBuf::from("test/does_not_exist.pbf"));
     validate_and_expect_error(config);
 }
 #[test] fn fail_validation_if_input_file_is_empty() {
     let mut config = base_config();
-    config.input_pbf =  PathBuf::from("target/tmp/empty_test_input.pbf");
+    config.input_pbf =  Some(PathBuf::from("target/tmp/empty_test_input.pbf"));
     test_with_file(&PathBuf::from("target/tmp/empty_test_input.pbf"), "simulated empty input file", validate_and_expect_error, config );
 }
 #[test] fn fail_validation_if_input_file_is_not_readable() {
     let mut config = base_config();
-    config.input_pbf = PathBuf::from("target/tmp/readonly_input.pbf");
+    config.input_pbf = Some(PathBuf::from("target/tmp/readonly_input.pbf"));
     let path_buf = PathBuf::from("target/tmp/readonly_input.pbf");
     let mut input_file = File::create(&path_buf).expect("could not create simulated input file");
     input_file.write_all("content".as_bytes()).expect("could not write to simulated input file");
@@ -235,7 +235,7 @@ fn fail_validation_if_input_file_does_not_exist() {
 }
 #[test] fn fail_validation_if_output_file_already_exists() {
     let mut config = base_config();
-    config.input_pbf = PathBuf::from("target/tmp/test_output.pbf");
+    config.input_pbf = Some(PathBuf::from("target/tmp/test_output.pbf"));
     test_with_file(&PathBuf::from("target/tmp/test_output.pbf"), "simulated pre-existing output file", validate_and_expect_error, config );
 }
 #[test]
