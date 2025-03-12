@@ -233,6 +233,10 @@ fn run_processing_chain(config: &Config, data: &mut HandlerData) {//TODO use bit
             .with_way_ids(config.print_way_ids.clone())
             .with_relation_ids(config.print_relation_ids.clone()));
 
+    if config.get_summary_level() > 2 {
+        handler_chain = handler_chain.add(MinMaxIdCollector::new(OsmElementTypeSelection::all()));
+    }
+
     if config.with_node_filtering {
         handler_chain = handler_chain.add(IdFilter{handle_types: OsmElementTypeSelection::all()});
     } else {
@@ -241,10 +245,6 @@ fn run_processing_chain(config: &Config, data: &mut HandlerData) {//TODO use bit
 
     if config.remove_metadata {
         handler_chain = handler_chain.add(MetadataRemover::default())
-    }
-
-    if config.get_summary_level() > 2 {
-        handler_chain = handler_chain.add(MinMaxIdCollector::new(OsmElementTypeSelection::all()));
     }
     handler_chain = handler_chain.add(ElementCounter::new(AcceptedCount));//todo needed? let writers count?
 
