@@ -5,6 +5,6 @@ COPY src ./src
 RUN cargo build --release
 
 FROM debian:bookworm-slim
-COPY --from=builder /app/target/release/rusty-routes-transformer /usr/local/bin/rusty-routes-transformer
-ENTRYPOINT ["/usr/local/bin/rusty-routes-transformer"]
+COPY --from=builder /app/target/release/osm-transform /usr/local/bin/osm-transform
+ENTRYPOINT ["/usr/local/bin/osm-transform"]
 CMD []

@@ -1,6 +1,6 @@
 use osm_io::osm::model::element::Element;
 use osm_io::osm::pbf::reader::Reader;
-use rusty_routes_transformer::Config;
+use osm_transform::Config;
 use std::collections::HashSet;
 use std::path::PathBuf;
 use std::{fs, panic};
@@ -48,8 +48,8 @@ const FILTERED_SPLIT_NODE_COUNT: u64 = 308u64;
 #[test]
 fn run_minimal() {
     let config = base_config();
-    rusty_routes_transformer::init(&config);
-    let data = rusty_routes_transformer::run(&config);
+    osm_transform::init(&config);
+    let data = osm_transform::run(&config);
     println!("{}", data.summary(&config));
     assert_eq!(&data.input_node_count, &BAARLE_NODE_COUNT);
     assert_eq!(&data.output_node_count, &BAARLE_NODE_COUNT);
@@ -62,8 +62,8 @@ fn run_minimal() {
 fn run_minimal_write() {
     let mut config = base_config();
     config.output_pbf = Some(PathBuf::from("target/tmp/output-integration-test-run_minimal_write.pbf"));
-    rusty_routes_transformer::init(&config);
-    let data = rusty_routes_transformer::run(&config);
+    osm_transform::init(&config);
+    let data = osm_transform::run(&config);
     println!("{}", data.summary(&config));
     assert_eq!(&data.input_node_count, &BAARLE_NODE_COUNT);
     assert_eq!(&data.output_node_count, &BAARLE_NODE_COUNT);
@@ -85,8 +85,8 @@ fn run_all() {
     config.with_node_filtering = true;
     config.remove_metadata = true;
     config.elevation_way_splitting = true;
-    rusty_routes_transformer::init(&config);
-    let data = rusty_routes_transformer::run(&config);
+    osm_transform::init(&config);
+    let data = osm_transform::run(&config);
     println!("{}", data.summary(&config));
     assert_eq!(&data.input_node_count, &BAARLE_NODE_COUNT);
     assert_eq!(&data.output_node_count, &FILTERED_SPLIT_NODE_COUNT);
@@ -103,8 +103,8 @@ fn run_country() {
     let mut config = base_config();
     config.country_data = Some(PathBuf::from("test/mapping_test.csv"));
     config.country_tile_size = 0.4;
-    rusty_routes_transformer::init(&config);
-    let data = rusty_routes_transformer::run(&config);
+    osm_transform::init(&config);
+    let data = osm_transform::run(&config);
     println!("{}", data.summary(&config));
     assert_eq!(&data.input_node_count, &BAARLE_NODE_COUNT);
     assert_eq!(&data.output_node_count, &BAARLE_NODE_COUNT);
@@ -118,8 +118,8 @@ fn run_country() {
 fn run_node_filtering() {
     let mut config = base_config();
     config.with_node_filtering = true;
-    rusty_routes_transformer::init(&config);
-    let data = rusty_routes_transformer::run(&config);
+    osm_transform::init(&config);
+    let data = osm_transform::run(&config);
     println!("{}", data.summary(&config));
     assert_eq!(&data.input_node_count, &BAARLE_NODE_COUNT);
     assert_eq!(&data.output_node_count, &FILTERED_NODE_COUNT);
@@ -133,8 +133,8 @@ fn run_node_filtering() {
 fn run_remove_metadata() {
     let mut config = base_config();
     config.remove_metadata = true;
-    rusty_routes_transformer::init(&config);
-    let data = rusty_routes_transformer::run(&config);
+    osm_transform::init(&config);
+    let data = osm_transform::run(&config);
     println!("{}", data.summary(&config));
     assert_eq!(&data.input_node_count, &BAARLE_NODE_COUNT);
     assert_eq!(&data.output_node_count, &BAARLE_NODE_COUNT);
@@ -147,8 +147,8 @@ fn run_remove_metadata() {
 fn run_elevation() {
     let mut config = base_config();
     config.elevation_tiffs = vec!["test/*.tif".to_string()];
-    rusty_routes_transformer::init(&config);
-    let data = rusty_routes_transformer::run(&config);
+    osm_transform::init(&config);
+    let data = osm_transform::run(&config);
     println!("{}", data.summary(&config));
     assert_eq!(&data.input_node_count, &BAARLE_NODE_COUNT);
     assert_eq!(&data.output_node_count, &BAARLE_NODE_COUNT);
@@ -162,8 +162,8 @@ fn run_elevation_way_splitting() {
     let mut config = base_config();
     config.elevation_tiffs = vec!["test/*.tif".to_string()];
     config.elevation_way_splitting = true;
-    rusty_routes_transformer::init(&config);
-    let data = rusty_routes_transformer::run(&config);
+    osm_transform::init(&config);
+    let data = osm_transform::run(&config);
     println!("{}", data.summary(&config));
     assert_eq!(&data.input_node_count, &BAARLE_NODE_COUNT);
     assert!(&data.output_node_count > &BAARLE_NODE_COUNT);
@@ -178,8 +178,8 @@ fn run_elevation_way_splitting_write() {
     config.elevation_tiffs = vec!["test/*.tif".to_string()];
     config.elevation_way_splitting = true;
     config.output_pbf = Some(PathBuf::from("target/tmp/output-integration-test-run_elevation_way_splitting_write.pbf"));
-    rusty_routes_transformer::init(&config);
-    let data = rusty_routes_transformer::run(&config);
+    osm_transform::init(&config);
+    let data = osm_transform::run(&config);
     println!("{}", data.summary(&config));
     assert_eq!(&data.input_node_count, &BAARLE_NODE_COUNT);
     assert_eq!(&data.output_node_count, &SPLIT_NODE_COUNT);
@@ -293,8 +293,8 @@ fn test_with_not_readable_dir(path_buf: &PathBuf, label: &str, test_fn: fn(Confi
 
 fn validate_and_expect_error(config: Config) {
     let result = panic::catch_unwind(|| {
-        rusty_routes_transformer::init(&config);
-        rusty_routes_transformer::validate(&config);
+        osm_transform::init(&config);
+        osm_transform::validate(&config);
     });
     assert!(result.is_err());
 }

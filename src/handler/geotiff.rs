@@ -737,6 +737,7 @@ mod tests {
     use simple_logger::SimpleLogger;
     use std::fs::File;
     use std::io::BufReader;
+    use crate::{get_application_name};
 
     #[test]
     #[ignore]
@@ -1295,7 +1296,7 @@ mod tests {
 
     #[test]
     fn test_handle_way_split_nodes_returned() {
-        let _ = Logger::builder().build("rusty_routes_transformer", LevelFilter::Debug);
+        let _ = Logger::builder().build(get_application_name(), LevelFilter::Debug);
         let mut handler = BufferingElevationEnricher::new(
             GeoTiffManager::with_file_pattern("test/region*.tif"),
             5,
@@ -1320,7 +1321,7 @@ mod tests {
 
     #[test]
     fn test_handle_way_split_nodes_added_as_refs() {
-        let _ = Logger::builder().build("rusty_routes_transformer", LevelFilter::Debug);
+        let _ = Logger::builder().build(get_application_name(), LevelFilter::Debug);
         let mut handler = BufferingElevationEnricher::new(
             GeoTiffManager::with_file_pattern("test/region*.tif"),
             5,

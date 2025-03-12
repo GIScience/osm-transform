@@ -47,7 +47,7 @@ pub fn init(config: &Config) {
             .build();
         let config = log4rs::Config::builder()
             .appender(Appender::builder().build("stdout", Box::new(stdout)))
-            .logger(Logger::builder().build("rusty_routes_transformer", log_level))
+            .logger(Logger::builder().build(get_application_name().as_str().replace("-", "_").as_str(), log_level))
             .build(Root::builder().appender("stdout").build(LevelFilter::Off))
             .unwrap();
         let _handle = log4rs::init_config(config).unwrap();
@@ -183,6 +183,9 @@ fn validate_country_tile_size(country_tile_size: &f64) {
     if &180.0 % (1.0/country_tile_size) != 0.0 {
         panic!("Country tile size must be a divisor of 180.0");
     }
+}
+pub fn get_application_name() -> String {
+    format!("{}", env!("CARGO_PKG_NAME"))
 }
 pub fn get_application_name_with_version() -> String {
     format!("{}_v{}", env!("CARGO_PKG_NAME"), env!("CARGO_PKG_VERSION"))

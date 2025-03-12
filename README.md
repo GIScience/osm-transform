@@ -1,4 +1,4 @@
-# rusty-routes-transformer
+# osm-transform
 
 A command line tool to preprocess OpenStreetMap data for routing purposes. 
 The tool reads an OpenStreetMap pbf file, filters data that is not relevant for routing (e.g. buildings) and produces a much smaller pbf file.
@@ -45,8 +45,8 @@ The executable binaries created by `cargo build` or `cargo build --release` are 
 
 You can run the executable with the same options as described above for running locally:
 ```shell
-./target/debug/rusty-routes-transformer <options>
-./target/release/rusty-routes-transformer <options>
+./target/debug/osm-transform <options>
+./target/release/osm-transform <options>
 ```
 
 

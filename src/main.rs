@@ -3,8 +3,8 @@ use std::path::PathBuf;
 
 use clap::Parser;
 
-use rusty_routes_transformer::{Config, init, run, validate};
-use rusty_routes_transformer::handler::HandlerData;
+use osm_transform::{Config, init, run, validate};
+use osm_transform::handler::HandlerData;
 
 fn main() {
     let args = Args::parse();
