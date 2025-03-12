@@ -1,5 +1,5 @@
 use bit_vec::BitVec;
-use log::{debug, warn};
+use log::warn;
 use osm_io::osm::model::relation::{Member};
 
 use crate::handler::{HandlerData, Handler, OsmElementTypeSelection};

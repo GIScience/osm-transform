@@ -165,7 +165,6 @@ impl AreaMappingManager {
         format!("{}_idx_{:.2}", source_base_name, tile_size).replace(".", "_")
     }
 
-
     pub(crate) fn save_area_records(&mut self, path_buf: &PathBuf, mapping: &Mapping) {
         let tile_size = mapping.tile_size;
         let index_dir_name = self.get_index_dir_name(path_buf, tile_size);
