@@ -145,17 +145,6 @@ fn validate_country_data(config: &Config) {
     }
 }
 
-pub(crate) fn validate_optional_file(path_buf: &Option<PathBuf>, label: &str) {
-    match path_buf {
-        Some(path_buf) => {
-            validate_file(path_buf, label);
-        }
-        None => {
-            debug!("{} not specified", label);
-        }
-    }
-}
-
 pub(crate) fn validate_file(path_buf: &PathBuf, label: &str) {
     if !path_buf.exists() {
         panic!("{} does not exist: {}", label, path_buf.display());

@@ -159,9 +159,7 @@ impl AreaMappingManager {
         let path_buf = path_buf.join(suffix);
         validate_file(&path_buf, label);
     }
-    fn create_index_file_path_buf(&self, base_name: &String, suffix: &str) -> PathBuf {
-        PathBuf::from(base_name).join(suffix)
-    }
+
     pub(crate) fn get_index_dir_name(&mut self, source_path_buf: &PathBuf, tile_size: f64) -> String {
         let source_base_name = source_path_buf.file_stem().to_owned().unwrap_or_default().to_str().unwrap_or_default();
         format!("{}_idx_{:.2}", source_base_name, tile_size).replace(".", "_")
