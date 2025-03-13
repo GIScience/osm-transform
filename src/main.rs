@@ -25,7 +25,7 @@ fn print_statistics(config: &Config, handler_data: HandlerData) {
 #[derive(Parser, Debug)]
 #[command(version, about, long_about = None)]
 pub struct Args {
-    /// PBF file to preprocess.
+    /// PBF file to preprocess. Running without PBF file processing can be useful, if only a country index should be computed.
     #[arg(short = 'i', long, value_name = "FILE")]
     pub(crate) input_pbf: Option<PathBuf>,
 
