@@ -20,7 +20,7 @@ use wkt::{Geometry, ToWkt};
 use wkt::Wkt;
 
 use crate::handler::{Handler, HandlerData};
-use crate::validate_file;
+use crate::{get_directory_as_absolute_path, validate_file};
 
 const AREA_ID_MULTIPLE: u16 = u16::MAX;
 
@@ -160,14 +160,17 @@ impl AreaMappingManager {
         validate_file(&path_buf, label);
     }
 
-    pub(crate) fn get_index_dir_name(&mut self, source_path_buf: &PathBuf, tile_size: f64) -> String {
-        let source_base_name = source_path_buf.file_stem().to_owned().unwrap_or_default().to_str().unwrap_or_default();
-        format!("{}_idx_{:.2}", source_base_name, tile_size).replace(".", "_")
+    pub(crate) fn get_index_dir_name(&mut self, csv_path_buf: &PathBuf, tile_size: f64) -> String {
+        let csv_abs_path_buf = fs::canonicalize(csv_path_buf).expect("failed to get absolute path");
+        let source_base_name = csv_abs_path_buf.file_stem().to_owned().unwrap_or_default().to_str().unwrap_or_default();
+        let csv_dir_abs_path = get_directory_as_absolute_path(csv_path_buf).expect("Failed to get absolute path");
+        let index_dir_name = format!("{}_idx_{:.2}", source_base_name, tile_size).replace(".", "_");
+        Path::new(&csv_dir_abs_path).join(&index_dir_name).display().to_string()
     }
 
-    pub(crate) fn save_area_records(&mut self, path_buf: &PathBuf, mapping: &Mapping) {
+    pub(crate) fn save_area_records(&mut self, csv_path_buf: &PathBuf, mapping: &Mapping) {
         let tile_size = mapping.tile_size;
-        let index_dir_name = self.get_index_dir_name(path_buf, tile_size);
+        let index_dir_name = self.get_index_dir_name(csv_path_buf, tile_size);
         create_dir(&index_dir_name).expect(format!("failed to create index directory {}", index_dir_name).as_str());
         let mut file_path: PathBuf = Path::new(&index_dir_name).join(self.info_file_suffix.clone());
         let file = File::create(file_path.clone()).expect("failed to create file");
@@ -219,7 +222,7 @@ impl AreaMappingManager {
         debug!("Saved {:?} with {} entries", file_path, mapping.area.len());
     }
 
-    pub(crate) fn build_index(&mut self, path_buf: &PathBuf, tile_size: f64) -> Result<Mapping, Box<dyn Error>> {
+    pub(crate) fn build_index(&mut self, csv_path_buf: &PathBuf, tile_size: f64) -> Result<Mapping, Box<dyn Error>> {
         #[derive(Debug, Deserialize)]
         struct Record {
             key: String,
@@ -227,7 +230,7 @@ impl AreaMappingManager {
             geo: String,
         }
         let mut mapping = Mapping::new(tile_size);
-        let file =  File::open(path_buf.clone())?;
+        let file =  File::open(csv_path_buf.clone())?;
         let mut rdr = ReaderBuilder::new().delimiter(b';').from_reader(file);
         let mut index: u16 = 1;
         for result in rdr.deserialize() {
@@ -243,7 +246,7 @@ impl AreaMappingManager {
             }
             index = index + 1;
         }
-        self.save_area_records(path_buf, &mapping);
+        self.save_area_records(csv_path_buf, &mapping);
         Ok(mapping)
     }
 

@@ -10,7 +10,7 @@ extern crate maplit;
 use std::sync::Once;
 use std::collections::HashSet;
 use std::fs;
-use std::fs::{create_dir, File};
+use std::fs::File;
 use std::path::{Path, PathBuf};
 use benchmark_rs::stopwatch::StopWatch;
 use glob::glob;
@@ -190,6 +190,15 @@ pub fn get_application_name() -> String {
 pub fn get_application_name_with_version() -> String {
     format!("{}_v{}", env!("CARGO_PKG_NAME"), env!("CARGO_PKG_VERSION"))
 }
+
+pub fn get_directory_as_absolute_path(path_buf: &PathBuf) -> Option<PathBuf> {
+    if path_buf.is_dir() {
+        fs::canonicalize(path_buf).ok()
+    } else {
+        path_buf.parent().and_then(|parent| fs::canonicalize(parent).ok())
+    }
+}
+
 pub fn run(config: &Config) -> HandlerData {
     info!("{}", get_application_name_with_version());
     let mut stopwatch_total = StopWatch::new();
@@ -434,7 +443,7 @@ pub(crate) mod test {
     use osm_io::osm::model::way::Way;
     use crate::handler::HandlerData;
     use crate::handler::tests::MemberType;
-
+    use std::path::PathBuf;
     pub(crate) fn simple_node_element(id: i64, tags: Vec<(&str, &str)>) -> Element {
         let tags_obj = tags.iter().map(|(k, v)| Tag::new(k.to_string(), v.to_string())).collect();
         node_element(id, 1, Coordinate::new(1.0f64, 1.1f64), 1, 1, 1, "a".to_string(), true, tags_obj)
@@ -490,5 +499,15 @@ pub(crate) mod test {
         let mut handler_data = HandlerData::default();
         handler_data.nodes = nodes;
         handler_data
+    }
+
+    #[test]
+    pub(crate) fn test_get_directory_as_absolute_path() {
+        let file_buf = PathBuf::from("src/main.rs");
+        let absolute_file_path = super::get_directory_as_absolute_path(&file_buf);
+        let dir_buf = PathBuf::from("src");
+        let absolute_dir_path = super::get_directory_as_absolute_path(&dir_buf);
+        assert_eq!(absolute_file_path, absolute_dir_path);
+        println!("{}", absolute_dir_path.unwrap().display())
     }
 }

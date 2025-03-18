@@ -99,7 +99,7 @@ fn run_all() {
 }
 #[test]
 fn run_country() {
-    let _ = fs::remove_dir_all("mapping_test_idx_0_40");
+    let _ = fs::remove_dir_all("test/mapping_test_idx_0_40");
     let mut config = base_config();
     config.country_data = Some(PathBuf::from("test/mapping_test.csv"));
     config.country_tile_size = 0.4;
@@ -250,7 +250,7 @@ fn fail_validation_if_country_index_directory_already_exists() {
     let mut config = base_config();
     config.country_data = Some(PathBuf::from("test/mapping_test.csv"));
     config.country_tile_size = 2.0;
-    test_with_dir(&PathBuf::from("mapping_test_idx_2_00"), "simulated pre-existing country index directory", validate_and_expect_error, config );
+    test_with_dir(&PathBuf::from("test/mapping_test_idx_2_00"), "simulated pre-existing country index directory", validate_and_expect_error, config );
 }
 
 #[test]
