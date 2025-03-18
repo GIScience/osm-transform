@@ -10,8 +10,8 @@ extern crate maplit;
 use std::sync::Once;
 use std::collections::HashSet;
 use std::fs;
-use std::fs::File;
-use std::path::PathBuf;
+use std::fs::{create_dir, File};
+use std::path::{Path, PathBuf};
 use benchmark_rs::stopwatch::StopWatch;
 use glob::glob;
 use log4rs::append::console::ConsoleAppender;
@@ -294,8 +294,11 @@ fn run_processing_chain(config: &Config, data: &mut HandlerData) {
             let mapping = AreaMappingManager::country().build_index(&config.country_data.clone().unwrap(), config.country_tile_size).expect("Area handler failed to load CSV file");
             let area_handler = AreaHandler::new(mapping);
             info!("Creating spatial country index for {} countries and country-tile-size={} done, time: {}", area_handler.mapping.id.len(), config.country_tile_size, stopwatch);
+
+            let index_dir_name = AreaMappingManager::country().get_index_dir_name(&config.country_data.clone().unwrap(), config.country_tile_size);
+            let index_path = fs::canonicalize(Path::new(&index_dir_name)).expect("Failed to get absolute path of index directory");
             info!("The country index files were saved to {} and can be loaded in subsequent runs to reduce processing time",
-                AreaMappingManager::country().get_index_dir_name(&config.country_data.clone().unwrap(), config.country_tile_size));
+                index_path.display());
             stopwatch.reset();
             handler_chain = handler_chain.add(area_handler);
         } else {
