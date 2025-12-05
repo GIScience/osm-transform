@@ -263,10 +263,26 @@ fn fail_validation_if_country_index_directory_is_not_readable() {
 }
 
 #[test]
-fn processing_preserves_timestamp()  {
+fn simple_output_handler_preserves_timestamp()  {
     let mut config = base_config();
-    let output_path = PathBuf::from("target/tmp/output-integration-test-processing_preserves_timestamp.pbf");
+    let output_path = PathBuf::from("target/tmp/output-integration-test-simple_output_handler_preserves_timestamp.pbf");
     config.output_pbf = Some(output_path.clone());
+    osm_transform::init(&config);
+    let data = osm_transform::run(&config);
+    println!("{}", data.summary(&config));
+    let reader = Reader::new(&output_path).expect("file not found");
+    let timestamp = reader.info().osmosis_replication_timestamp().expect("no timestamp found");
+    let datetime = chrono::DateTime::from_timestamp(timestamp as i64, 0).expect("invalid timestamp");
+    assert_eq!(datetime.to_rfc3339(), "2024-09-08T20:21:00+00:00");
+}
+
+#[test]
+fn splitting_output_handler_preserves_timestamp()  {
+    let mut config = base_config();
+    let output_path = PathBuf::from("target/tmp/output-integration-test-splitting_output_handler_preserves_timestamp.pbf");
+    config.output_pbf = Some(output_path.clone());
+    config.elevation_tiffs = vec!["test/*.tif".to_string()];
+    config.elevation_way_splitting = true;
     osm_transform::init(&config);
     let data = osm_transform::run(&config);
     println!("{}", data.summary(&config));
