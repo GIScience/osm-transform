@@ -15,8 +15,9 @@ pub struct SimpleOutputHandler {
 
 
 impl SimpleOutputHandler {
-    pub fn new(output_path: PathBuf) -> Self {
+    pub fn new(output_path: PathBuf, data: &mut HandlerData) -> Self {
         let mut file_info = FileInfo::default();
+        file_info.with_osmosis_replication_timestamp(&data.osmosis_replication_timestamp);
         file_info.with_writingprogram_str(get_application_name_with_version().as_str());
         Self {
             writer: pbf::writer::Writer::from_file_info(output_path, file_info, CompressionType::Zlib).expect("Failed to create output writer"),

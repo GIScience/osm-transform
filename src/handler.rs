@@ -66,8 +66,10 @@ impl OsmElementTypeSelection {
 
 #[derive(Debug)]
 pub struct HandlerData {
+    /// PBF Metadata
+    pub osmosis_replication_timestamp: Option<i64>,
 
-    ///Elements to handle
+    /// Elements to handle
     pub nodes: Vec<Node>,
     pub ways: Vec<Way>,
     pub relations: Vec<Relation>,
@@ -119,6 +121,8 @@ impl HandlerData {
     }
     pub(crate) fn with_capacity(nbits_node: usize, nbits_way: usize, nbits_relation: usize) -> Self {
         HandlerData {
+            osmosis_replication_timestamp: None,
+
             nodes: vec![],
             ways: vec![],
             relations: vec![],

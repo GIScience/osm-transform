@@ -13,6 +13,7 @@ pub(crate) fn process_with_handler(config: &Config, handler_chain: &mut HandlerC
     let total_count = data.input_element_count();
     data.clear_counts();
     let reader = pbf::reader::Reader::new(&config.input_pbf.clone().unwrap())?;
+    data.osmosis_replication_timestamp = *reader.info().osmosis_replication_timestamp();
     let mut count: i64 = 0;
     for element in reader.elements()? {
         count += 1;

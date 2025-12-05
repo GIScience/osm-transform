@@ -333,7 +333,7 @@ fn run_processing_chain(config: &Config, data: &mut HandlerData) {
             output_handler.init();
             handler_chain = handler_chain.add(output_handler);
         } else {
-            let mut output_handler = SimpleOutputHandler::new(config.output_pbf.clone().unwrap());
+            let mut output_handler = SimpleOutputHandler::new(config.output_pbf.clone().unwrap(), data);
             output_handler.init();
             handler_chain = handler_chain.add(output_handler);
         }
