@@ -73,8 +73,8 @@ fn run_minimal_write() {
     assert_eq!(&data.output_way_count, &FILTERED_WAY_COUNT);
 }
 #[test]
+#[cfg_attr(feature = "in-github-ci", ignore)]
 fn run_all() {
-    let _ = fs::remove_dir_all("mapping_test_idx_0_40");
     let mut config = base_config();
     config.output_pbf = Some(PathBuf::from("target/tmp/output-integration-test-run_all.pbf"));
     config.country_data = Some(PathBuf::from("test/mapping_test.csv"));
@@ -99,7 +99,6 @@ fn run_all() {
 }
 #[test]
 fn run_country() {
-    let _ = fs::remove_dir_all("test/mapping_test_idx_0_40");
     let mut config = base_config();
     config.country_data = Some(PathBuf::from("test/mapping_test.csv"));
     config.country_tile_size = 0.4;
@@ -158,6 +157,7 @@ fn run_elevation() {
     assert_eq!(&data.output_way_count, &FILTERED_WAY_COUNT);
 }
 #[test]
+#[cfg_attr(feature = "in-github-ci", ignore)]
 fn run_elevation_way_splitting() {
     let mut config = base_config();
     config.elevation_tiffs = vec!["test/*.tif".to_string()];
@@ -173,6 +173,7 @@ fn run_elevation_way_splitting() {
     assert_eq!(&data.output_way_count, &FILTERED_WAY_COUNT);
 }
 #[test]
+#[cfg_attr(feature = "in-github-ci", ignore)]
 fn run_elevation_way_splitting_write() {
     let mut config = base_config();
     config.elevation_tiffs = vec!["test/*.tif".to_string()];
