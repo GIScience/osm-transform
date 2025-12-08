@@ -1,7 +1,7 @@
-use fs::create_dir;
 use std::collections::BTreeMap;
 use std::error::Error;
 use std::fs;
+use std::fs::create_dir_all;
 use std::fs::File;
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
@@ -9,7 +9,7 @@ use std::string::String;
 
 use btreemultimap::BTreeMultiMap;
 use csv::{ReaderBuilder, WriterBuilder};
-use geo::{BoundingRect, Contains, Coord, coord, Intersects, MultiPolygon, Rect, HasDimensions};
+use geo::{BoundingRect, Contains, Coord, coord, HasDimensions, Intersects, MultiPolygon, Rect};
 use geo::BooleanOps;
 use log::{debug, log_enabled, trace, warn};
 use log::Level::Trace;
@@ -19,8 +19,8 @@ use serde::{Deserialize, Serialize};
 use wkt::{Geometry, ToWkt};
 use wkt::Wkt;
 
-use crate::handler::{Handler, HandlerData};
 use crate::{get_directory_as_absolute_path, validate_file};
+use crate::handler::{Handler, HandlerData};
 
 const AREA_ID_MULTIPLE: u16 = u16::MAX;
 
@@ -171,7 +171,7 @@ impl AreaMappingManager {
     pub(crate) fn save_area_records(&mut self, csv_path_buf: &PathBuf, mapping: &Mapping) {
         let tile_size = mapping.tile_size;
         let index_dir_name = self.get_index_dir_name(csv_path_buf, tile_size);
-        create_dir(&index_dir_name).expect(format!("failed to create index directory {}", index_dir_name).as_str());
+        create_dir_all(&index_dir_name).expect(format!("failed to create index directory {}", index_dir_name).as_str());
         let mut file_path: PathBuf = Path::new(&index_dir_name).join(self.info_file_suffix.clone());
         let file = File::create(file_path.clone()).expect("failed to create file");
         let _ = serde_yaml::to_writer(file, &mapping.meta_info());
