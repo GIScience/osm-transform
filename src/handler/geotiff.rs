@@ -740,7 +740,7 @@ mod tests {
     use crate::{get_application_name};
 
     #[test]
-    #[ignore]
+    #[cfg_attr(feature = "in-github-ci", ignore)]
     fn test_find_geotiff_id_for_wgs84_coord_srtm_ma_hd() {
         let _ = SimpleLogger::new().init();
         let mut geotiff_loader = GeoTiffManager::with_file_patterns(vec!["test/srtm*.tif".to_string(), "test/region*.tif".to_string(), "test/*gmted*.tif".to_string()]);
@@ -885,7 +885,7 @@ mod tests {
         assert_eq!("test/region_heidelberg_mannheim.tif", geotiffs[0]);
     }
     #[test]
-    #[ignore]
+    #[cfg_attr(feature = "in-github-ci", ignore)]
     fn test_find_geotiff_id_for_wgs84_coord_ma_hd_srtm() {
         let _ = SimpleLogger::new().init();
         let mut geotiff_loader = GeoTiffManager::new();

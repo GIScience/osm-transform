@@ -73,6 +73,7 @@ fn run_minimal_write() {
     assert_eq!(&data.output_way_count, &FILTERED_WAY_COUNT);
 }
 #[test]
+#[cfg_attr(feature = "in-github-ci", ignore)]
 fn run_all() {
     let mut config = base_config();
     config.output_pbf = Some(PathBuf::from("target/tmp/output-integration-test-run_all.pbf"));
@@ -156,6 +157,7 @@ fn run_elevation() {
     assert_eq!(&data.output_way_count, &FILTERED_WAY_COUNT);
 }
 #[test]
+#[cfg_attr(feature = "in-github-ci", ignore)]
 fn run_elevation_way_splitting() {
     let mut config = base_config();
     config.elevation_tiffs = vec!["test/*.tif".to_string()];
@@ -171,6 +173,7 @@ fn run_elevation_way_splitting() {
     assert_eq!(&data.output_way_count, &FILTERED_WAY_COUNT);
 }
 #[test]
+#[cfg_attr(feature = "in-github-ci", ignore)]
 fn run_elevation_way_splitting_write() {
     let mut config = base_config();
     config.elevation_tiffs = vec!["test/*.tif".to_string()];

@@ -102,7 +102,6 @@ mod tests {
     }
 
     #[test]
-    #[ignore] //fixme - test does not work with cargo test
     fn process_files_verify_node_added() {
         let output = "test/baarle_small-mod.pbf".to_string();
 
