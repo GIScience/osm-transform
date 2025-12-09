@@ -62,8 +62,9 @@ pub struct SplittingOutputHandler {
 }
 
 impl SplittingOutputHandler {
-    pub fn new(output_path: PathBuf) -> Self {
+    pub fn new(output_path: PathBuf, data: &mut HandlerData) -> Self {
         let mut file_info_node = FileInfo::default();
+        file_info_node.with_osmosis_replication_timestamp(&data.osmosis_replication_timestamp);
         file_info_node.with_writingprogram_str(get_application_name_with_version().as_str());
         let mut file_info_way_relation = FileInfo::default();
         file_info_way_relation.with_writingprogram_str(get_application_name_with_version().as_str());
