@@ -270,10 +270,9 @@ fn simple_output_handler_preserves_timestamp()  {
     osm_transform::init(&config);
     let data = osm_transform::run(&config);
     println!("{}", data.summary(&config));
-    let reader = Reader::new(&output_path).expect("file not found");
-    let timestamp = reader.info().osmosis_replication_timestamp().expect("no timestamp found");
-    let datetime = chrono::DateTime::from_timestamp(timestamp as i64, 0).expect("invalid timestamp");
-    assert_eq!(datetime.to_rfc3339(), "2024-09-08T20:21:00+00:00");
+    let input_timestamp = read_osm_timestamp(&config.input_pbf.unwrap());
+    let output_timestamp = read_osm_timestamp(&output_path);
+    assert_eq!(input_timestamp, output_timestamp);
 }
 
 #[test]
@@ -281,15 +280,19 @@ fn splitting_output_handler_preserves_timestamp()  {
     let mut config = base_config();
     let output_path = PathBuf::from("target/tmp/output-integration-test-splitting_output_handler_preserves_timestamp.pbf");
     config.output_pbf = Some(output_path.clone());
-    config.elevation_tiffs = vec!["test/*.tif".to_string()];
     config.elevation_way_splitting = true;
     osm_transform::init(&config);
     let data = osm_transform::run(&config);
     println!("{}", data.summary(&config));
+    let input_timestamp = read_osm_timestamp(&config.input_pbf.unwrap());
+    let output_timestamp = read_osm_timestamp(&output_path);
+    assert_eq!(input_timestamp, output_timestamp);
+}
+
+fn read_osm_timestamp(output_path: &PathBuf) -> i64 {
     let reader = Reader::new(&output_path).expect("file not found");
     let timestamp = reader.info().osmosis_replication_timestamp().expect("no timestamp found");
-    let datetime = chrono::DateTime::from_timestamp(timestamp as i64, 0).expect("invalid timestamp");
-    assert_eq!(datetime.to_rfc3339(), "2024-09-08T20:21:00+00:00");
+    timestamp
 }
 
 fn test_with_file(path_buf: &PathBuf, label: &str, test_fn: fn(Config), config: Config) {
