@@ -289,8 +289,8 @@ fn splitting_output_handler_preserves_timestamp()  {
     assert_eq!(input_timestamp, output_timestamp);
 }
 
-fn read_osm_timestamp(output_path: &PathBuf) -> i64 {
-    let reader = Reader::new(&output_path).expect("file not found");
+fn read_osm_timestamp(file_path: &PathBuf) -> i64 {
+    let reader = Reader::new(&file_path).expect("file not found");
     let timestamp = reader.info().osmosis_replication_timestamp().expect("no timestamp found");
     timestamp
 }
