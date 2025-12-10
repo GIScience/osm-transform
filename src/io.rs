@@ -42,7 +42,8 @@ mod tests {
     use osm_io::osm::pbf::compression_type::CompressionType;
     use osm_io::osm::pbf::file_info::FileInfo;
     use pbf::reader::Reader;
-
+    use utils::read_osm_timestamp;
+    use crate::utils;
     use super::*;
 
     pub fn process_file(output: String) -> Result<(), anyhow::Error> {
@@ -126,9 +127,8 @@ mod tests {
 
     #[test]
     fn testfile_has_expected_timestamp()  {
-        let input_path = PathBuf::from("test/baarle_small.pbf");
-        let reader = Reader::new(&input_path).expect("input file not found");
-        let timestamp = reader.info().osmosis_replication_timestamp().expect("no timestamp found");
+        let file_path = PathBuf::from("test/baarle_small.pbf");
+        let timestamp = read_osm_timestamp(&file_path);
         let datetime = chrono::DateTime::from_timestamp(timestamp as i64, 0).expect("invalid timestamp");
         assert_eq!(datetime.to_rfc3339(), "2024-09-08T20:21:00+00:00");
     }

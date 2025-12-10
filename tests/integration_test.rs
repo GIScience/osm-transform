@@ -1,12 +1,13 @@
 use osm_io::osm::model::element::Element;
 use osm_io::osm::pbf::reader::Reader;
-use osm_transform::Config;
+use osm_transform::{Config, utils};
 use std::collections::HashSet;
 use std::path::PathBuf;
 use std::{fs, panic};
 use std::fs::File;
 use std::io::Write;
 use std::os::unix::fs::PermissionsExt;
+use utils::read_osm_timestamp;
 
 fn base_config() -> Config {
     let mut config = Config {
@@ -287,12 +288,6 @@ fn splitting_output_handler_preserves_timestamp()  {
     let input_timestamp = read_osm_timestamp(&config.input_pbf.unwrap());
     let output_timestamp = read_osm_timestamp(&output_path);
     assert_eq!(input_timestamp, output_timestamp);
-}
-
-fn read_osm_timestamp(file_path: &PathBuf) -> i64 {
-    let reader = Reader::new(&file_path).expect("file not found");
-    let timestamp = reader.info().osmosis_replication_timestamp().expect("no timestamp found");
-    timestamp
 }
 
 fn test_with_file(path_buf: &PathBuf, label: &str, test_fn: fn(Config), config: Config) {

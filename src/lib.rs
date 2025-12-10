@@ -3,6 +3,7 @@ pub mod area;
 pub mod output;
 pub mod srs;
 pub mod handler;
+pub mod utils;
 
 #[macro_use]
 extern crate maplit;
