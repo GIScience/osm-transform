@@ -3,6 +3,7 @@ pub mod area;
 pub mod output;
 pub mod srs;
 pub mod handler;
+pub mod utils;
 
 #[macro_use]
 extern crate maplit;
@@ -329,11 +330,11 @@ fn run_processing_chain(config: &Config, data: &mut HandlerData) {
 
     if config.should_write_pbf_file() {
         if config.elevation_way_splitting == true {
-            let mut output_handler = SplittingOutputHandler::new(config.output_pbf.clone().unwrap());
+            let mut output_handler = SplittingOutputHandler::new(config.output_pbf.clone().unwrap(), data);
             output_handler.init();
             handler_chain = handler_chain.add(output_handler);
         } else {
-            let mut output_handler = SimpleOutputHandler::new(config.output_pbf.clone().unwrap());
+            let mut output_handler = SimpleOutputHandler::new(config.output_pbf.clone().unwrap(), data);
             output_handler.init();
             handler_chain = handler_chain.add(output_handler);
         }

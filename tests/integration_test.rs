@@ -1,12 +1,13 @@
 use osm_io::osm::model::element::Element;
 use osm_io::osm::pbf::reader::Reader;
-use osm_transform::Config;
+use osm_transform::{Config, utils};
 use std::collections::HashSet;
 use std::path::PathBuf;
 use std::{fs, panic};
 use std::fs::File;
 use std::io::Write;
 use std::os::unix::fs::PermissionsExt;
+use utils::read_osm_timestamp;
 
 fn base_config() -> Config {
     let mut config = Config {
@@ -260,6 +261,33 @@ fn fail_validation_if_country_index_directory_is_not_readable() {
     config.country_data = Some(PathBuf::from("target/tmp/mapping_test_idx_2_00"));
     config.country_tile_size = 2.0;
     test_with_not_readable_dir(&PathBuf::from("target/tmp/mapping_test_idx_2_00"), "simulated pre-existing country index directory", validate_and_expect_error, config );
+}
+
+#[test]
+fn simple_output_handler_preserves_timestamp()  {
+    let mut config = base_config();
+    let output_path = PathBuf::from("target/tmp/output-integration-test-simple_output_handler_preserves_timestamp.pbf");
+    config.output_pbf = Some(output_path.clone());
+    osm_transform::init(&config);
+    let data = osm_transform::run(&config);
+    println!("{}", data.summary(&config));
+    let input_timestamp = read_osm_timestamp(&config.input_pbf.unwrap());
+    let output_timestamp = read_osm_timestamp(&output_path);
+    assert_eq!(input_timestamp, output_timestamp);
+}
+
+#[test]
+fn splitting_output_handler_preserves_timestamp()  {
+    let mut config = base_config();
+    let output_path = PathBuf::from("target/tmp/output-integration-test-splitting_output_handler_preserves_timestamp.pbf");
+    config.output_pbf = Some(output_path.clone());
+    config.elevation_way_splitting = true;
+    osm_transform::init(&config);
+    let data = osm_transform::run(&config);
+    println!("{}", data.summary(&config));
+    let input_timestamp = read_osm_timestamp(&config.input_pbf.unwrap());
+    let output_timestamp = read_osm_timestamp(&output_path);
+    assert_eq!(input_timestamp, output_timestamp);
 }
 
 fn test_with_file(path_buf: &PathBuf, label: &str, test_fn: fn(Config), config: Config) {
