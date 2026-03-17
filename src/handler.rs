@@ -6,6 +6,7 @@ pub(crate) mod modify;
 pub mod geotiff;
 pub(crate) mod interpolate;
 pub(crate) mod skip_ele;
+pub mod pmtiles;
 
 use std::collections::HashMap;
 use std::time::Duration;
