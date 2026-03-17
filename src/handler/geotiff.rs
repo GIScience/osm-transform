@@ -730,14 +730,12 @@ mod tests {
     use georaster::geotiff::{GeoTiffReader, RasterValue};
     use log::LevelFilter;
     use log4rs::config::Logger;
-    use osm_io::osm::model::node::Node;
-    use osm_io::osm::model::tag::Tag;
-    use osm_io::osm::model::way::Way;
     use proj4rs::Proj;
     use simple_logger::SimpleLogger;
     use std::fs::File;
     use std::io::BufReader;
-    use crate::{get_application_name};
+    use crate::{get_application_name, utils};
+    use crate::utils::test_utils;
 
     #[test]
     #[cfg_attr(feature = "in-github-ci", ignore)]
@@ -746,7 +744,7 @@ mod tests {
         let mut geotiff_loader = GeoTiffManager::with_file_patterns(vec!["test/srtm*.tif".to_string(), "test/region*.tif".to_string(), "test/*gmted*.tif".to_string()]);
         assert_eq!(6, geotiff_loader.index.get_geotiff_count());
 
-        let test_point = wgs84_coordinate_hd_river();
+        let test_point = test_utils::wgs84_coordinate_hd_river();
         let geotiffs = geotiff_loader.index.find_geotiff_id_for_wgs84_coord(test_point.lon(), test_point.lat());
         dbg!(&geotiffs);
         assert_eq!(3, geotiffs.len());
@@ -754,7 +752,7 @@ mod tests {
         assert_eq!(geotiffs[1], "test/region_heidelberg_mannheim.tif");
         assert_eq!(geotiffs[2], "test/30N000E_20101117_gmted_mea075.tif");
 
-        let test_point = wgs84_coordinate_limburg_traffic_circle();
+        let test_point = test_utils::wgs84_coordinate_limburg_traffic_circle();
         let geotiffs = geotiff_loader.index.find_geotiff_id_for_wgs84_coord(test_point.lon(), test_point.lat());
         dbg!(&geotiffs);
         assert_eq!(3, geotiffs.len());
@@ -762,7 +760,7 @@ mod tests {
         assert_eq!(geotiffs[1], "test/srtm_38_02.tif");
         assert_eq!(geotiffs[2], "test/50N000E_20101117_gmted_mea075.tif");
 
-        let test_point = wgs84_coord_hd_mountain();
+        let test_point = test_utils::wgs84_coord_hd_mountain();
         let geotiffs = geotiff_loader.index.find_geotiff_id_for_wgs84_coord(test_point.lon(), test_point.lat());
         dbg!(&geotiffs);
         assert_eq!(3, geotiffs.len());
@@ -770,7 +768,7 @@ mod tests {
         assert_eq!(geotiffs[1], "test/region_heidelberg_mannheim.tif");
         assert_eq!(geotiffs[2], "test/30N000E_20101117_gmted_mea075.tif");
 
-        let test_point = wgs84_coordinate_limburg_vienna_house();
+        let test_point = test_utils::wgs84_coordinate_limburg_vienna_house();
         let geotiffs = geotiff_loader.index.find_geotiff_id_for_wgs84_coord(test_point.lon(), test_point.lat());
         dbg!(&geotiffs);
         assert_eq!(3, geotiffs.len());
@@ -778,31 +776,12 @@ mod tests {
         assert_eq!(geotiffs[1], "test/srtm_38_02.tif");
         assert_eq!(geotiffs[2], "test/50N000E_20101117_gmted_mea075.tif");
 
-        let test_point = wgs84_coordinate_hamburg_elbphilharmonie();
+        let test_point = test_utils::wgs84_coordinate_hamburg_elbphilharmonie();
         let geotiffs = geotiff_loader.index.find_geotiff_id_for_wgs84_coord(test_point.lon(), test_point.lat());
         dbg!(&geotiffs);
         assert_eq!(2, geotiffs.len());
         assert_eq!(geotiffs[0], "test/srtm_38_02.tif");
         assert_eq!(geotiffs[1], "test/50N000E_20101117_gmted_mea075.tif");
-    }
-
-    fn wgs84_coord_hd_philosophers_way_start() -> LocationWithElevation  { LocationWithElevation::new(8.693313002586367, 49.41470412961422, 125.0)}
-    fn wgs84_coord_hd_philosophers_way_end() -> LocationWithElevation  { LocationWithElevation::new(8.707872033119203, 49.41732503427102, 200.0)}
-    fn wgs84_coord_hd_mountain() -> LocationWithElevation { LocationWithElevation::from_lon_lat(8.726878, 49.397500)}
-    fn wgs84_coordinate_hd_river() -> LocationWithElevation { LocationWithElevation::from_lon_lat(8.682461, 49.411029)}
-    fn wgs84_coordinate_limburg_vienna_house() -> LocationWithElevation { LocationWithElevation::from_lon_lat(8.06, 50.39)}
-    fn wgs84_coordinate_limburg_traffic_circle() -> LocationWithElevation { LocationWithElevation::from_lon_lat(8.06185930, 50.38536322)}
-
-    fn wgs84_coordinate_hamburg_elbphilharmonie() -> LocationWithElevation { LocationWithElevation::from_lon_lat(9.984270930290224, 53.54137211789218)}
-    fn create_geotiff_limburg() -> GeoTiff {
-        let mut tiff_loader = GeoTiffManager::new();
-        let geotiff = tiff_loader.load_geotiff("test/region_limburg_an_der_lahn.tif").expect("got error");
-        geotiff
-    }
-    fn create_geotiff_ma_hd() -> GeoTiff {
-        let mut tiff_loader = GeoTiffManager::new();
-        let geotiff = tiff_loader.load_geotiff("test/region_heidelberg_mannheim.tif").expect("got error");
-        geotiff
     }
 
     fn create_fake_geotiff(proj_tiff: Proj, file_path: &str) -> GeoTiff {
@@ -820,39 +799,10 @@ mod tests {
             geotiffreader: geotiffreader,
         }
     }
-    fn are_floats_close_7(a: f64, b: f64) -> bool {
-        are_floats_close(a, b, 1e-7)
-    }
 
-    fn are_floats_close(a: f64, b: f64, epsilon: f64) -> bool {
-        (a - b).abs() < epsilon
-    }
-    pub fn simple_node_element_limburg(id: i64, tags: Vec<(&str, &str)>) -> Node {
-        let tags_obj = tags.iter().map(|(k, v)| Tag::new(k.to_string(), v.to_string())).collect();
-        Node::new(id, 1, wgs84_coordinate_limburg_vienna_house().get_coordinate(), 1, 1, 1, "a".to_string(), true, tags_obj)
-    }
-
-    pub fn simple_way_element(id: i64, node_refs: Vec<i64>, tags: Vec<(&str, &str)>) -> Way {
-        let tags_obj = tags.iter().map(|(k, v)| Tag::new(k.to_string(), v.to_string())).collect();
-        Way::new(id, 1, 1, 1, 1, "a".to_string(), true, node_refs, tags_obj)
-    }
-    pub fn simple_node_element_hd_ma(id: i64, tags: Vec<(&str, &str)>) -> Node {
-        let tags_obj = tags.iter().map(|(k, v)| Tag::new(k.to_string(), v.to_string())).collect();
-        Node::new(id, 1, wgs84_coordinate_hd_river().get_coordinate(), 1, 1, 1, "a".to_string(), true, tags_obj)
-    }
-    fn validate_has_ids(elements: &Vec<Node>, ids: Vec<i64>) {
-        let element_ids = elements.into_iter().map(|node| node.id()).collect::<Vec<_>>();
-        assert!(element_ids.iter().all(|id| ids.contains(id)));
-    }
-    fn validate_all_have_elevation_tag(elements: &Vec<Node>) {
-        elements.iter().for_each(|element| validate_has_elevation_tag(&element));
-    }
-    fn validate_has_elevation_tag(node: &Node) {
-        assert!(node.tags().iter().any(|tag| tag.k().eq("ele") && !tag.v().is_empty()));
-    }
     #[test]
     fn test_geotiff_limburg_load() {
-        let geotiff = create_geotiff_limburg();
+        let geotiff = test_utils::create_geotiff_limburg();
         assert_eq!(geotiff.pixels_vertical, 991);
         assert_eq!(geotiff.pixels_horizontal, 1016);
     }
@@ -868,7 +818,7 @@ mod tests {
         let _ = SimpleLogger::new().init();
         let mut geotiff_loader = GeoTiffManager::with_file_pattern("test/region*.tif");
         assert_eq!(2, geotiff_loader.index.get_geotiff_count());
-        let test_point = wgs84_coordinate_limburg_vienna_house();
+        let test_point = utils::test_utils::wgs84_coordinate_limburg_vienna_house();
         let geotiffs = geotiff_loader.index.find_geotiff_id_for_wgs84_coord(test_point.lon(), test_point.lat());
         assert_eq!(1, geotiffs.len());
         assert_eq!("test/region_limburg_an_der_lahn.tif", geotiffs[0]);
@@ -879,7 +829,7 @@ mod tests {
         let _ = SimpleLogger::new().init();
         let mut geotiff_loader = GeoTiffManager::with_file_pattern("test/region*.tif");
         assert_eq!(2, geotiff_loader.index.get_geotiff_count());
-        let test_point = wgs84_coordinate_hd_river();
+        let test_point = test_utils::wgs84_coordinate_hd_river();
         let geotiffs = geotiff_loader.index.find_geotiff_id_for_wgs84_coord(test_point.lon(), test_point.lat());
         assert_eq!(1, geotiffs.len());
         assert_eq!("test/region_heidelberg_mannheim.tif", geotiffs[0]);
@@ -896,7 +846,7 @@ mod tests {
         geotiff_loader.index_geotiffs("test/srtm*.tif");
         assert_eq!(6, geotiff_loader.index.get_geotiff_count());
 
-        let test_point = wgs84_coordinate_hd_river();
+        let test_point = test_utils::wgs84_coordinate_hd_river();
         let geotiffs = geotiff_loader.index.find_geotiff_id_for_wgs84_coord(test_point.lon(), test_point.lat());
         dbg!(&geotiffs);
         assert_eq!(3, geotiffs.len());
@@ -904,7 +854,7 @@ mod tests {
         assert_eq!(geotiffs[1], "test/region_heidelberg_mannheim.tif");
         assert_eq!(geotiffs[2], "test/30N000E_20101117_gmted_mea075.tif");
 
-        let test_point = wgs84_coordinate_limburg_traffic_circle();
+        let test_point = test_utils::wgs84_coordinate_limburg_traffic_circle();
         let geotiffs = geotiff_loader.index.find_geotiff_id_for_wgs84_coord(test_point.lon(), test_point.lat());
         dbg!(&geotiffs);
         assert_eq!(3, geotiffs.len());
@@ -912,7 +862,7 @@ mod tests {
         assert_eq!(geotiffs[1], "test/srtm_38_02.tif");
         assert_eq!(geotiffs[2], "test/50N000E_20101117_gmted_mea075.tif");
 
-        let test_point = wgs84_coord_hd_mountain();
+        let test_point = test_utils::wgs84_coord_hd_mountain();
         let geotiffs = geotiff_loader.index.find_geotiff_id_for_wgs84_coord(test_point.lon(), test_point.lat());
         dbg!(&geotiffs);
         assert_eq!(3, geotiffs.len());
@@ -920,7 +870,7 @@ mod tests {
         assert_eq!(geotiffs[1], "test/region_heidelberg_mannheim.tif");
         assert_eq!(geotiffs[2], "test/30N000E_20101117_gmted_mea075.tif");
 
-        let test_point = wgs84_coordinate_limburg_vienna_house();
+        let test_point = test_utils::wgs84_coordinate_limburg_vienna_house();
         let geotiffs = geotiff_loader.index.find_geotiff_id_for_wgs84_coord(test_point.lon(), test_point.lat());
         dbg!(&geotiffs);
         assert_eq!(3, geotiffs.len());
@@ -928,7 +878,7 @@ mod tests {
         assert_eq!(geotiffs[1], "test/srtm_38_02.tif");
         assert_eq!(geotiffs[2], "test/50N000E_20101117_gmted_mea075.tif");
 
-        let test_point = wgs84_coordinate_hamburg_elbphilharmonie();
+        let test_point = test_utils::wgs84_coordinate_hamburg_elbphilharmonie();
         let geotiffs = geotiff_loader.index.find_geotiff_id_for_wgs84_coord(test_point.lon(), test_point.lat());
         dbg!(&geotiffs);
         assert_eq!(2, geotiffs.len());
@@ -938,7 +888,7 @@ mod tests {
 
     #[test]
     fn test_geotiff_limburg_get_value_for_pixel_coord() {
-        let mut geotiff = create_geotiff_limburg();
+        let mut geotiff = test_utils::create_geotiff_limburg();
 
         let value = geotiff.get_value_for_pixel_coord(540u32, 978u32);
         dbg!(&value);
@@ -951,8 +901,8 @@ mod tests {
 
     #[test]
     fn test_geotiff_limburg_get_value_for_wgs_84() {
-        let mut geotiff = create_geotiff_limburg();
-        let test_point = wgs84_coordinate_limburg_traffic_circle();
+        let mut geotiff = test_utils::create_geotiff_limburg();
+        let test_point = test_utils::wgs84_coordinate_limburg_traffic_circle();
         let value = geotiff.get_value_for_wgs_84(test_point.lon(), test_point.lat());
         dbg!(&value);
         assert_eq!(&value, &RasterValue::F32(121.21507));
@@ -960,8 +910,8 @@ mod tests {
 
     #[test]
     fn test_geotiff_ma_hd_get_value_for_wgs_84() {
-        let mut geotiff = create_geotiff_ma_hd();
-        let test_point = wgs84_coordinate_hd_river();
+        let mut geotiff = test_utils::create_geotiff_ma_hd();
+        let test_point = test_utils::wgs84_coordinate_hd_river();
         let value = geotiff.get_value_for_wgs_84(test_point.lon(), test_point.lat());
         dbg!(&value);
         assert_eq!(&value, &RasterValue::I16(107));
@@ -1010,7 +960,7 @@ mod tests {
         let point_3d = transform(
             &Proj::from_epsg_code(4326).expect("not found"),
             &Proj::from_epsg_code(4326).expect("not found"),
-            wgs84_coordinate_limburg_traffic_circle().lon(), wgs84_coordinate_limburg_traffic_circle().lat()).expect("transformation error");
+            test_utils::wgs84_coordinate_limburg_traffic_circle().lon(), test_utils::wgs84_coordinate_limburg_traffic_circle().lat()).expect("transformation error");
         assert_eq!(point_3d.0, 8.06185930f64);
         assert_eq!(point_3d.1, 50.38536322f64);
     }
@@ -1020,18 +970,18 @@ mod tests {
             &Proj::from_epsg_code(25832).expect("not found"),
             &Proj::from_epsg_code(4326).expect("not found"),
             433305.7043197789f64, 5581899.216447188f64).expect("transformation error");
-        assert!(are_floats_close_7(point_3d.0, 8.06185930f64));
-        assert!(are_floats_close_7(point_3d.1, 50.38536322f64));
+        assert!(test_utils::are_floats_close_7(point_3d.0, 8.06185930f64));
+        assert!(test_utils::are_floats_close_7(point_3d.1, 50.38536322f64));
     }
     #[test]
     fn test_transform_4326_to_25832() {
         let point_3d = transform(
             &Proj::from_epsg_code(4326).expect("not found"),
             &Proj::from_epsg_code(25832).expect("not found"),
-            wgs84_coordinate_limburg_traffic_circle().lon(), wgs84_coordinate_limburg_traffic_circle().lat()).expect("transformation error");
+            test_utils::wgs84_coordinate_limburg_traffic_circle().lon(), test_utils::wgs84_coordinate_limburg_traffic_circle().lat()).expect("transformation error");
         dbg!(&point_3d);
-        assert!(are_floats_close(point_3d.0, 433305.7043197789f64, 1e-2)); // Is this precision still ok?
-        assert!(are_floats_close(point_3d.1, 5581899.216447188f64, 1e-2)); // Is this precision still ok?
+        assert!(test_utils::are_floats_close(point_3d.0, 433305.7043197789f64, 1e-2)); // Is this precision still ok?
+        assert!(test_utils::are_floats_close(point_3d.1, 5581899.216447188f64, 1e-2)); // Is this precision still ok?
     }
 
     #[test]
@@ -1041,8 +991,8 @@ mod tests {
             &Proj::from_epsg_code(25832).expect("not found"),
             8.06f64, 50.28f64).expect("transformation error");
         dbg!(&point_3d);
-        assert!(are_floats_close(point_3d.0, 433025.5633903637f64, 1e-4)); // Is this precision still ok?
-        assert!(are_floats_close(point_3d.1, 5570185.7364423815f64, 1e-3)); // Is this precision still ok?
+        assert!(test_utils::are_floats_close(point_3d.0, 433025.5633903637f64, 1e-4)); // Is this precision still ok?
+        assert!(test_utils::are_floats_close(point_3d.1, 5570185.7364423815f64, 1e-3)); // Is this precision still ok?
     }
 
     #[test]
@@ -1058,28 +1008,28 @@ mod tests {
         point_3d.0 = point_3d.0.to_degrees();
         point_3d.1 = point_3d.1.to_degrees();
         dbg!(&point_3d);
-        assert!(are_floats_close(point_3d.0, 126.98069676435814, 1e-2));
-        assert!(are_floats_close(point_3d.1, 37.58308534678718, 1e-2));
+        assert!(test_utils::are_floats_close(point_3d.0, 126.98069676435814, 1e-2));
+        assert!(test_utils::are_floats_close(point_3d.1, 37.58308534678718, 1e-2));
     }
     #[test]
     fn test_wgs_84_to_tiff_coord_4326() {
         let geotiff = create_fake_geotiff(Proj::from_epsg_code(4326).unwrap(), "test/region_limburg_an_der_lahn.tif");
-        let tiff_coord = geotiff.wgs_84_to_tiff_coord(wgs84_coordinate_limburg_traffic_circle().lon(), wgs84_coordinate_limburg_traffic_circle().lat());
+        let tiff_coord = geotiff.wgs_84_to_tiff_coord(test_utils::wgs84_coordinate_limburg_traffic_circle().lon(), test_utils::wgs84_coordinate_limburg_traffic_circle().lat());
         assert_eq!(tiff_coord.0, 8.06185930f64);
         assert_eq!(tiff_coord.1, 50.38536322f64);
     }
     #[test]
     fn test_wgs_84_to_tiff_coord_25832() {
         let geotiff = create_fake_geotiff(Proj::from_epsg_code(25832).unwrap(), "test/region_limburg_an_der_lahn.tif");
-        let tiff_coord = geotiff.wgs_84_to_tiff_coord(wgs84_coordinate_limburg_traffic_circle().lon(), wgs84_coordinate_limburg_traffic_circle().lat());
-        assert!(are_floats_close(tiff_coord.0, 433305.7043197789f64, 1e-2));
-        assert!(are_floats_close(tiff_coord.1, 5581899.216447188f64, 1e-2));
+        let tiff_coord = geotiff.wgs_84_to_tiff_coord(test_utils::wgs84_coordinate_limburg_traffic_circle().lon(), test_utils::wgs84_coordinate_limburg_traffic_circle().lat());
+        assert!(test_utils::are_floats_close(tiff_coord.0, 433305.7043197789f64, 1e-2));
+        assert!(test_utils::are_floats_close(tiff_coord.1, 5581899.216447188f64, 1e-2));
     }
 
     #[test]
     fn test_geotiff_limburg_to_pixel_coord_and_get_value_for_pixel_coord() {
         //Values and expected results picket from QGIS
-        let mut geotiff = create_geotiff_limburg();
+        let mut geotiff = test_utils::create_geotiff_limburg();
         check_tiff_to_pixel_coord_and_get_value_for_pixel_coord(&mut geotiff, (435123.07f64, 5587878.78f64), (520u32, 73u32), RasterValue::F32(238.54259));
         check_tiff_to_pixel_coord_and_get_value_for_pixel_coord(&mut geotiff, (434919.63f64, 5588157.30f64), (500u32, 45u32), RasterValue::F32(210.00824));
         check_tiff_to_pixel_coord_and_get_value_for_pixel_coord(&mut geotiff, (430173.346f64, 5581806.030f64), (25u32, 680u32), RasterValue::F32(108.33898));
@@ -1090,9 +1040,9 @@ mod tests {
     #[test]
     fn test_geotiff_ma_hd_to_pixel_coord_and_get_value_for_pixel_coord() {
         //Values and expected results picket from QGIS
-        let mut geotiff = create_geotiff_ma_hd();
-        check_tiff_to_pixel_coord_and_get_value_for_pixel_coord(&mut geotiff, wgs84_coord_hd_mountain().get_tuple_lon_lat(), (425u32, 342u32), RasterValue::I16(573));
-        check_tiff_to_pixel_coord_and_get_value_for_pixel_coord(&mut geotiff, wgs84_coordinate_hd_river().get_tuple_lon_lat(), (372u32, 326u32), RasterValue::I16(107));
+        let mut geotiff = test_utils::create_geotiff_ma_hd();
+        check_tiff_to_pixel_coord_and_get_value_for_pixel_coord(&mut geotiff, test_utils::wgs84_coord_hd_mountain().get_tuple_lon_lat(), (425u32, 342u32), RasterValue::I16(573));
+        check_tiff_to_pixel_coord_and_get_value_for_pixel_coord(&mut geotiff, test_utils::wgs84_coordinate_hd_river().get_tuple_lon_lat(), (372u32, 326u32), RasterValue::I16(107));
     }
     fn check_tiff_to_pixel_coord_and_get_value_for_pixel_coord(geotiff: &mut GeoTiff, tiff_coord: (f64, f64), expected_pixel_coord: (u32, u32), expected_value: RasterValue) {
         let pixel_coord = geotiff.tiff_to_pixel_coord(tiff_coord.0, tiff_coord.1);
@@ -1105,7 +1055,7 @@ mod tests {
 
     #[test]
     fn test_elevation_lookup() { //passing test from osm-transform
-        let mut geotiff = create_geotiff_limburg();
+        let mut geotiff = test_utils::create_geotiff_limburg();
         let tiff_coord = geotiff.wgs_84_to_tiff_coord(8.0513629, 50.3876977);
         dbg!(&tiff_coord);
         let pixel_coord = geotiff.tiff_to_pixel_coord(tiff_coord.0, tiff_coord.1);
@@ -1169,36 +1119,36 @@ mod tests {
             1.0);
 
         // The first elements should be buffered in the buffer for their tiff
-        assert_eq!(0usize, handler.handle_node(simple_node_element_limburg(1, vec![])).len());
-        assert_eq!(0usize, handler.handle_node(simple_node_element_hd_ma(20, vec![])).len());
-        assert_eq!(0usize, handler.handle_node(simple_node_element_hd_ma(21, vec![])).len());
-        assert_eq!(0usize, handler.handle_node(simple_node_element_limburg(2, vec![])).len());
-        assert_eq!(0usize, handler.handle_node(simple_node_element_limburg(3, vec![])).len());
+        assert_eq!(0usize, handler.handle_node(test_utils::simple_node_element_limburg(1, vec![])).len());
+        assert_eq!(0usize, handler.handle_node(test_utils::simple_node_element_hd_ma(20, vec![])).len());
+        assert_eq!(0usize, handler.handle_node(test_utils::simple_node_element_hd_ma(21, vec![])).len());
+        assert_eq!(0usize, handler.handle_node(test_utils::simple_node_element_limburg(2, vec![])).len());
+        assert_eq!(0usize, handler.handle_node(test_utils::simple_node_element_limburg(3, vec![])).len());
 
         // When receiving the max_buffer_len st element for tiff limburg, this buffer should be flushed
         // and all 4 elements should be returned.
         // But the 2 elements for tiff hd_ma should remain in their buffer.
-        let probably_4_limburg_nodes = handler.handle_node(simple_node_element_limburg(4, vec![]));
+        let probably_4_limburg_nodes = handler.handle_node(test_utils::simple_node_element_limburg(4, vec![]));
         assert_eq!(4usize, probably_4_limburg_nodes.len());
-        validate_has_ids(&probably_4_limburg_nodes, vec![1, 2, 3, 4]);
-        validate_all_have_elevation_tag(&probably_4_limburg_nodes);
+        test_utils::validate_has_ids(&probably_4_limburg_nodes, vec![1, 2, 3, 4]);
+        test_utils::validate_all_have_elevation_tag(&probably_4_limburg_nodes);
 
         // After the flush call all 2 elements from the hd buffer should be released
         let probably_2_ma_hd_nodes = handler.handle_and_flush_nodes(vec![]);
         assert_eq!(2usize, probably_2_ma_hd_nodes.len());
-        validate_has_ids(&probably_2_ma_hd_nodes, vec![20, 21]);
-        validate_all_have_elevation_tag(&probably_2_ma_hd_nodes);
+        test_utils::validate_has_ids(&probably_2_ma_hd_nodes, vec![20, 21]);
+        test_utils::validate_all_have_elevation_tag(&probably_2_ma_hd_nodes);
 
         // Now one more element is add, it should be buffered
-        assert_eq!(0usize, handler.handle_node(simple_node_element_limburg(10, vec![])).len());
+        assert_eq!(0usize, handler.handle_node(test_utils::simple_node_element_limburg(10, vec![])).len());
         // and now the flush fn is called with two additional node elements.
         // The two buffered and the two transferred arguments are expected in the return vec:
         let probably_3_elements = handler.handle_and_flush_nodes(vec![
-            simple_node_element_hd_ma(22, vec![]),
-            simple_node_element_limburg(5, vec![]),
+            test_utils::simple_node_element_hd_ma(22, vec![]),
+            test_utils::simple_node_element_limburg(5, vec![]),
         ]);
-        validate_has_ids(&probably_3_elements, vec![5, 10, 22]);
-        validate_all_have_elevation_tag(&probably_3_elements);
+        test_utils::validate_has_ids(&probably_3_elements, vec![5, 10, 22]);
+        test_utils::validate_all_have_elevation_tag(&probably_3_elements);
     }
 
     #[test]
@@ -1216,12 +1166,12 @@ mod tests {
             1.0);
 
         // The first elements should be buffered in the buffers for their tiffs
-        assert_eq!(0usize, handler.handle_node(simple_node_element_limburg(1, vec![])).len());
-        assert_eq!(0usize, handler.handle_node(simple_node_element_limburg(2, vec![])).len());
-        assert_eq!(0usize, handler.handle_node(simple_node_element_limburg(3, vec![])).len());
-        assert_eq!(0usize, handler.handle_node(simple_node_element_limburg(4, vec![])).len());
-        assert_eq!(0usize, handler.handle_node(simple_node_element_hd_ma(5, vec![])).len());
-        assert_eq!(0usize, handler.handle_node(simple_node_element_hd_ma(6, vec![])).len());
+        assert_eq!(0usize, handler.handle_node(test_utils::simple_node_element_limburg(1, vec![])).len());
+        assert_eq!(0usize, handler.handle_node(test_utils::simple_node_element_limburg(2, vec![])).len());
+        assert_eq!(0usize, handler.handle_node(test_utils::simple_node_element_limburg(3, vec![])).len());
+        assert_eq!(0usize, handler.handle_node(test_utils::simple_node_element_limburg(4, vec![])).len());
+        assert_eq!(0usize, handler.handle_node(test_utils::simple_node_element_hd_ma(5, vec![])).len());
+        assert_eq!(0usize, handler.handle_node(test_utils::simple_node_element_hd_ma(6, vec![])).len());
 
         // Now let's check the buffer sizes
         assert_eq!(vec!["test/region_limburg_an_der_lahn.tif", "test/region_heidelberg_mannheim.tif"], handler.get_most_filled_buffers(5));
@@ -1230,7 +1180,7 @@ mod tests {
 
         // The next element should trigger the flush of the limburg buffer, which is the most filled one
         // assert_eq!(0usize, handler.handle_node(simple_node_element_hd_ma(7, vec![])).len());
-        let expected_flushed_limburg_nodes = handler.handle_node(simple_node_element_hd_ma(7, vec![]));
+        let expected_flushed_limburg_nodes = handler.handle_node(test_utils::simple_node_element_hd_ma(7, vec![]));
         assert_eq!(4usize, expected_flushed_limburg_nodes.len());
         let expected_ids = vec![1, 2, 3, 4];
         let actual_ids: Vec<i64> = expected_flushed_limburg_nodes.iter().map(|node| node.id()).collect();
@@ -1252,8 +1202,8 @@ mod tests {
             1.0);
 
         let mut data = HandlerData::default();
-        data.nodes.push(simple_node_element_limburg(1, vec![("ele", "10000")]));
-        data.nodes.push(simple_node_element_limburg(2, vec![]));
+        data.nodes.push(test_utils::simple_node_element_limburg(1, vec![("ele", "10000")]));
+        data.nodes.push(test_utils::simple_node_element_limburg(2, vec![]));
         handler.flush(&mut data);
 
         assert_eq!(data.nodes.iter().any(|node| node.id() == 1 && node.tags().iter().any(|tag| tag.k().eq("ele") && tag.v().eq("10000"))), true);
@@ -1261,8 +1211,8 @@ mod tests {
 
         handler.keep_original_elevation = false;
         data = HandlerData::default();
-        data.nodes.push(simple_node_element_limburg(1, vec![("ele", "10000")]));
-        data.nodes.push(simple_node_element_limburg(2, vec![]));
+        data.nodes.push(test_utils::simple_node_element_limburg(1, vec![("ele", "10000")]));
+        data.nodes.push(test_utils::simple_node_element_limburg(2, vec![]));
         handler.flush(&mut data);
 
         assert_eq!(data.nodes.iter().any(|node| node.id() == 1 && node.tags().iter().any(|tag| tag.k().eq("ele") && !tag.v().eq("10000"))), true);
@@ -1283,12 +1233,12 @@ mod tests {
             1.0);
 
         // The first elements should be buffered in the buffers for their tiffs
-        assert_eq!(0usize, handler.handle_node(simple_node_element_limburg(1, vec![])).len());
-        assert_eq!(0usize, handler.handle_node(simple_node_element_limburg(2, vec![])).len());
-        assert_eq!(0usize, handler.handle_node(simple_node_element_limburg(3, vec![])).len());
-        assert_eq!(0usize, handler.handle_node(simple_node_element_limburg(4, vec![])).len());
-        assert_eq!(0usize, handler.handle_node(simple_node_element_hd_ma(5, vec![])).len());
-        assert_eq!(6usize, handler.handle_and_flush_nodes(vec![simple_node_element_hd_ma(6, vec![])]).len());
+        assert_eq!(0usize, handler.handle_node(test_utils::simple_node_element_limburg(1, vec![])).len());
+        assert_eq!(0usize, handler.handle_node(test_utils::simple_node_element_limburg(2, vec![])).len());
+        assert_eq!(0usize, handler.handle_node(test_utils::simple_node_element_limburg(3, vec![])).len());
+        assert_eq!(0usize, handler.handle_node(test_utils::simple_node_element_limburg(4, vec![])).len());
+        assert_eq!(0usize, handler.handle_node(test_utils::simple_node_element_hd_ma(5, vec![])).len());
+        assert_eq!(6usize, handler.handle_and_flush_nodes(vec![test_utils::simple_node_element_hd_ma(6, vec![])]).len());
 
         // Now let's check the buffer sizes
         assert_eq!(6usize, handler.node_cache.len());
@@ -1308,10 +1258,10 @@ mod tests {
             0.01,
             1.0);
 
-        handler.node_cache.insert(1000, wgs84_coord_hd_philosophers_way_start());
-        handler.node_cache.insert(1001, wgs84_coord_hd_philosophers_way_end());
+        handler.node_cache.insert(1000, test_utils::wgs84_coord_hd_philosophers_way_start());
+        handler.node_cache.insert(1001, test_utils::wgs84_coord_hd_philosophers_way_end());
 
-        let mut way = simple_way_element(1, vec![1000, 1001], vec![]);
+        let mut way = test_utils::simple_way_element(1, vec![1000, 1001], vec![]);
         let nodes = handler.handle_way(&mut way);
         dbg!(&nodes);
         assert!(nodes.len() > 0);
@@ -1333,10 +1283,10 @@ mod tests {
             0.005,
             1.0);
 
-        handler.node_cache.insert(1000, wgs84_coord_hd_philosophers_way_start());
-        handler.node_cache.insert(1001, wgs84_coord_hd_philosophers_way_end());
+        handler.node_cache.insert(1000, test_utils::wgs84_coord_hd_philosophers_way_start());
+        handler.node_cache.insert(1001, test_utils::wgs84_coord_hd_philosophers_way_end());
 
-        let mut way = simple_way_element(1, vec![1000, 1001], vec![]);
+        let mut way = test_utils::simple_way_element(1, vec![1000, 1001], vec![]);
         assert!(&way.refs().len() == &2);
 
         let _nodes = handler.handle_way(&mut way);

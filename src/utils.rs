@@ -1,5 +1,7 @@
 use std::path::PathBuf;
 use osm_io::osm::pbf::reader::Reader;
+#[cfg(test)]
+pub(crate) mod test_utils;
 
 pub fn read_osm_timestamp(file_path: &PathBuf) -> i64 {
     let reader = Reader::new(&file_path).expect("file not found");
