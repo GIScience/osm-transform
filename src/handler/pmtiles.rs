@@ -2,9 +2,11 @@ use std::f64::consts::PI;
 
 use crate::handler::Handler;
 use bytes::Bytes;
+use libwebp::boxed::WebpBox;
 use osm_io::osm::model::node::Node;
 use pmtiles::aws_sdk_s3::Client; // Re-exported AWS SDK S3 client
 use pmtiles::{AsyncPmTilesReader, HashMapCache, TileCoord};
+use libwebp::WebPDecodeRGBA;
 
 pub(crate) struct PMTilesElevationEnricher {}
 
@@ -45,6 +47,20 @@ async fn get_tile_file(path: &str, z: u8, x: u32, y: u32) -> Option<Bytes> {
     let coord = TileCoord::new(z, x, y).unwrap();
     // reader.get_tile(coord).await.unwrap()
     reader.get_tile(coord).await.unwrap()
+}
+
+fn bytes_to_rgba(data: Bytes) -> (u32, u32, WebpBox<[u8]>) {
+    let (width, height, buf) = WebPDecodeRGBA(data.iter().as_slice()).unwrap();
+    // assert_eq!(buf.len(), width as usize * height as usize * 4);
+    // eprintln!("width = {}, height = {}", width, height);
+    // eprintln!(
+    //     "top-left pixel: rgba({}, {}, {}, {})",
+    //     buf[0],
+    //     buf[1],
+    //     buf[2],
+    //     buf[3] as f64 / 255.0,
+    // );
+    (width, height, buf)
 }
 
 fn match_node_to_tile(node: Node, zoom: u8) -> TileCoord {
@@ -96,5 +112,19 @@ mod test {
         let path = "test/pmtiles/hd-6-33-21.pmtiles";
         let bytes = get_tile_file(path, 16, 34354, 22396 ).await.unwrap();
         assert!(!bytes.is_empty());
+    }
+
+    #[tokio::test]
+    async fn test_convert_bytes() {
+        let path = "test/pmtiles/hd-6-33-21.pmtiles";
+        let bytes = get_tile_file(path, 16, 34354, 22396 ).await.unwrap();
+        let (width, height, buf) = crate::handler::pmtiles::bytes_to_rgba(bytes);
+        assert_eq!(width, 512);
+        assert_eq!(height, 512);
+        assert_eq!(buf.len(), 512 * 512 * 4);
+        assert_eq!(buf[0], 129);
+        assert_eq!(buf[1], 99);
+        assert_eq!(buf[2], 16);
+        assert_eq!(buf[3], 255);
     }
 }
