@@ -40,6 +40,13 @@ async fn get_tile(client: Client, z: u8, x: u32, y: u32) -> Option<Bytes> {
     reader.get_tile(coord).await.unwrap()
 }
 
+async fn get_tile_file(path: &str, z: u8, x: u32, y: u32) -> Option<Bytes> {
+    let reader = AsyncPmTilesReader::new_with_path(path).await.unwrap();
+    let coord = TileCoord::new(z, x, y).unwrap();
+    // reader.get_tile(coord).await.unwrap()
+    reader.get_tile(coord).await.unwrap()
+}
+
 fn match_node_to_tile(node: Node, zoom: u8) -> TileCoord {
     let lon = node.coordinate().lon();
     let lat = node.coordinate().lat();
@@ -53,10 +60,13 @@ fn match_node_to_tile(node: Node, zoom: u8) -> TileCoord {
     TileCoord::new(zoom, tile_x, tile_y).unwrap()
 }
 
+
 #[cfg(test)]
 mod test {
+    use std::ptr::null;
     use crate::handler::Handler;
     use crate::handler::{pmtiles::PMTilesElevationEnricher, HandlerData};
+    use crate::handler::pmtiles::get_tile_file;
     use crate::utils::test_utils;
 
     #[test]
@@ -79,5 +89,12 @@ mod test {
         data.nodes
             .push(test_utils::simple_node_element_limburg(2, vec![]));
         handler.flush(&mut data);
+    }
+
+    #[tokio::test]
+    async fn test_access_file() {
+        let path = "test/pmtiles/hd-6-33-21.pmtiles";
+        let bytes = get_tile_file(path, 16, 34354, 22396 ).await.unwrap();
+        assert!(!bytes.is_empty());
     }
 }
