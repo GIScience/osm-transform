@@ -50,19 +50,19 @@ async fn get_tile_file(path: &str, z: u8, x: u32, y: u32) -> Option<Bytes> {
     reader.get_tile(coord).await.unwrap()
 }
 
-fn bytes_to_rgba(data: Bytes) -> (u32, u32, WebpBox<[u8]>) {
-    let (width, height, buf) = WebPDecodeRGBA(data.iter().as_slice()).unwrap();
-    // assert_eq!(buf.len(), width as usize * height as usize * 4);
-    // eprintln!("width = {}, height = {}", width, height);
-    // eprintln!(
-    //     "top-left pixel: rgba({}, {}, {}, {})",
-    //     buf[0],
-    //     buf[1],
-    //     buf[2],
-    //     buf[3] as f64 / 255.0,
-    // );
-    (width, height, buf)
-}
+// fn bytes_to_rgba(data: Bytes) -> (u32, u32, WebpBox<[u8]>) {
+//     let (width, height, buf) = WebPDecodeRGBA(data.iter().as_slice()).unwrap();
+//     // assert_eq!(buf.len(), width as usize * height as usize * 4);
+//     // eprintln!("width = {}, height = {}", width, height);
+//     // eprintln!(
+//     //     "top-left pixel: rgba({}, {}, {}, {})",
+//     //     buf[0],
+//     //     buf[1],
+//     //     buf[2],
+//     //     buf[3] as f64 / 255.0,
+//     // );
+//     (width, height, buf)
+// }
 
 fn match_node_to_tile(node: Node, zoom: u8) -> TileCoord {
     let lon = node.coordinate().lon();
@@ -104,24 +104,33 @@ pub fn get_pixel_coordinates(
     (pixel_x, pixel_y)
 }
 
-pub fn get_elevation_for_pixel(rgba: WebpBox<[u8]>, width: u32, height: u32, x: usize, y: usize) -> f64 {
-    let index = (y * width as usize + x) * 4;//TODO: only RGB channels are needed, use WebPDecodeRGB istead of WebPDecodeRGBA to avoid unnecessary alpha channel
+pub fn get_elevation_for_pixel(rgba: WebpBox<[u8]>, width: u32, height: u32, pixel_x: usize, pixel_y: usize) -> f64 {
+    //TODO: only RGB channels are needed, use WebPDecodeRGB istead of WebPDecodeRGBA to avoid unnecessary alpha channel
+    let index = convert_pixel_coordinate_to_pixel_index(pixel_x, pixel_y, width);
 
-    let r = rgba[index];
-    let g = rgba[index + 1];
-    let b = rgba[index + 2];
-
-    let elevation = (r as f64 * 256.0 + g as f64 + b as f64 / 256.0) - 32768.0;
+    let elevation = calculate_elevation_for_pixel(rgba, index);
 
     elevation
 }
 
+fn calculate_elevation_for_pixel(rgba: WebpBox<[u8]>, pixel_index: usize) -> f64 {
+    let r = rgba[pixel_index];
+    let g = rgba[pixel_index + 1];
+    let b = rgba[pixel_index + 2];
+
+    (r as f64 * 256.0 + g as f64 + b as f64 / 256.0) - 32768.0
+}
+
+pub fn convert_pixel_coordinate_to_pixel_index(pixel_x: usize, pixel_y: usize, width: u32) -> usize {
+    (pixel_y * width as usize + pixel_x) * 4
+}
+
+
 #[cfg(test)]
 mod test {
-    use std::ptr::null;
     use crate::handler::Handler;
     use crate::handler::{pmtiles::PMTilesElevationEnricher, HandlerData};
-    use crate::handler::pmtiles::get_tile_file;
+    use crate::handler::pmtiles::{convert_pixel_coordinate_to_pixel_index, get_tile_file, match_node_to_tile};
     use crate::utils::test_utils;
 
     #[test]
@@ -153,17 +162,32 @@ mod test {
         assert!(!bytes.is_empty());
     }
 
-    #[tokio::test]
-    async fn test_convert_bytes() {
-        let path = "test/pmtiles/hd-6-33-21.pmtiles";
-        let bytes = get_tile_file(path, 16, 34354, 22396 ).await.unwrap();
-        let (width, height, buf) = crate::handler::pmtiles::bytes_to_rgba(bytes);
-        assert_eq!(width, 512);
-        assert_eq!(height, 512);
-        assert_eq!(buf.len(), 512 * 512 * 4);
-        assert_eq!(buf[0], 129);
-        assert_eq!(buf[1], 99);
-        assert_eq!(buf[2], 16);
-        assert_eq!(buf[3], 255);
+    // #[tokio::test]
+    // async fn test_convert_bytes() {
+    //     let path = "test/pmtiles/hd-6-33-21.pmtiles";
+    //     let bytes = get_tile_file(path, 16, 34354, 22396 ).await.unwrap();
+    //     let (width, height, buf) = crate::handler::pmtiles::bytes_to_rgba(bytes);
+    //     assert_eq!(width, 512);
+    //     assert_eq!(height, 512);
+    //     assert_eq!(buf.len(), 512 * 512 * 4);
+    //     assert_eq!(buf[0], 129);
+    //     assert_eq!(buf[1], 99);
+    //     assert_eq!(buf[2], 16);
+    //     assert_eq!(buf[3], 255);
+    // }
+
+    #[ignore]
+    #[test]
+    fn test_calculate_elevation_for_pixel() {
+        todo!("missing test")
+    }
+
+    #[test]
+    fn test_convert_pixel_coordinate_to_byte_array_index() {
+        let mut index = convert_pixel_coordinate_to_pixel_index(0, 0, 10);
+        assert_eq!(0, index);
+
+        index = convert_pixel_coordinate_to_pixel_index(0, 1, 10);
+        assert_eq!(40, index)
     }
 }
