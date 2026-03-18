@@ -8,6 +8,8 @@ use osm_io::osm::model::node::Node;
 use pmtiles::aws_sdk_s3::Client; // Re-exported AWS SDK S3 client
 use pmtiles::{AsyncPmTilesReader, HashMapCache, TileCoord};
 use libwebp::WebPDecodeRGBA;
+use proj4rs::Proj;
+use proj4rs::transform::transform;
 
 pub(crate) struct PMTilesElevationEnricher {}
 
@@ -64,17 +66,29 @@ async fn get_tile_file(path: &str, z: u8, x: u32, y: u32) -> Option<Bytes> {
 //     (width, height, buf)
 // }
 
-fn match_node_to_tile(node: Node, zoom: u8) -> TileCoord {
-    let lon = node.coordinate().lon();
-    let lat = node.coordinate().lat();
+fn match_node_to_tile(node: Node, zoom: &u8) -> (f64, f64) {
+    // TODO: Calculation seems incorrect
+    let lon = node.coordinate().lon().to_radians();
+    let lat = node.coordinate().lat().to_radians();
+    let src = Proj::from_epsg_code(4326).unwrap();
+    let dst = Proj::from_epsg_code(3857).expect("Projection not Implemented");
 
-    let lat_radian = lat.to_radians();
-    let n = (2 as u8).pow(zoom as u32) as f64;
+    let mut point = (lon, lat, 0.0);
 
-    let tile_x = ((lon + 180.0) / (360.0 * n)) as u32;
-    let tile_y = ((1.0 - lat_radian.tan().asinh() / PI) / 2.0 * n) as u32;
+    transform(&src, &dst, &mut point).unwrap();
 
-    TileCoord::new(zoom, tile_x, tile_y).unwrap()
+    let lon_trans = point.0.to_degrees();
+    let lat_trans = point.1;
+
+    let x = 0.5 + lon_trans / 360.0;
+    let y = 0.5 - lat_trans / (2.0 * PI);
+        
+    let n = (2 as u32).pow(zoom.clone() as u32) as f64;
+
+    let x_tile = n * x;
+    let y_tile = n * y;
+
+    (x_tile, y_tile)
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -138,6 +152,28 @@ mod test {
         let enricher = PMTilesElevationEnricher {};
         let result = enricher.handle_node();
         assert_eq!(0, result.unwrap())
+    }
+
+    #[ignore]
+    #[test]
+    fn test_match_node_to_tile() {
+        let node = test_utils::simple_node_element_heidelberg_gaulskopfbrunnen(1, vec![]);
+
+        let (x,y ) = match_node_to_tile(node, &16);
+
+        assert_eq!(x as u64, 34354);
+        assert_eq!(y as u64, 22396);
+    }
+
+    #[ignore]
+    #[test]
+    fn test_match_node_osm_example() {
+        let node = test_utils::simple_node_element_osm_example(1, vec![]);
+
+        let (x, y) = match_node_to_tile(node, &18);
+
+        assert_eq!(y, 103246.410442);
+        assert_eq!(x, 232798.930207);
     }
 
     #[ignore]

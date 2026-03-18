@@ -1,3 +1,4 @@
+use osm_io::osm::model::coordinate::Coordinate;
 use osm_io::osm::model::node::Node;
 use osm_io::osm::model::tag::Tag;
 use osm_io::osm::model::way::Way;
@@ -67,3 +68,13 @@ pub fn simple_node_element_limburg(id: i64, tags: Vec<(&str, &str)>) -> Node {
         let tags_obj = tags.iter().map(|(k, v)| Tag::new(k.to_string(), v.to_string())).collect();
         Node::new(id, 1, wgs84_coordinate_limburg_vienna_house().get_coordinate(), 1, 1, 1, "a".to_string(), true, tags_obj)
     }
+
+pub fn simple_node_element_heidelberg_gaulskopfbrunnen(id: i64, tags: Vec<(&str, &str)>) -> Node {
+    let tags_obj = tags.iter().map(|(k, v)| Tag::new(k.to_string(), v.to_string())).collect();
+    Node::new(id, 1, Coordinate::new(49.394664, 8.716664), 1, 1, 1, "a".to_string(), true, tags_obj)
+}
+
+pub fn simple_node_element_osm_example(id: i64, tags: Vec<(&str, &str)>) -> Node {
+    let tags_obj = tags.iter().map(|(k, v)| Tag::new(k.to_string(), v.to_string())).collect();
+    Node::new(id, 1, Coordinate::new(35.6590699, 139.7006793), 1, 1, 1, "a".to_string(), true, tags_obj)
+}
