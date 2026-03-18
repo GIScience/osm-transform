@@ -1,3 +1,4 @@
+use std::cmp::min;
 use std::f64::consts::PI;
 
 use crate::handler::Handler;
@@ -76,6 +77,44 @@ fn match_node_to_tile(node: Node, zoom: u8) -> TileCoord {
     TileCoord::new(zoom, tile_x, tile_y).unwrap()
 }
 
+#[derive(Debug, Clone, Copy)]
+pub struct BoundingBox {
+    pub min_lon: f64,
+    pub min_lat: f64,
+    pub max_lon: f64,
+    pub max_lat: f64,
+}
+
+pub fn get_pixel_coordinates(
+    bbox: &BoundingBox,
+    img_w: usize,
+    img_h: usize,
+    lon: f64,
+    lat: f64,
+) -> (usize, usize) {
+    let pixel_width = (bbox.max_lon - bbox.min_lon) / img_w as f64;
+    let pixel_height = (bbox.max_lat - bbox.min_lat) / img_h as f64;
+
+    let mut pixel_x = ((lon - bbox.min_lon) / pixel_width) as usize;
+    let mut pixel_y = ((bbox.max_lat - lat) / pixel_height) as usize;
+
+    pixel_x = min(pixel_x, img_w - 1);
+    pixel_y = min(pixel_y, img_h - 1);
+
+    (pixel_x, pixel_y)
+}
+
+pub fn get_elevation_for_pixel(rgba: WebpBox<[u8]>, width: u32, height: u32, x: usize, y: usize) -> f64 {
+    let index = (y * width as usize + x) * 4;//TODO: only RGB channels are needed, use WebPDecodeRGB istead of WebPDecodeRGBA to avoid unnecessary alpha channel
+
+    let r = rgba[index];
+    let g = rgba[index + 1];
+    let b = rgba[index + 2];
+
+    let elevation = (r as f64 * 256.0 + g as f64 + b as f64 / 256.0) - 32768.0;
+
+    elevation
+}
 
 #[cfg(test)]
 mod test {
