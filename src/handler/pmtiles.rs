@@ -195,17 +195,19 @@ mod test {
     //     index = convert_pixel_coordinate_to_pixel_index(0, 1, 10);
     //     assert_eq!(40, index)
     // }
-
+    #[ignore]
     #[tokio::test]
     async fn test_get_tile_from_s3() {
-        let aws_access_key_id="SqYNlvX3Ca8JDHx2gdBi";
-        let aws_secret_access_key="5mW6OR09erJzUZ8ESG4FtBoskhAYgflVDwPdQI7T";
-        let url = "https://warm.storage.heigit.org".to_string();
-        let bucket = "heigit-highres-elevation-data".to_string();
+        // TODO this needs a better test setup
+        // because environment variables are probably not the best choice of secrets management here
+        let aws_access_key_id=std::env::var("AWS_ACCESS_KEY_ID").unwrap();
+        let aws_secret_access_key= std::env::var("AWS_SECRET_ACCESS_KEY").unwrap();
+        let url = std::env::var("S3_URL").unwrap();
+        let bucket = std::env::var("S3_BUCKET").unwrap();
         let path = "mapterhorn/0.0.8/";
         let pmtiles = "6-33-21.pmtiles";
         let key = format!("{path}{pmtiles}");
-        let bytes = get_tile_from_s3(url, bucket, key, aws_secret_access_key, aws_access_key_id, 16, 34352, 22394).await.unwrap();
+        let bytes = get_tile_from_s3(url, bucket, key, &aws_secret_access_key, &aws_access_key_id, 16, 34352, 22394).await.unwrap();
         let (width, height, tile) = bytes_to_rgba(bytes);
         let elevation = get_elevation_for_pixel(tile, width, height, 0.64369550222 , 0.08548168248);
         assert_eq!(371.125, elevation);

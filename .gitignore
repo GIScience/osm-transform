@@ -34,3 +34,5 @@ test/30N000E_20101117_gmted_mea075.tif
 test/50N000E_20101117_gmted_mea075.tif
 test/srtm_38_02.tif
 test/srtm_38_03.tif
+
+*.env
