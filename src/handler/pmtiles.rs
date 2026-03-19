@@ -7,9 +7,6 @@ use libwebp::boxed::WebpBox;
 use osm_io::osm::model::node::Node;
 use pmtiles::aws_sdk_s3::Client; // Re-exported AWS SDK S3 client
 use pmtiles::{AsyncPmTilesReader, HashMapCache, TileCoord};
-use libwebp::WebPDecodeRGBA;
-use proj4rs::Proj;
-use proj4rs::transform::transform;
 
 pub(crate) struct PMTilesElevationEnricher {}
 
@@ -67,27 +64,9 @@ async fn get_tile_file(path: &str, z: u8, x: u32, y: u32) -> Option<Bytes> {
 // }
 
 fn match_node_to_tile(node: Node, zoom: &u8) -> (f64, f64) {
-    // TODO: Calculation seems incorrect
-    let lon = node.coordinate().lon().to_radians();
-    let lat = node.coordinate().lat().to_radians();
-    let src = Proj::from_epsg_code(4326).unwrap();
-    let dst = Proj::from_epsg_code(3857).expect("Projection not Implemented");
-
-    let mut point = (lon, lat, 0.0);
-
-    transform(&src, &dst, &mut point).unwrap();
-
-    let lon_trans = point.0.to_degrees();
-    let lat_trans = point.1;
-
-    let x = 0.5 + lon_trans / 360.0;
-    let y = 0.5 - lat_trans / (2.0 * PI);
-        
     let n = (2 as u32).pow(zoom.clone() as u32) as f64;
-
-    let x_tile = n * x;
-    let y_tile = n * y;
-
+    let x_tile = n * (0.5 + node.coordinate().lon() / 360.0);
+    let y_tile = n * (0.5 - node.coordinate().lat().to_radians().tan().asinh() / (2.0 * PI));
     (x_tile, y_tile)
 }
 
@@ -172,8 +151,8 @@ mod test {
 
         let (x, y) = match_node_to_tile(node, &18);
 
-        assert_eq!(y, 103246.410442);
-        assert_eq!(x, 232798.930207);
+        assert_eq!(x, 232798.93020672, "x should be correct");
+        assert_eq!(y, 103246.41043781971, "y should be correct");
     }
 
     #[ignore]
