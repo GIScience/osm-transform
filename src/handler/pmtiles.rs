@@ -1,12 +1,11 @@
-use std::cmp::min;
-use std::f64::consts::PI;
-
 use crate::handler::Handler;
 use bytes::Bytes;
 use libwebp::boxed::WebpBox;
 use libwebp::WebPDecodeRGBA;
 use osm_io::osm::model::node::Node;
-use pmtiles::aws_sdk_s3::Client; // Re-exported AWS SDK S3 client
+use std::f64::consts::PI;
+use pmtiles::s3::creds::Credentials;
+use pmtiles::s3::{Bucket, Region};
 use pmtiles::{AsyncPmTilesReader, HashMapCache, TileCoord};
 
 pub(crate) struct PMTilesElevationEnricher {}
@@ -31,19 +30,29 @@ impl Handler for PMTilesElevationEnricher {
     }
 }
 
-async fn get_tile(client: Client, z: u8, x: u32, y: u32) -> Option<Bytes> {
+async fn get_tile_from_s3(url: String, bucket_name: String, key: String, secret_access_key: &str, access_key_id: &str, z: u8, x: u32, y: u32) -> Option<Bytes> {
+    let credentials = Credentials::new(
+        Some(access_key_id),
+        Some(secret_access_key),
+        None, None, None)
+        .expect("failed to get credentials");
+
+    let region = Region::Custom {
+        region: "eu-central-1".to_owned(),
+        endpoint: url,
+    };
+
     let cache = HashMapCache::default();
-    let bucket = "https://s3.example.com".to_string();
-    let key = "example.pmtiles".to_string();
+    let bucket = Bucket::new(&bucket_name, region, credentials).expect("failed to create bucket").with_path_style();
     let reader =
-        AsyncPmTilesReader::new_with_cached_client_bucket_and_path(cache, client, bucket, key)
+        AsyncPmTilesReader::new_with_cached_bucket_path(cache, *bucket, key)
             .await
             .unwrap();
     let coord = TileCoord::new(z, x, y).unwrap();
     reader.get_tile(coord).await.unwrap()
 }
 
-async fn get_tile_file(path: &str, z: u8, x: u32, y: u32) -> Option<Bytes> {
+async fn get_tile_from_file(path: &str, z: u8, x: u32, y: u32) -> Option<Bytes> {
     let reader = AsyncPmTilesReader::new_with_path(path).await.unwrap();
     let coord = TileCoord::new(z, x, y).unwrap();
     reader.get_tile(coord).await.unwrap()
@@ -88,9 +97,9 @@ pub fn convert_pixel_coordinate_to_pixel_index(pixel_x: f64, pixel_y: f64, width
 
 #[cfg(test)]
 mod test {
+    use crate::handler::pmtiles::{bytes_to_rgba, get_elevation_for_pixel, get_tile_from_file, get_tile_from_s3, match_node_to_tile};
     use crate::handler::Handler;
     use crate::handler::{pmtiles::PMTilesElevationEnricher, HandlerData};
-    use crate::handler::pmtiles::{bytes_to_rgba, convert_pixel_coordinate_to_pixel_index, get_elevation_for_pixel, get_tile_file, match_node_to_tile};
     use crate::utils::test_utils;
 
     #[test]
@@ -130,7 +139,7 @@ mod test {
         assert_eq!(y, 22394.08548168248, "y should be correct");
 
         let path = "test/pmtiles/hd-6-33-21.pmtiles";
-        let bytes = get_tile_file(path, 16, 34352, 22394 ).await.unwrap();
+        let bytes = get_tile_from_file(path, 16, 34352, 22394 ).await.unwrap();
         let (width, height, tile) = bytes_to_rgba(bytes);
         let elevation = get_elevation_for_pixel(tile, width, height, 0.64369550222 , 0.08548168248);
         assert_eq!(371.125, elevation);
@@ -154,14 +163,14 @@ mod test {
     #[tokio::test]
     async fn test_access_file() {
         let path = "test/pmtiles/hd-6-33-21.pmtiles";
-        let bytes = get_tile_file(path, 16, 34354, 22396 ).await.unwrap();
+        let bytes = get_tile_from_file(path, 16, 34354, 22396 ).await.unwrap();
         assert!(!bytes.is_empty());
     }
 
     #[tokio::test]
     async fn test_convert_bytes() {
         let path = "test/pmtiles/hd-6-33-21.pmtiles";
-        let bytes = get_tile_file(path, 16, 34354, 22396 ).await.unwrap();
+        let bytes = get_tile_from_file(path, 16, 34354, 22396 ).await.unwrap();
         let (width, height, buf) = crate::handler::pmtiles::bytes_to_rgba(bytes);
         assert_eq!(width, 512);
         assert_eq!(height, 512);
@@ -186,4 +195,20 @@ mod test {
     //     index = convert_pixel_coordinate_to_pixel_index(0, 1, 10);
     //     assert_eq!(40, index)
     // }
+
+    #[tokio::test]
+    async fn test_get_tile_from_s3() {
+        let aws_access_key_id="SqYNlvX3Ca8JDHx2gdBi";
+        let aws_secret_access_key="5mW6OR09erJzUZ8ESG4FtBoskhAYgflVDwPdQI7T";
+        let url = "https://warm.storage.heigit.org".to_string();
+        let bucket = "heigit-highres-elevation-data".to_string();
+        let path = "mapterhorn/0.0.8/";
+        let pmtiles = "6-33-21.pmtiles";
+        let key = format!("{path}{pmtiles}");
+        let bytes = get_tile_from_s3(url, bucket, key, aws_secret_access_key, aws_access_key_id, 16, 34352, 22394).await.unwrap();
+        let (width, height, tile) = bytes_to_rgba(bytes);
+        let elevation = get_elevation_for_pixel(tile, width, height, 0.64369550222 , 0.08548168248);
+        assert_eq!(371.125, elevation);
+    }
+
 }
