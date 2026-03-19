@@ -74,6 +74,11 @@ pub fn simple_node_element_heidelberg_gaulskopfbrunnen(id: i64, tags: Vec<(&str,
     Node::new(id, 1, Coordinate::new(49.394664, 8.716664), 1, 1, 1, "a".to_string(), true, tags_obj)
 }
 
+pub fn simple_node_element_heidelberg_gaisberg_peak(id: i64, tags: Vec<(&str, &str)>) -> Node {
+    let tags_obj = tags.iter().map(|(k, v)| Tag::new(k.to_string(), v.to_string())).collect();
+    Node::new(id, 1, Coordinate::new(49.4035191, 8.7047078), 1, 1, 1, "a".to_string(), true, tags_obj)
+}
+
 pub fn simple_node_element_osm_example(id: i64, tags: Vec<(&str, &str)>) -> Node {
     let tags_obj = tags.iter().map(|(k, v)| Tag::new(k.to_string(), v.to_string())).collect();
     Node::new(id, 1, Coordinate::new(35.6590699, 139.7006793), 1, 1, 1, "a".to_string(), true, tags_obj)
