@@ -3,26 +3,42 @@ use bytes::Bytes;
 use libwebp::boxed::WebpBox;
 use libwebp::WebPDecodeRGBA;
 use osm_io::osm::model::node::Node;
+use std::collections::HashMap;
 use std::f64::consts::PI;
 use pmtiles::s3::creds::Credentials;
 use pmtiles::s3::{Bucket, Region};
-use pmtiles::{AsyncPmTilesReader, HashMapCache, TileCoord};
+use pmtiles::{AsyncPmTilesReader, HashMapCache, TileCoord, TileId};
 
-pub(crate) struct PMTilesElevationEnricher {}
+pub(crate) struct PMTilesElevationEnricher {
+    buckets: HashMap<TileId, Vec<Node>>
+}
 
 impl PMTilesElevationEnricher {
-    fn handle_node(&self) -> Result<i32, String> {
-        Ok(0)
+    fn new() -> Self {
+        PMTilesElevationEnricher { buckets: HashMap::new() }
+    }
+
+    fn handle_single_node(&mut self, node: Node) {
+        let zoom = 6;
+        let (tile_x, tile_y) = match_node_to_tile(&node, &zoom); // TODO make configurable later    
+        let tile_coordinate = TileCoord::new(zoom, tile_x as u32, tile_y as u32).unwrap();
+
+        let tile_id = TileId::from(tile_coordinate);
+
+        self.buckets.entry(tile_id).or_insert_with(Vec::new).push(node);
     }
 }
+
 
 impl Handler for PMTilesElevationEnricher {
     fn name(&self) -> String {
         String::from("PMTilesElevationEnricher")
     }
 
-    fn handle(&mut self, _data: &mut super::HandlerData) {
-        todo!()
+    fn handle(&mut self, data: &mut super::HandlerData) { 
+        for node in &data.nodes {
+            self.handle_single_node(node.clone());
+        }
     }
 
     fn flush(&mut self, data: &mut super::HandlerData) {
@@ -62,7 +78,7 @@ fn bytes_to_rgba(data: Bytes) -> (u32, u32, WebpBox<[u8]>) {
     WebPDecodeRGBA(data.iter().as_slice()).unwrap()
 }
 
-fn match_node_to_tile(node: Node, zoom: &u8) -> (f64, f64) {
+fn match_node_to_tile(node: &Node, zoom: &u8) -> (f64, f64) {
     // see https://wiki.openstreetmap.org/wiki/Slippy_map_tilenames
     let n = (2 as u32).pow(zoom.clone() as u32) as f64;
     let x_tile = n * (0.5 + node.coordinate().lon() / 360.0);
@@ -102,18 +118,20 @@ mod test {
     use crate::handler::{pmtiles::PMTilesElevationEnricher, HandlerData};
     use crate::utils::test_utils;
 
-    #[test]
-    fn test_pmtiles_elevation_enricher_handle_node() {
-        let enricher = PMTilesElevationEnricher {};
-        let result = enricher.handle_node();
-        assert_eq!(0, result.unwrap())
-    }
+    // TODO write test for new handle node
+    // #[test]
+    // fn test_pmtiles_elevation_enricher_handle_node() {
+    //     let enricher = PMTilesElevationEnricher {
+    //     };
+    //     let result = enricher.handle_single_node();
+    //     assert_eq!(0, result.unwrap())
+    // }
 
     #[test]
     fn test_match_node_to_tile() {
         let node = test_utils::simple_node_element_heidelberg_gaulskopfbrunnen(1, vec![]);
 
-        let (x,y ) = match_node_to_tile(node, &16);
+        let (x,y ) = match_node_to_tile(&node, &16);
 
         assert_eq!(x as u64, 34354);
         assert_eq!(y as u64, 22396);
@@ -123,7 +141,7 @@ mod test {
     fn test_match_node_osm_example() {
         let node = test_utils::simple_node_element_osm_example(1, vec![]);
 
-        let (x, y) = match_node_to_tile(node, &18);
+        let (x, y) = match_node_to_tile(&node, &18);
 
         assert_eq!(x, 232798.93020672, "x should be correct");
         assert_eq!(y, 103246.41043781971, "y should be correct");
@@ -133,7 +151,7 @@ mod test {
     async fn test_match_node_gaisberg() {
         let node = test_utils::simple_node_element_heidelberg_gaisberg_peak(1, vec![]);
 
-        let (x, y) = match_node_to_tile(node, &16);
+        let (x, y) = match_node_to_tile(&node, &16);
         println!("x: {}, y: {}", x, y);
         assert_eq!(x, 34352.64369550222, "x should be correct");
         assert_eq!(y, 22394.08548168248, "y should be correct");
@@ -148,7 +166,7 @@ mod test {
     #[ignore]
     #[test]
     fn test_pmtiles_elevation_enricher() {
-        let mut handler = PMTilesElevationEnricher {};
+        let mut handler = PMTilesElevationEnricher::new();
 
         let mut data = HandlerData::default();
         data.nodes.push(test_utils::simple_node_element_limburg(
