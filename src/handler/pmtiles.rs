@@ -8,6 +8,7 @@ use std::f64::consts::PI;
 use pmtiles::s3::creds::Credentials;
 use pmtiles::s3::{Bucket, Region};
 use pmtiles::{AsyncPmTilesReader, HashMapCache, TileCoord, TileId};
+use osm_io::osm::model::coordinate::Coordinate;
 
 pub(crate) struct PMTilesElevationEnricher {
     buckets: HashMap<TileId, Vec<Node>>
@@ -20,8 +21,8 @@ impl PMTilesElevationEnricher {
 
     fn handle_single_node(&mut self, node: Node) {
         let zoom = 6;
-        let (tile_x, tile_y) = match_node_to_tile(&node, &zoom); // TODO make configurable later    
-        let tile_coordinate = TileCoord::new(zoom, tile_x as u32, tile_y as u32).unwrap();
+        let (tile_x, tile_y, x_in_tile, y_in_tile) = match_node_to_tile(&node, &zoom); // TODO make configurable later
+        let tile_coordinate = TileCoord::new(zoom, tile_x, tile_y).unwrap();
 
         let tile_id = TileId::from(tile_coordinate);
 
@@ -78,12 +79,16 @@ fn bytes_to_rgba(data: Bytes) -> (u32, u32, WebpBox<[u8]>) {
     WebPDecodeRGBA(data.iter().as_slice()).unwrap()
 }
 
-fn match_node_to_tile(node: &Node, zoom: &u8) -> (f64, f64) {
+fn match_node_to_tile(node: &Node, zoom: &u8) -> (u32, u32, f64, f64) {
     // see https://wiki.openstreetmap.org/wiki/Slippy_map_tilenames
     let n = (2 as u32).pow(zoom.clone() as u32) as f64;
-    let x_tile = n * (0.5 + node.coordinate().lon() / 360.0);
-    let y_tile = n * (0.5 - node.coordinate().lat().to_radians().tan().asinh() / (2.0 * PI));
-    (x_tile, y_tile)
+    let x = n * (0.5 + node.coordinate().lon() / 360.0);
+    let y = n * (0.5 - node.coordinate().lat().to_radians().tan().asinh() / (2.0 * PI));
+    let tile_x = x as u32;
+    let tile_y = y as u32;
+    let x_in_tile = x.fract();
+    let y_in_tile = y.fract();
+    (tile_x, tile_y, x_in_tile, y_in_tile)
 }
 
 pub fn get_elevation_for_pixel(rgba: WebpBox<[u8]>, width: u32, height: u32, pixel_x: f64, pixel_y: f64) -> f64 {
@@ -113,54 +118,89 @@ pub fn convert_pixel_coordinate_to_pixel_index(pixel_x: f64, pixel_y: f64, width
 
 #[cfg(test)]
 mod test {
+    use osm_io::osm::model::coordinate::Coordinate;
     use crate::handler::pmtiles::{bytes_to_rgba, get_elevation_for_pixel, get_tile_from_file, get_tile_from_s3, match_node_to_tile};
     use crate::handler::Handler;
     use crate::handler::{pmtiles::PMTilesElevationEnricher, HandlerData};
     use crate::utils::test_utils;
+    use crate::utils::test_utils::{loc_hd_gaulskopfbrunnen, loc_osm_example, simple_node_element, wgs84_coordinate_hamburg_elbphilharmonie, wgs84_coordinate_limburg_traffic_circle, wgs84_coordinate_limburg_vienna_house};
+
 
     // TODO write test for new handle node
-    // #[test]
-    // fn test_pmtiles_elevation_enricher_handle_node() {
-    //     let enricher = PMTilesElevationEnricher {
-    //     };
-    //     let result = enricher.handle_single_node();
-    //     assert_eq!(0, result.unwrap())
-    // }
+    #[test]
+    fn test_pmtiles_elevation_enricher_handle_node() {
+        let mut enricher = PMTilesElevationEnricher::new();
+        enricher.handle_single_node(wgs84_coordinate_hamburg_elbphilharmonie().to_node(1));
+        enricher.handle_single_node(wgs84_coordinate_hamburg_elbphilharmonie().to_node(1));
+        assert!(!enricher.buckets.is_empty());
+    }
+
 
     #[test]
     fn test_match_node_to_tile() {
         let node = test_utils::simple_node_element_heidelberg_gaulskopfbrunnen(1, vec![]);
 
-        let (x,y ) = match_node_to_tile(&node, &16);
+        let (tile_x, tile_y, x_in_tile, y_in_tile) = match_node_to_tile(&node, &16);
 
-        assert_eq!(x as u64, 34354);
-        assert_eq!(y as u64, 22396);
+        assert_eq!(tile_x, 34354);
+        assert_eq!(tile_y, 22396);
+        assert!(test_utils::are_floats_close_7(x_in_tile, 0.8202552888906212));
+        assert!(test_utils::are_floats_close_7(y_in_tile, 0.5625188843041542));
+    }
+
+    // TODO this is just explorative for now - develop a useful test
+    #[test]
+    fn test_match_node_to_tile__() {
+        let mut enricher = PMTilesElevationEnricher::new();
+        let mut coords = vec![
+            simple_node_element(1, Coordinate::new(8.697355076272407, 49.4095351845969), vec![]),
+            simple_node_element(1, Coordinate::new(8.701197202042264, 49.4110429951535), vec![]),
+            simple_node_element(1, Coordinate::new(8.705683259505369, 49.40871145371345), vec![]),
+            simple_node_element(1, Coordinate::new(8.693577343671906, 49.405039400462755), vec![]),
+            simple_node_element(1, Coordinate::new(8.704674433185888, 49.40240037890541), vec![]),
+            simple_node_element(1, Coordinate::new(8.695438792261415, 49.39645148761798), vec![]),
+            simple_node_element(1, wgs84_coordinate_limburg_vienna_house().get_coordinate(), vec![]),
+            simple_node_element(1, wgs84_coordinate_limburg_traffic_circle().get_coordinate(), vec![]),
+            wgs84_coordinate_hamburg_elbphilharmonie().to_node(122),
+            loc_hd_gaulskopfbrunnen().to_node(123),
+            loc_osm_example().to_node(2),
+        ];
+        let zoom = 18;
+        for node in &coords {
+            let (tile_x, tile_y, x_in_tile, y_in_tile) = match_node_to_tile(&node, &zoom);
+            println!("zoom={zoom} tile_x={tile_x} tile_y={tile_y} x_in_tile={x_in_tile} y_in_tile={y_in_tile}");
+        }
     }
 
     #[test]
     fn test_match_node_osm_example() {
         let node = test_utils::simple_node_element_osm_example(1, vec![]);
 
-        let (x, y) = match_node_to_tile(&node, &18);
-
-        assert_eq!(x, 232798.93020672, "x should be correct");
-        assert_eq!(y, 103246.41043781971, "y should be correct");
+        let zoom = 18;
+        let (tile_x, tile_y, x_in_tile, y_in_tile) = match_node_to_tile(&node, &zoom);
+        println!("zoom={zoom} tile_x={tile_x} tile_y={tile_y} x_in_tile={x_in_tile} y_in_tile={y_in_tile}");
+        assert_eq!(tile_x, 232798, "x should be correct");
+        assert_eq!(tile_y, 103246, "y should be correct");
+        assert!(test_utils::are_floats_close_7(x_in_tile, 0.93020672));
+        assert!(test_utils::are_floats_close_7(y_in_tile, 0.41043781971));
     }
 
     #[tokio::test]
     async fn test_match_node_gaisberg() {
-        let node = test_utils::simple_node_element_heidelberg_gaisberg_peak(1, vec![]);
+        let node = test_utils::loc_hd_gaisberg_peak().to_node(1);
 
-        let (x, y) = match_node_to_tile(&node, &16);
-        println!("x: {}, y: {}", x, y);
-        assert_eq!(x, 34352.64369550222, "x should be correct");
-        assert_eq!(y, 22394.08548168248, "y should be correct");
-
+        let zoom = 16;
+        let (tile_x, tile_y, x_in_tile, y_in_tile) = match_node_to_tile(&node, &zoom);
+        println!("zoom={zoom} tile_x={tile_x} tile_y={tile_y} x_in_tile={x_in_tile} y_in_tile={y_in_tile}");
+        assert_eq!(tile_x, 34352, "x should be correct");
+        assert_eq!(tile_y, 22394, "y should be correct");
+        assert!(test_utils::are_floats_close_7(x_in_tile, 0.64369550222));
+        assert!(test_utils::are_floats_close_7(y_in_tile, 0.08548168248));
         let path = "test/pmtiles/hd-6-33-21.pmtiles";
-        let bytes = get_tile_from_file(path, 16, 34352, 22394 ).await.unwrap();
+        let bytes = get_tile_from_file(path, zoom, tile_x, tile_y ).await.unwrap();
         let (width, height, tile) = bytes_to_rgba(bytes);
-        let elevation = get_elevation_for_pixel(tile, width, height, 0.64369550222 , 0.08548168248);
-        assert_eq!(371.125, elevation);
+        let elevation = get_elevation_for_pixel(tile, width, height, x_in_tile, y_in_tile);
+        assert_eq!(elevation, test_utils::loc_hd_gaisberg_peak().ele());
     }
 
     #[ignore]
