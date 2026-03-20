@@ -40,3 +40,4 @@ pmtiles = "0.21.0"
 bytes = "1.11.1"
 tokio = "1.43.0"
 libwebp = { version = "0.1.2", features = ["0_6"] }
+futures-util = "0.3.31"

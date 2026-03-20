@@ -1,3 +1,4 @@
+use futures_util::TryStreamExt;
 use crate::handler::Handler;
 use bytes::Bytes;
 use libwebp::boxed::WebpBox;
@@ -5,9 +6,10 @@ use libwebp::WebPDecodeRGBA;
 use osm_io::osm::model::node::Node;
 use std::collections::HashMap;
 use std::f64::consts::PI;
+use std::sync::Arc;
 use pmtiles::s3::creds::Credentials;
 use pmtiles::s3::{Bucket, Region};
-use pmtiles::{AsyncPmTilesReader, HashMapCache, TileCoord, TileId};
+use pmtiles::{AsyncPmTilesReader, HashMapCache, Header, TileCoord, TileId};
 use osm_io::osm::model::coordinate::Coordinate;
 
 pub(crate) struct PMTilesElevationEnricher {
@@ -75,6 +77,16 @@ async fn get_tile_from_file(path: &str, z: u8, x: u32, y: u32) -> Option<Bytes> 
     reader.get_tile(coord).await.unwrap()
 }
 
+async fn get_tile_ids() -> Result<(), pmtiles::PmtError> {
+    let path = "test/pmtiles/hd-6-33-21.pmtiles";
+    let reader = Arc::new(AsyncPmTilesReader::new_with_path(path).await?);
+    let mut entries = reader.entries();
+    while let Some(entry) = entries.try_next().await? {
+        println!("entry: {entry:?}");
+    }
+    Ok(())
+}
+
 fn bytes_to_rgba(data: Bytes) -> (u32, u32, WebpBox<[u8]>) {
     WebPDecodeRGBA(data.iter().as_slice()).unwrap()
 }
@@ -117,9 +129,8 @@ pub fn convert_pixel_coordinate_to_pixel_index(pixel_x: f64, pixel_y: f64, width
 
 
 #[cfg(test)]
-mod test {
-    use osm_io::osm::model::coordinate::Coordinate;
-    use crate::handler::pmtiles::{bytes_to_rgba, get_elevation_for_pixel, get_tile_from_file, get_tile_from_s3, match_node_to_tile};
+mod test {use osm_io::osm::model::coordinate::Coordinate;
+    use crate::handler::pmtiles::{bytes_to_rgba, get_tile_ids, get_elevation_for_pixel, get_tile_from_file, get_tile_from_s3, match_node_to_tile};
     use crate::handler::Handler;
     use crate::handler::{pmtiles::PMTilesElevationEnricher, HandlerData};
     use crate::utils::test_utils;
@@ -223,6 +234,11 @@ mod test {
         let path = "test/pmtiles/hd-6-33-21.pmtiles";
         let bytes = get_tile_from_file(path, 16, 34354, 22396 ).await.unwrap();
         assert!(!bytes.is_empty());
+    }
+
+    #[tokio::test]
+    async fn test_get_tile_ids() {
+        get_tile_ids().await.unwrap();
     }
 
     #[tokio::test]
