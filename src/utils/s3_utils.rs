@@ -1,7 +1,7 @@
-use aws_sdk_s3::Config;
-use aws_sdk_s3::config::SharedCredentialsProvider;
+//use aws_sdk_s3::Config;
+//use aws_sdk_s3::config::SharedCredentialsProvider;
 use pmtiles::aws_sdk_s3::config::{BehaviorVersion, Credentials, Region};
-use pmtiles::aws_sdk_s3::Client;
+use pmtiles::aws_sdk_s3::{Client, Config};
 
 async fn get_tiles_json_from_s3(url: String, bucket_name: String, key: String, secret_access_key: &str, access_key_id: &str) -> String {
 
@@ -56,8 +56,8 @@ mod test {
     async fn test_list_pmtiles_from_s3() {
         // TODO this needs a better test setup
         // because environment variables are probably not the best choice of secrets management here
-        let aws_access_key_id=std::env::var("AWS_ACCESS_KEY_ID").unwrap();
-        let aws_secret_access_key= std::env::var("AWS_SECRET_ACCESS_KEY").unwrap();
+        let aws_access_key_id= std::env::var("AWS_ACCESS_KEY_ID").unwrap().as_str();
+        let aws_secret_access_key= std::env::var("AWS_SECRET_ACCESS_KEY").unwrap().as_str();
         let url = std::env::var("S3_URL").unwrap();
         let bucket = std::env::var("S3_BUCKET").unwrap();
         let key = "mapterhorn/0.0.8/download_urls.json".to_string();
