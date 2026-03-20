@@ -6,26 +6,26 @@ use pmtiles::aws_sdk_s3::{Client, Config};
 use serde::Deserialize;
 
 #[derive(Debug, Deserialize)]
-struct PMTilesDownloadUrls {
-    version: String,
-    items: Vec<TileInfo>,
+pub(crate) struct PMTilesDownloadUrls {
+    pub(crate) version: String,
+    pub(crate) items: Vec<TileInfo>,
 }
 
 #[derive(Debug, Deserialize)]
-struct TileInfo {
-    name: String,
-    url: String,
-    md5sum: String,
-    size: u64,
-    min_lon: f64,
-    min_lat: f64,
-    max_lon: f64,
-    max_lat: f64,
-    min_zoom: u8,
-    max_zoom: u8,
+pub(crate) struct TileInfo {
+    pub(crate) name: String,
+    pub(crate) url: String,
+    pub(crate) md5sum: String,
+    pub(crate) size: u64,
+    pub(crate) min_lon: f64,
+    pub(crate) min_lat: f64,
+    pub(crate) max_lon: f64,
+    pub(crate) max_lat: f64,
+    pub(crate) min_zoom: u8,
+    pub(crate) max_zoom: u8,
 }
 
-async fn get_tiles_json_from_s3(url: String, bucket_name: String, key: String, access_key_id: String, secret_access_key: String) -> Result<PMTilesDownloadUrls,Box<dyn std::error::Error>> {
+pub(crate) async fn get_tiles_json_from_s3(url: String, bucket_name: String, key: String, access_key_id: String, secret_access_key: String) -> Result<PMTilesDownloadUrls,Box<dyn std::error::Error>> {
 
     let credentials = Credentials::new(
         access_key_id,

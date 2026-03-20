@@ -7,6 +7,7 @@ use osm_io::osm::model::node::Node;
 use std::collections::HashMap;
 use std::f64::consts::PI;
 use std::sync::Arc;
+use itertools::Itertools;
 use pmtiles::s3::creds::Credentials;
 use pmtiles::s3::{Bucket, Region};
 use pmtiles::{AsyncPmTilesReader, HashMapCache, Header, TileCoord, TileId};
@@ -91,6 +92,33 @@ async fn get_tile_ids() -> Result<(), pmtiles::PmtError> {
     Ok(())
 }
 
+async fn get_tile_ids_from_s3(url: String, bucket_name: String, key: String, access_key_id: &str, secret_access_key: &str) -> Result<Vec<TileId>,Box<dyn std::error::Error>> {
+    let credentials = Credentials::new(
+        Some(&access_key_id),
+        Some(&secret_access_key),
+        None, None, None)
+        .expect("failed to get credentials");
+
+    let region = Region::Custom {
+        region: "eu-central-1".to_owned(),
+        endpoint: url,
+    };
+
+    let cache = HashMapCache::default();
+    let bucket = Bucket::new(&bucket_name, region, credentials).expect("failed to create bucket").with_path_style();
+    let reader = Arc::new(AsyncPmTilesReader::new_with_cached_bucket_path(cache, *bucket, key).await?);
+
+    let mut entries = reader.entries();
+    let mut tile_ids = vec![];
+    while let Some(entry) = entries.try_next().await? {
+        entry.iter_coords().for_each(|tile_id| {
+            tile_ids.push(tile_id);
+        }
+        );
+    }
+    Ok(tile_ids)
+}
+
 fn bytes_to_rgba(data: Bytes) -> (u32, u32, WebpBox<[u8]>) {
     WebPDecodeRGBA(data.iter().as_slice()).unwrap()
 }
@@ -134,7 +162,7 @@ pub fn convert_pixel_coordinate_to_pixel_index(pixel_x: f64, pixel_y: f64, width
 
 #[cfg(test)]
 mod test {use osm_io::osm::model::coordinate::Coordinate;
-    use crate::handler::pmtiles::{bytes_to_rgba, get_tile_ids, get_elevation_for_pixel, get_tile_from_file, get_tile_from_s3, match_node_to_tile};
+    use crate::handler::pmtiles::{bytes_to_rgba, get_tile_ids, get_elevation_for_pixel, get_tile_from_file, get_tile_from_s3, match_node_to_tile, get_tile_ids_from_s3};
     use crate::handler::Handler;
     use crate::handler::{pmtiles::PMTilesElevationEnricher, HandlerData};
     use crate::utils::test_utils;
@@ -289,6 +317,52 @@ mod test {use osm_io::osm::model::coordinate::Coordinate;
         let (width, height, tile) = bytes_to_rgba(bytes);
         let elevation = get_elevation_for_pixel(tile, width, height, 0.64369550222 , 0.08548168248);
         assert_eq!(371.125, elevation);
+    }
+
+
+    #[ignore]
+    #[tokio::test]
+    async fn test_one_list_pmtiles_from_s3() {
+        // TODO this needs a better test setup
+        // because environment variables are probably not the best choice of secrets management here
+        let aws_access_key_id= std::env::var("AWS_ACCESS_KEY_ID").expect("AWS_ACCESS_KEY_ID not set");
+        let aws_secret_access_key= std::env::var("AWS_SECRET_ACCESS_KEY").expect("AWS_SECRET_ACCESS_KEY not set");
+        let url = std::env::var("S3_URL").unwrap();
+        let bucket = std::env::var("S3_BUCKET").unwrap();
+        // let download_urls_key = "mapterhorn/0.0.8/download_urls.json".to_string();
+        //
+        // let download_urls = crate::utils::s3_utils::get_tiles_json_from_s3(url.clone(), bucket.clone(), download_urls_key, aws_access_key_id.clone(), aws_secret_access_key.clone()).await.unwrap();
+        let tiles_path = "mapterhorn/0.0.8/";
+        let tile_name = "6-5-14.pmtiles";
+        println!("downloading {tile_name}");
+        let key = format!("{tiles_path}{tile_name}");
+        let current_tile_ids = get_tile_ids_from_s3(url.clone(), bucket.clone(), key, aws_access_key_id.as_str(), aws_secret_access_key.as_str()).await.unwrap();
+
+        println!("current_tile_ids.len(): {}", current_tile_ids.len());
+    }
+
+    #[ignore]
+    #[tokio::test]
+    async fn test_list_pmtiles_from_s3() {
+        // TODO this needs a better test setup
+        // because environment variables are probably not the best choice of secrets management here
+        let aws_access_key_id= std::env::var("AWS_ACCESS_KEY_ID").expect("AWS_ACCESS_KEY_ID not set");
+        let aws_secret_access_key= std::env::var("AWS_SECRET_ACCESS_KEY").expect("AWS_SECRET_ACCESS_KEY not set");
+        let url = std::env::var("S3_URL").unwrap();
+        let bucket = std::env::var("S3_BUCKET").unwrap();
+        let download_urls_key = "mapterhorn/0.0.8/download_urls.json".to_string();
+
+        let download_urls = crate::utils::s3_utils::get_tiles_json_from_s3(url.clone(), bucket.clone(), download_urls_key, aws_access_key_id.clone(), aws_secret_access_key.clone()).await.unwrap();
+        let mut tile_ids = vec![];
+        let tiles_path = "mapterhorn/0.0.8/";
+        for tile_info in download_urls.items.iter() {
+            println!("downloading {:?}", tile_info.name);
+            let tile_name = tile_info.name.as_str();
+            let key = format!("{tiles_path}{tile_name}");
+            let current_tile_ids = get_tile_ids_from_s3(url.clone(), bucket.clone(), key, aws_access_key_id.as_str(), aws_secret_access_key.as_str()).await.unwrap();
+            tile_ids.extend(current_tile_ids);
+        }
+        println!("tile_ids.len(): {}", tile_ids.len());
     }
 
 }
