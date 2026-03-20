@@ -82,6 +82,10 @@ async fn get_tile_ids() -> Result<(), pmtiles::PmtError> {
     let reader = Arc::new(AsyncPmTilesReader::new_with_path(path).await?);
     let mut entries = reader.entries();
     while let Some(entry) = entries.try_next().await? {
+        entry.iter_coords().for_each(|coord| {
+            let xyz = TileCoord::from(coord);
+            println!("entry: {xyz:?}  ");
+        });
         println!("entry: {entry:?}");
     }
     Ok(())
