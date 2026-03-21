@@ -722,7 +722,7 @@ impl LocationWithElevation {
 
 #[cfg(test)]
 mod tests {
-    use crate::handler::geotiff::{format_as_elevation_string, round_f32, round_f64, transform, BufferingElevationEnricher, GeoTiff, GeoTiffManager, LocationWithElevation};
+    use crate::handler::geotiff::{format_as_elevation_string, round_f32, round_f64, transform, BufferingElevationEnricher, GeoTiff, GeoTiffManager};
     use crate::handler::{Handler, HandlerData, HIGHEST_NODE_ID};
     use crate::srs::DynamicSrsResolver;
     use bit_vec::BitVec;

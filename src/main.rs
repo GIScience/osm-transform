@@ -6,12 +6,13 @@ use clap::Parser;
 use osm_transform::{Config, init, run, validate};
 use osm_transform::handler::HandlerData;
 
-fn main() {
+#[tokio::main]
+async fn main() {
     let args = Args::parse();
     let config = args.to_config();
     init(&config);
     validate(&config);
-    let handler_data = run(&config);
+    let handler_data = run(&config).await;
     print_statistics(&config, handler_data);
 }
 
@@ -77,6 +78,19 @@ pub struct Args {
     #[arg(long)]
     pub elevation_keep_original_value: bool,
 
+    /// Elevation PMTiles URL to S3 backend
+    #[arg(long)]
+    pub(crate) elevation_pmtiles_url: String,
+
+    /// Elevation PMTiles bucket in S3 backend
+    #[arg(long)]
+    pub(crate) elevation_pmtiles_bucket: String,
+
+    /// Elevation PMTiles path in S3 backend
+    #[arg(long)]
+    pub(crate) elevation_pmtiles_path: String,
+
+
     /// Do NOT remove nodes that are not referenced by accepted ways or relations.
     /// Not recommended for openrouteservice graph building
     #[arg(long)]
@@ -128,6 +142,11 @@ impl Args {
             elevation_total_buffer_size: self.elevation_total_buffer_size,
             elevation_way_splitting: self.elevation_way_splitting,
             elevation_threshold: self.elevation_threshold,
+
+            elevation_pmtiles_url: self.elevation_pmtiles_url,
+            elevation_pmtiles_bucket: self.elevation_pmtiles_bucket,
+            elevation_pmtiles_path: self.elevation_pmtiles_path,
+
             resolution_lon: self.elevation_resolution_lon,
             resolution_lat: self.elevation_resolution_lat,
             keep_original_elevation: self.elevation_keep_original_value,

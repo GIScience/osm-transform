@@ -29,6 +29,7 @@ use crate::handler::filter::{AllElementsFilter, ComplexElementsFilter, FilterTyp
 use crate::handler::geotiff::{BufferingElevationEnricher, GeoTiffManager};
 use crate::handler::info::{ElementCountResultType, ElementCounter, ElementPrinter};
 use crate::handler::modify::MetadataRemover;
+use crate::handler::pmtiles::PMTilesElevationEnricher;
 use crate::handler::skip_ele::SkipElevationNodeCollector;
 use crate::output::{SimpleOutputHandler, SplittingOutputHandler};
 
@@ -200,13 +201,13 @@ pub fn get_directory_as_absolute_path(path_buf: &PathBuf) -> Option<PathBuf> {
     }
 }
 
-pub fn run(config: &Config) -> HandlerData {
+pub async fn run(config: &Config) -> HandlerData {
     info!("{}", get_application_name_with_version());
     let mut stopwatch_total = StopWatch::new();
     stopwatch_total.start();
     let mut data = HandlerData::default();
     run_filter_chain(config, &mut data);
-    run_processing_chain(config, &mut data);
+    run_processing_chain(config, &mut data).await;
     stopwatch_total.stop();
     data.total_processing_time = stopwatch_total.accumulated();
     data
@@ -232,7 +233,7 @@ fn run_filter_chain(config: &Config, data: &mut HandlerData){
     run_chain(config, data, &mut handler_chain, info_msg);
 }
 
-fn run_processing_chain(config: &Config, data: &mut HandlerData) {
+async fn run_processing_chain(config: &Config, data: &mut HandlerData) {
     data.clear_non_input_counts();
     let mut handler_chain = HandlerChain::default()
         .add(ElementCounter::new(InputCount))
@@ -281,6 +282,33 @@ fn run_processing_chain(config: &Config, data: &mut HandlerData) {
         handler_chain = handler_chain.add(elevation_enricher);
         if log_enabled!(Trace) {
             handler_chain = handler_chain.add(ElementPrinter::with_prefix(" after BufferingElevationEnricher:----------------\n".to_string())
+                .with_node_ids(config.print_node_ids.clone())
+                .with_way_ids(config.print_way_ids.clone())
+                .with_relation_ids(config.print_relation_ids.clone()));
+        }
+        info!("Creating spatial elevation index done, time: {}", stopwatch);
+        stopwatch.reset();
+    }
+
+    if config.should_enrich_elevation_pmtiles() {
+        stopwatch.start();
+        info!("Initializing PMTiles elevation enricher...");
+        let elevation_enricher = PMTilesElevationEnricher::new(
+            config.elevation_pmtiles_url.clone(),
+            config.elevation_pmtiles_bucket.clone(),
+            config.elevation_pmtiles_path.clone(),
+            config.elevation_batch_size,
+            config.elevation_total_buffer_size,
+        ).await;
+        if log_enabled!(Trace) {
+            handler_chain = handler_chain.add(ElementPrinter::with_prefix(" before PMTilesElevationEnricher:----------------\n".to_string())
+                .with_node_ids(config.print_node_ids.clone())
+                .with_way_ids(config.print_way_ids.clone())
+                .with_relation_ids(config.print_relation_ids.clone()));
+        }
+        handler_chain = handler_chain.add(elevation_enricher);
+        if log_enabled!(Trace) {
+            handler_chain = handler_chain.add(ElementPrinter::with_prefix(" after PMTilesElevationEnricher:----------------\n".to_string())
                 .with_node_ids(config.print_node_ids.clone())
                 .with_way_ids(config.print_way_ids.clone())
                 .with_relation_ids(config.print_relation_ids.clone()));
@@ -378,6 +406,10 @@ pub struct Config {
     pub resolution_lat: f64,
     pub keep_original_elevation: bool,
 
+    pub elevation_pmtiles_url: String,
+    pub elevation_pmtiles_bucket: String,
+    pub elevation_pmtiles_path: String,
+
     pub print_relation_ids: HashSet<i64>,
     pub print_node_ids: HashSet<i64>,
     pub print_way_ids: HashSet<i64>,
@@ -396,6 +428,9 @@ impl Config {
     }
     pub fn should_enrich_elevation(&self) -> bool {
         self.elevation_tiffs.len() > 0
+    }
+    pub fn should_enrich_elevation_pmtiles(&self) -> bool {
+        self.elevation_pmtiles_url.len() > 0
     }
     pub fn should_enrich_country(&self) -> bool {
         self.country_data.is_some()

@@ -19,6 +19,9 @@ fn base_config() -> Config {
         elevation_batch_size: 10000,
         elevation_total_buffer_size: 50000,
         elevation_way_splitting: false,
+        elevation_pmtiles_url: "".to_string(),
+        elevation_pmtiles_bucket: "".to_string(),
+        elevation_pmtiles_path: "".to_string(),
         remove_metadata: false,
         keep_original_elevation: false,
         with_node_filtering: false,
@@ -46,11 +49,11 @@ const FILTERED_WAY_COUNT: u64 = 51u64;
 const SPLIT_NODE_COUNT: u64 = 3973u64;
 const FILTERED_SPLIT_NODE_COUNT: u64 = 308u64;
 
-#[test]
-fn run_minimal() {
+#[tokio::test]
+async fn run_minimal() {
     let config = base_config();
     osm_transform::init(&config);
-    let data = osm_transform::run(&config);
+    let data = osm_transform::run(&config).await;
     println!("{}", data.summary(&config));
     assert_eq!(&data.input_node_count, &BAARLE_NODE_COUNT);
     assert_eq!(&data.output_node_count, &BAARLE_NODE_COUNT);
@@ -59,12 +62,12 @@ fn run_minimal() {
     assert_eq!(&data.input_way_count, &BAARLE_WAY_COUNT);
     assert_eq!(&data.output_way_count, &FILTERED_WAY_COUNT);
 }
-#[test]
-fn run_minimal_write() {
+#[tokio::test]
+async fn run_minimal_write() {
     let mut config = base_config();
     config.output_pbf = Some(PathBuf::from("target/tmp/output-integration-test-run_minimal_write.pbf"));
     osm_transform::init(&config);
-    let data = osm_transform::run(&config);
+    let data = osm_transform::run(&config).await;
     println!("{}", data.summary(&config));
     assert_eq!(&data.input_node_count, &BAARLE_NODE_COUNT);
     assert_eq!(&data.output_node_count, &BAARLE_NODE_COUNT);
@@ -73,9 +76,9 @@ fn run_minimal_write() {
     assert_eq!(&data.input_way_count, &BAARLE_WAY_COUNT);
     assert_eq!(&data.output_way_count, &FILTERED_WAY_COUNT);
 }
-#[test]
+#[tokio::test]
 #[cfg_attr(feature = "in-github-ci", ignore)]
-fn run_all() {
+async fn run_all() {
     let mut config = base_config();
     config.output_pbf = Some(PathBuf::from("target/tmp/output-integration-test-run_all.pbf"));
     config.country_data = Some(PathBuf::from("test/mapping_test.csv"));
@@ -87,7 +90,7 @@ fn run_all() {
     config.remove_metadata = true;
     config.elevation_way_splitting = true;
     osm_transform::init(&config);
-    let data = osm_transform::run(&config);
+    let data = osm_transform::run(&config).await;
     println!("{}", data.summary(&config));
     assert_eq!(&data.input_node_count, &BAARLE_NODE_COUNT);
     assert_eq!(&data.output_node_count, &FILTERED_SPLIT_NODE_COUNT);
@@ -98,13 +101,13 @@ fn run_all() {
     check_pbf("target/tmp/output-integration-test-run_all.pbf", Some(42645645));
     check_pbf("target/tmp/output-integration-test-run_all.pbf", Some(50000000001));
 }
-#[test]
-fn run_country() {
+#[tokio::test]
+async fn run_country() {
     let mut config = base_config();
     config.country_data = Some(PathBuf::from("test/mapping_test.csv"));
     config.country_tile_size = 0.4;
     osm_transform::init(&config);
-    let data = osm_transform::run(&config);
+    let data = osm_transform::run(&config).await;
     println!("{}", data.summary(&config));
     assert_eq!(&data.input_node_count, &BAARLE_NODE_COUNT);
     assert_eq!(&data.output_node_count, &BAARLE_NODE_COUNT);
@@ -114,12 +117,12 @@ fn run_country() {
     assert_eq!(&data.output_way_count, &FILTERED_WAY_COUNT);
 }
 
-#[test]
-fn run_node_filtering() {
+#[tokio::test]
+async fn run_node_filtering() {
     let mut config = base_config();
     config.with_node_filtering = true;
     osm_transform::init(&config);
-    let data = osm_transform::run(&config);
+    let data = osm_transform::run(&config).await;
     println!("{}", data.summary(&config));
     assert_eq!(&data.input_node_count, &BAARLE_NODE_COUNT);
     assert_eq!(&data.output_node_count, &FILTERED_NODE_COUNT);
@@ -129,12 +132,12 @@ fn run_node_filtering() {
     assert_eq!(&data.output_way_count, &FILTERED_WAY_COUNT);
 }
 
-#[test]
-fn run_remove_metadata() {
+#[tokio::test]
+async fn run_remove_metadata() {
     let mut config = base_config();
     config.remove_metadata = true;
     osm_transform::init(&config);
-    let data = osm_transform::run(&config);
+    let data = osm_transform::run(&config).await;
     println!("{}", data.summary(&config));
     assert_eq!(&data.input_node_count, &BAARLE_NODE_COUNT);
     assert_eq!(&data.output_node_count, &BAARLE_NODE_COUNT);
@@ -143,12 +146,12 @@ fn run_remove_metadata() {
     assert_eq!(&data.input_way_count, &BAARLE_WAY_COUNT);
     assert_eq!(&data.output_way_count, &FILTERED_WAY_COUNT);
 }
-#[test]
-fn run_elevation() {
+#[tokio::test]
+async fn run_elevation() {
     let mut config = base_config();
     config.elevation_tiffs = vec!["test/*.tif".to_string()];
     osm_transform::init(&config);
-    let data = osm_transform::run(&config);
+    let data = osm_transform::run(&config).await;
     println!("{}", data.summary(&config));
     assert_eq!(&data.input_node_count, &BAARLE_NODE_COUNT);
     assert_eq!(&data.output_node_count, &BAARLE_NODE_COUNT);
@@ -157,14 +160,32 @@ fn run_elevation() {
     assert_eq!(&data.input_way_count, &BAARLE_WAY_COUNT);
     assert_eq!(&data.output_way_count, &FILTERED_WAY_COUNT);
 }
-#[test]
+
+#[ignore]
+#[tokio::test]
+async fn run_elevation_pmtiles() {
+    let mut config = base_config();
+    config.elevation_pmtiles_url = "https://warm.storage.heigit.org".to_string();
+    config.elevation_pmtiles_bucket = "heigit-highres-elevation-data".to_string();
+    config.elevation_pmtiles_path = "mapterhorn/0.0.8/".to_string();
+    osm_transform::init(&config);
+    let data = osm_transform::run(&config).await;
+    println!("{}", data.summary(&config));
+    assert_eq!(&data.input_node_count, &BAARLE_NODE_COUNT);
+    assert_eq!(&data.output_node_count, &BAARLE_NODE_COUNT);
+    assert_eq!(&data.input_relation_count, &BAARLE_RELATION_COUNT);
+    assert_eq!(&data.output_relation_count, &FILTERED_RELATION_COUNT);
+    assert_eq!(&data.input_way_count, &BAARLE_WAY_COUNT);
+    assert_eq!(&data.output_way_count, &FILTERED_WAY_COUNT);
+}
+#[tokio::test]
 #[cfg_attr(feature = "in-github-ci", ignore)]
-fn run_elevation_way_splitting() {
+async fn run_elevation_way_splitting() {
     let mut config = base_config();
     config.elevation_tiffs = vec!["test/*.tif".to_string()];
     config.elevation_way_splitting = true;
     osm_transform::init(&config);
-    let data = osm_transform::run(&config);
+    let data = osm_transform::run(&config).await;
     println!("{}", data.summary(&config));
     assert_eq!(&data.input_node_count, &BAARLE_NODE_COUNT);
     assert!(&data.output_node_count > &BAARLE_NODE_COUNT);
@@ -173,15 +194,15 @@ fn run_elevation_way_splitting() {
     assert_eq!(&data.input_way_count, &BAARLE_WAY_COUNT);
     assert_eq!(&data.output_way_count, &FILTERED_WAY_COUNT);
 }
-#[test]
+#[tokio::test]
 #[cfg_attr(feature = "in-github-ci", ignore)]
-fn run_elevation_way_splitting_write() {
+async fn run_elevation_way_splitting_write() {
     let mut config = base_config();
     config.elevation_tiffs = vec!["test/*.tif".to_string()];
     config.elevation_way_splitting = true;
     config.output_pbf = Some(PathBuf::from("target/tmp/output-integration-test-run_elevation_way_splitting_write.pbf"));
     osm_transform::init(&config);
-    let data = osm_transform::run(&config);
+    let data = osm_transform::run(&config).await;
     println!("{}", data.summary(&config));
     assert_eq!(&data.input_node_count, &BAARLE_NODE_COUNT);
     assert_eq!(&data.output_node_count, &SPLIT_NODE_COUNT);
@@ -263,27 +284,27 @@ fn fail_validation_if_country_index_directory_is_not_readable() {
     test_with_not_readable_dir(&PathBuf::from("target/tmp/mapping_test_idx_2_00"), "simulated pre-existing country index directory", validate_and_expect_error, config );
 }
 
-#[test]
-fn simple_output_handler_preserves_timestamp()  {
+#[tokio::test]
+async fn simple_output_handler_preserves_timestamp()  {
     let mut config = base_config();
     let output_path = PathBuf::from("target/tmp/output-integration-test-simple_output_handler_preserves_timestamp.pbf");
     config.output_pbf = Some(output_path.clone());
     osm_transform::init(&config);
-    let data = osm_transform::run(&config);
+    let data = osm_transform::run(&config).await;
     println!("{}", data.summary(&config));
     let input_timestamp = read_osm_timestamp(&config.input_pbf.unwrap());
     let output_timestamp = read_osm_timestamp(&output_path);
     assert_eq!(input_timestamp, output_timestamp);
 }
 
-#[test]
-fn splitting_output_handler_preserves_timestamp()  {
+#[tokio::test]
+async fn splitting_output_handler_preserves_timestamp()  {
     let mut config = base_config();
     let output_path = PathBuf::from("target/tmp/output-integration-test-splitting_output_handler_preserves_timestamp.pbf");
     config.output_pbf = Some(output_path.clone());
     config.elevation_way_splitting = true;
     osm_transform::init(&config);
-    let data = osm_transform::run(&config);
+    let data = osm_transform::run(&config).await;
     println!("{}", data.summary(&config));
     let input_timestamp = read_osm_timestamp(&config.input_pbf.unwrap());
     let output_timestamp = read_osm_timestamp(&output_path);

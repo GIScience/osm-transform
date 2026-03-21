@@ -298,7 +298,7 @@ other = {other}"#)
                 country_detections,
                 country_found_percentage, country_not_found_percentage, multiple_country_found_percentage).as_str());
         }
-        if config.get_summary_level() > 1 && config.should_enrich_elevation() {
+        if config.get_summary_level() > 1 && (config.should_enrich_elevation() || config.should_enrich_elevation_pmtiles()) {
             formatted_statistics.push_str(Self::elevation_enrichment_elements_summary(
                 elevation_found_node_count, elevation_not_found_node_count, elevation_not_relevant_node_count,
                 elevation_detections,

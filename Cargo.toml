@@ -38,7 +38,7 @@ itertools = "0.11.0"
 chrono = "0.4.40"
 pmtiles = "0.21.0"
 bytes = "1.11.1"
-tokio = "1.43.0"
+tokio = { version = "1.43.0", features = ["rt", "rt-multi-thread", "macros"] }
 libwebp = { version = "0.1.2", features = ["0_6"] }
 futures-util = "0.3.31"
 serde_json = "1.0.138"

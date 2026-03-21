@@ -1,6 +1,3 @@
-use std::env::VarError;
-//use aws_sdk_s3::Config;
-//use aws_sdk_s3::config::SharedCredentialsProvider;
 use pmtiles::aws_sdk_s3::config::{BehaviorVersion, Credentials, Region};
 use pmtiles::aws_sdk_s3::{Client, Config};
 use serde::Deserialize;
@@ -25,7 +22,7 @@ pub(crate) struct TileInfo {
     pub(crate) max_zoom: u8,
 }
 
-pub(crate) async fn get_tiles_json_from_s3(url: String, bucket_name: String, key: String, access_key_id: String, secret_access_key: String) -> Result<PMTilesDownloadUrls,Box<dyn std::error::Error>> {
+pub(crate) async fn get_tiles_json_from_s3(url: String, bucket_name: String, key: String, access_key_id: &str, secret_access_key: &str) -> Result<PMTilesDownloadUrls,Box<dyn std::error::Error>> {
 
     let credentials = Credentials::new(
         access_key_id,
@@ -58,9 +55,15 @@ pub(crate) async fn get_tiles_json_from_s3(url: String, bucket_name: String, key
     Ok(download_urls)
 }
 
+pub(crate) fn get_tiles_json_from_file() -> Result<PMTilesDownloadUrls, Box<dyn std::error::Error>> {
+    let result_string = std::fs::read_to_string("test/download_urls.json").unwrap();
+    let download_urls: PMTilesDownloadUrls = serde_json::from_str(&result_string).unwrap();
+    Ok(download_urls)
+}
+
 #[cfg(test)]
 mod test {
-    use crate::utils::s3_utils::{get_tiles_json_from_s3};
+    use crate::utils::s3_utils::get_tiles_json_from_s3;
 
     #[ignore]
     #[tokio::test]
@@ -73,7 +76,7 @@ mod test {
         let bucket = std::env::var("S3_BUCKET").unwrap();
         let key = "mapterhorn/0.0.8/download_urls.json".to_string();
 
-        let download_urls = get_tiles_json_from_s3(url, bucket, key, aws_access_key_id, aws_secret_access_key).await.unwrap();
+        let download_urls = get_tiles_json_from_s3(url, bucket, key, &aws_access_key_id, &aws_secret_access_key).await.unwrap();
 
         println!("items count: {}", download_urls.items.len());
         for tile_info in download_urls.items.iter() {
