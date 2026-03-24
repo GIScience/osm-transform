@@ -117,7 +117,7 @@ pub struct HandlerData {
     pub other: HashMap<String, String>,
 }
 impl HandlerData {
-    pub(crate) fn default() -> Self {
+    pub fn default() -> Self {
         Self::with_capacity(HIGHEST_NODE_ID as usize, HIGHEST_WAY_ID as usize, HIGHEST_RELATION_ID as usize)
     }
     pub(crate) fn with_capacity(nbits_node: usize, nbits_way: usize, nbits_relation: usize) -> Self {
@@ -417,7 +417,7 @@ way      | {min_neg_wa_id:>13} | {max_neg_wa_id:>13} | {min_pos_wa_id:>13} | {ma
 relation | {min_neg_re_id:>13} | {max_neg_re_id:>13} | {min_pos_re_id:>13} | {max_pos_re_id:>13}
 ")
     }
-    pub(crate) fn clear_elements(&mut self) {
+    pub fn clear_elements(&mut self) {
         self.nodes.clear();
         self.ways.clear();
         self.relations.clear();

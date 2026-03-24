@@ -6,13 +6,12 @@ use clap::Parser;
 use osm_transform::{Config, init, run, validate};
 use osm_transform::handler::HandlerData;
 
-#[tokio::main]
-async fn main() {
+fn main() {
     let args = Args::parse();
     let config = args.to_config();
     init(&config);
     validate(&config);
-    let handler_data = run(&config).await;
+    let handler_data = run(&config);
     print_statistics(&config, handler_data);
 }
 

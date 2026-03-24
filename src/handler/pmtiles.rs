@@ -6,51 +6,71 @@ use libwebp::boxed::WebpBox;
 use libwebp::WebPDecodeRGBA;
 use log::info;
 use osm_io::osm::model::node::Node;
+use osm_io::osm::model::tag::Tag;
 use pmtiles::s3::creds::Credentials;
 use pmtiles::s3::{Bucket, Region};
-use pmtiles::{AsyncPmTilesReader, HashMapCache, TileCoord, TileId};
-use std::collections::HashMap;
+use pmtiles::{AsyncPmTilesReader, HashMapCache, S3Backend, TileCoord, TileId};
+use std::collections::{HashMap, HashSet};
 use std::f64::consts::PI;
 use std::sync::Arc;
 
-pub(crate) struct PMTilesElevationEnricher {
+pub struct PMTilesElevationEnricher {
     buffers: HashMap<TileId, Vec<Node>>,
     tiles_map: HashMap<TileId, PMTilesInfo>,
-    access_key_id: String,
-    secret_access_key: String,
-    url: String,
-    bucket: String,
-    path: String,
+    planet_reader: Option<AsyncPmTilesReader<S3Backend, HashMapCache>>,
+    failed_tile_lookups: HashSet<TileId>,
     buffer_threshold: usize,
     total_threshold: usize,
+
+    bucket: String,
+    credentials: Option<Credentials>,
+    region: Option<Region>,
+    planet_key: String,
 
     ele_lookups_successful: usize,
     ele_lookups_failed: usize,
     ele_lookups_skipped: usize,
 }
 
-#[derive(Debug)]
-pub(crate) struct PMTilesInfo {
+pub struct PMTilesInfo {
     z_max: u8,
+    key: String,
+    reader: Option<AsyncPmTilesReader<S3Backend, HashMapCache>>,
 }
 
 impl PMTilesElevationEnricher {
-    pub(crate) async fn new(url: String, bucket: String, path: String, buffer_threshold: usize, total_threshold: usize) -> Self {
+    pub async fn new(url: String, bucket: String, path: String, buffer_threshold: usize, total_threshold: usize) -> Self {
         let access_key_id= std::env::var("AWS_ACCESS_KEY_ID").expect("AWS_ACCESS_KEY_ID not set");
         let secret_access_key= std::env::var("AWS_SECRET_ACCESS_KEY").expect("AWS_SECRET_ACCESS_KEY not set");
-        let download_urls_key = "mapterhorn/0.0.8/download_urls.json".to_string();
+        let download_urls_key = format!("{path}download_urls.json");
         let download_urls = crate::utils::s3_utils::get_tiles_json_from_s3(url.clone(), bucket.clone(), download_urls_key, &access_key_id, &secret_access_key).await.unwrap();
-        let tiles_map = Self::extract_tiles_map(download_urls);
+        info!("JSON downloaded, initializing readers...");
+        let credentials = Credentials::new(
+            Some(access_key_id.as_str()),
+            Some(secret_access_key.as_str()),
+            None, None, None)
+            .expect("failed to get credentials");
+
+        let region = Region::Custom {
+            region: "eu-central-1".to_owned(),
+            endpoint: url,
+        };
+        let planet_key = format!("{}planet.pmtiles", path);
+        let tiles_map = Self::extract_tiles_map(download_urls, path).await;
+        info!("Readers initialized.");
         PMTilesElevationEnricher {
             buffers: HashMap::new(),
             tiles_map,
-            access_key_id,
-            secret_access_key,
-            url,
-            bucket,
-            path,
+            planet_reader: None,
+            failed_tile_lookups: HashSet::new(),
             buffer_threshold,
             total_threshold,
+
+            bucket: bucket,
+            credentials: Some(credentials),
+            region: Some(region),
+            planet_key,
+
             ele_lookups_successful: 0,
             ele_lookups_failed: 0,
             ele_lookups_skipped: 0,
@@ -58,7 +78,7 @@ impl PMTilesElevationEnricher {
     }
 
     #[allow(dead_code)]
-    fn default() -> Self {
+    async fn default() -> Self {
         info!("Initializing PMTilesElevationEnricher with defaults for testing...");
         let access_key_id= "AWS_ACCESS_KEY_ID".to_string();
         let secret_access_key= "AWS_SECRET_ACCESS_KEY".to_string();
@@ -68,24 +88,27 @@ impl PMTilesElevationEnricher {
         let buffer_threshold = 100;
         let total_threshold = 1000;
         let download_urls = crate::utils::s3_utils::get_tiles_json_from_file().unwrap();
-        let tiles_map = Self::extract_tiles_map(download_urls);
+        let tiles_map = Self::extract_tiles_map(download_urls, path).await;
         PMTilesElevationEnricher {
             buffers: HashMap::new(),
             tiles_map,
-            access_key_id,
-            secret_access_key,
-            url,
-            bucket,
-            path,
+            planet_reader: None,
+            failed_tile_lookups: HashSet::new(),
             buffer_threshold,
             total_threshold,
+
+            bucket: "Ignored for default".to_string(),
+            credentials: None,
+            region: None,
+            planet_key: "Ignored for default".to_string(),
+
             ele_lookups_successful: 0,
             ele_lookups_failed: 0,
             ele_lookups_skipped: 0,
         }
     }
 
-    fn extract_tiles_map(download_urls: PMTilesDownloadUrls) -> HashMap<TileId, PMTilesInfo> {
+    async fn extract_tiles_map(download_urls: PMTilesDownloadUrls, path: String) -> HashMap<TileId, PMTilesInfo> {
         let mut tiles_map = HashMap::new();
         for tile_info in download_urls.items.iter() {
             if tile_info.name.starts_with("planet") {
@@ -97,32 +120,33 @@ impl PMTilesElevationEnricher {
             let y = tile_name.next().unwrap().parse().unwrap();
             let tile_id = TileCoord::new(6, x, y).unwrap();
             let z_max = tile_info.max_zoom;
-            tiles_map.insert(TileId::from(tile_id), PMTilesInfo { z_max });
+            let key = format!("{}{}", path, tile_info.name);
+            tiles_map.insert(TileId::from(tile_id), PMTilesInfo { z_max, key, reader: None });
         }
         tiles_map
     }
 
-    fn handle_nodes(&mut self, nodes: Vec<Node>) -> Vec<Node> {
+    async fn handle_nodes(&mut self, nodes: Vec<Node>) -> Vec<Node> {
         let mut result_vec = Vec::new();
         for node in nodes {
-            result_vec.extend(self.handle_single_node(node.clone()));
+            result_vec.extend(self.handle_single_node(node.clone()).await);
         }
         result_vec
     }
-    fn handle_and_flush_nodes(&mut self, nodes: Vec<Node>) -> Vec<Node> {
+    async fn handle_and_flush_nodes(&mut self, nodes: Vec<Node>) -> Vec<Node> {
         let mut result_vec = Vec::new();
         for node in &nodes {
-            result_vec.extend(self.handle_single_node(node.clone()));
+            result_vec.extend(self.handle_single_node(node.clone()).await);
         }
         // flush all remaining buffers
         for tile_id in self.buffers.keys().cloned().collect::<Vec<TileId>>() {
-            let buffer = self.buffers.remove(&tile_id).unwrap();
-            result_vec.extend(self.handle_buffer(&tile_id, &buffer));
+            let mut buffer = self.buffers.remove(&tile_id).unwrap();
+            result_vec.extend(self.handle_buffer(&tile_id, &mut buffer).await);
         }
         result_vec
     }
 
-    fn handle_single_node(&mut self, node: Node) -> Vec<Node> {
+    async fn handle_single_node(&mut self, node: Node) -> Vec<Node> {
         let zoom = 6;
         let (tile_x, tile_y, _x_in_tile, _y_in_tile) = match_node_to_tile(&node, &zoom); // TODO make configurable later
         let tile_coordinate = TileCoord::new(zoom, tile_x, tile_y).unwrap();
@@ -130,65 +154,128 @@ impl PMTilesElevationEnricher {
         let tile_id = TileId::from(tile_coordinate);
 
         self.buffers.entry(tile_id).or_insert_with(Vec::new).push(node);
-        self.check_threshold(&tile_id)
+        self.check_threshold(&tile_id).await
     }
 
-    fn check_threshold(&mut self, tile_id: &TileId) -> Vec<Node> {
+    async fn check_threshold(&mut self, tile_id: &TileId) -> Vec<Node> {
         let mut result_vec = Vec::new();
         if self.buffers[&tile_id].len() >= self.buffer_threshold {
             info!("Buffer for tile_id {tile_id:?} reached threshold {}, processing...", self.buffer_threshold);
-            let buffer =self.buffers.remove(&tile_id).unwrap();
-            result_vec.extend(self.handle_buffer(&tile_id, &buffer));
+            let mut buffer =self.buffers.remove(&tile_id).unwrap();
+            result_vec.extend(self.handle_buffer(&tile_id, &mut buffer).await);
         }
         if self.buffers.values().map(|buffer| buffer.len()).sum::<usize>() >= self.total_threshold {
             info!("Total buffer size reached threshold {:?}, flushing largest buffer...", self.total_threshold);
             let largest_buffer_tile_id = self.buffers.iter().max_by_key(|entry| entry.1.len()).map(|(tile_id, _)| tile_id).unwrap().clone();
-            let buffer = self.buffers.remove(&largest_buffer_tile_id).unwrap();
-            result_vec.extend(self.handle_buffer(&largest_buffer_tile_id, &buffer));
+            let mut buffer = self.buffers.remove(&largest_buffer_tile_id).unwrap();
+            result_vec.extend(self.handle_buffer(&largest_buffer_tile_id, &mut buffer).await);
         }
         result_vec
     }
 
-    fn handle_buffer(&mut self, tile_id: &TileId, buffer: &Vec<Node>) -> Vec<Node> {
+    async fn handle_buffer(&mut self, tile_id: &TileId, buffer: &mut Vec<Node>) -> Vec<Node> {
         let mut result_vec = Vec::new();
-        for node in buffer.iter() {
-            result_vec.push(self.enrich_node(tile_id, node.clone()));
+        for node in buffer.iter_mut() {
+            result_vec.push(self.enrich_node(tile_id, &mut node.clone()).await);
         }
         result_vec
     }
 
-    fn enrich_node(&mut self, tile_id: &TileId, node: Node) -> Node {
+pub     async fn enrich_node(&mut self, tile_id: &TileId, node: &mut Node) -> Node {
         // TODO implement actual enrichment logic here
         // for now just return the node as is and count lookups
-        let tile_info = self.tiles_map.get(tile_id).unwrap_or_else(|| &PMTilesInfo{z_max: 12});
-        println!("NodeID {:?}: {:?}, z_max: {:?}", node.id(),TileCoord::from(*tile_id), tile_info.z_max);
-        self.ele_lookups_successful += 1;
-        node
-    }
-}
+        let mut tile_info = self.tiles_map.get_mut(tile_id);
+        let reader = if tile_info.is_none() {
+            if self.planet_reader.is_none() {
+                let new_reader = match self.credentials {
+                    Some(_) => Some(get_reader_for_key(self.bucket.as_str(), self.planet_key.to_string(), self.credentials.clone().unwrap(), self.region.clone().unwrap()).await),
+                    _ => None
+                };
+                if new_reader.is_none() {
+                    panic!("Reader for tile_id {tile_id:?} could not be initialized, but needed for enrichment");
+                }
+                tile_info.as_mut().unwrap().reader = new_reader;
+            }
+            self.planet_reader.as_ref().unwrap()
+        } else {
+            if tile_info.as_ref().unwrap().reader.is_none() {
+                let new_reader = match self.credentials {
+                    Some(_) => Some(get_reader_for_key(self.bucket.as_str(), tile_info.as_ref().unwrap().key.to_string(), self.credentials.clone().unwrap(), self.region.clone().unwrap()).await),
+                    _ => None
+                };
+                if new_reader.is_none() {
+                    panic!("Reader for tile_id {tile_id:?} could not be initialized, but needed for enrichment");
+                }
+                tile_info.as_mut().unwrap().reader = new_reader;
+            }
+            tile_info.as_ref().unwrap().reader.as_ref().unwrap()
+        };
+        let zoom = if tile_info.is_none() { 12 } else { tile_info.as_ref().unwrap().z_max };
+        // println!("Node {:?} matched to tile_id {tile_id:?} with zoom {zoom}", node.id());
+        for z in (13..=zoom).rev() {
+            let (tile_x, tile_y, x_in_tile, y_in_tile) = match_node_to_tile(&node, &z);
+            if self.failed_tile_lookups.contains(&TileId::from(TileCoord::new(z, tile_x, tile_y).unwrap())) {
+                continue;
+            }
+            let tile = get_tile_from_reader(reader, z, tile_x, tile_y).await;
+            println!("Fetched: {:?}", tile);
 
-
-impl Handler for PMTilesElevationEnricher {
-    fn name(&self) -> String {
-        String::from("PMTilesElevationEnricher")
-    }
-
-    fn handle(&mut self, data: &mut super::HandlerData) {
-        if data.nodes.len() > 0 {
-            data.nodes = self.handle_nodes(data.nodes.clone());
+            if !tile.is_none() {
+                self.ele_lookups_successful += 1;
+                return add_elevation_to_node(node, tile.unwrap(), x_in_tile, y_in_tile)
+            } else {
+                println!("Tile {z:?} {tile_x:?} {tile_y:?} could not be found");
+                self.failed_tile_lookups.insert(TileId::from(TileCoord::new(z, tile_x, tile_y).unwrap()));
+            }
         }
+        self.ele_lookups_failed += 1;
+        node.to_owned()
     }
 
-    fn flush(&mut self, data: &mut super::HandlerData) {
-        data.nodes = self.handle_and_flush_nodes(data.nodes.clone());
-    }
+        fn name(&self) -> String {
+            String::from("PMTilesElevationEnricher")
+        }
 
-    fn close(&mut self, data: &mut HandlerData) {
-        data.elevation_found_node_count = self.ele_lookups_successful as u64;
-        data.elevation_not_found_node_count = self.ele_lookups_failed as u64;
-        data.elevation_not_relevant_node_count = self.ele_lookups_skipped as u64;
-    }
+        pub async fn handle(&mut self, data: &mut super::HandlerData) {
+            if data.nodes.len() > 0 {
+                data.nodes = self.handle_nodes(data.nodes.clone()).await;
+            }
+        }
+
+        pub async fn flush(&mut self, data: &mut super::HandlerData) {
+            data.nodes = self.handle_and_flush_nodes(data.nodes.clone()).await;
+        }
+
+        pub fn close(&mut self, data: &mut HandlerData) {
+            data.elevation_found_node_count = self.ele_lookups_successful as u64;
+            data.elevation_not_found_node_count = self.ele_lookups_failed as u64;
+            data.elevation_not_relevant_node_count = self.ele_lookups_skipped as u64;
+        }
+
 }
+
+fn add_elevation_to_node(node: &mut Node, tile: Bytes, x: f64, y: f64) -> Node {
+    let (width, height, rgba) = bytes_to_rgba(tile);
+    let elevation = get_elevation_for_pixel(rgba, width, height, x, y);
+    node.tags_mut().push(Tag::new("ele".to_string(), elevation.to_string()));
+    println!("{:?}", node);
+    node.to_owned()
+}
+
+async fn get_tile_from_reader(reader: &AsyncPmTilesReader<S3Backend, HashMapCache>, z: u8, x: u32, y: u32) -> Option<Bytes> {
+    println!("Fetch: {z:?}, {x:?}, {y:?}");
+    let coord = TileCoord::new(z, x, y).unwrap();
+    reader.get_tile(coord).await.unwrap()
+}
+
+pub async fn get_reader_for_key(bucket_name: &str, key: String, credentials: Credentials, region: Region) -> AsyncPmTilesReader<S3Backend, HashMapCache> {
+    let cache = HashMapCache::default();
+    let bucket = Bucket::new(bucket_name, region, credentials).expect("failed to create bucket").with_path_style();
+    AsyncPmTilesReader::new_with_cached_bucket_path(cache, *bucket, key)
+            .await
+            .unwrap()
+}
+
 
 async fn get_tile_from_s3(url: String, bucket_name: String, key: String, secret_access_key: &str, access_key_id: &str, z: u8, x: u32, y: u32) -> Option<Bytes> {
     let credentials = Credentials::new(
@@ -300,18 +387,21 @@ pub fn convert_pixel_coordinate_to_pixel_index(pixel_x: f64, pixel_y: f64, width
 
 #[cfg(test)]
 mod test {
-    use crate::handler::pmtiles::{bytes_to_rgba, get_elevation_for_pixel, get_tile_from_file, get_tile_from_s3, get_tile_ids, get_tile_ids_from_s3, match_node_to_tile};
+    use benchmark_rs::stopwatch::StopWatch;
+    use log::error;
+    use crate::handler::pmtiles::{bytes_to_rgba, calculate_elevation_for_pixel, get_elevation_for_pixel, get_reader_for_key, get_tile_from_file, get_tile_from_reader, get_tile_from_s3, get_tile_ids, get_tile_ids_from_s3, match_node_to_tile};
     use crate::handler::Handler;
     use crate::handler::{pmtiles::PMTilesElevationEnricher, HandlerData};
     use crate::utils::test_utils;
     use crate::utils::test_utils::{loc_hd_gaulskopfbrunnen, loc_osm_example, simple_node_element, wgs84_coordinate_hamburg_elbphilharmonie, wgs84_coordinate_limburg_traffic_circle, wgs84_coordinate_limburg_vienna_house};
     use osm_io::osm::model::coordinate::Coordinate;
-
+    use pmtiles::s3::creds::Credentials;
+    use pmtiles::s3::Region;
 
     // TODO write test for new handle node
-    #[test]
-    fn test_pmtiles_elevation_enricher_handle_node() {
-        let mut enricher = PMTilesElevationEnricher::default();
+    #[tokio::test]
+    async fn test_pmtiles_elevation_enricher_handle_node() {
+        let mut enricher = PMTilesElevationEnricher::default().await;
         enricher.handle_single_node(wgs84_coordinate_hamburg_elbphilharmonie().to_node(1));
         enricher.handle_single_node(wgs84_coordinate_hamburg_elbphilharmonie().to_node(1));
         assert!(!enricher.buffers.is_empty());
@@ -385,10 +475,45 @@ mod test {
         assert_eq!(elevation, test_utils::loc_hd_gaisberg_peak().ele());
     }
 
+    #[tokio::test]
+    async fn test_match_node_gaisberg_s3() {
+        let node = test_utils::loc_hd_gaisberg_peak().to_node(1);
+
+        let zoom = 16;
+        let (tile_x, tile_y, x_in_tile, y_in_tile) = match_node_to_tile(&node, &zoom);
+        println!("zoom={zoom} tile_x={tile_x} tile_y={tile_y} x_in_tile={x_in_tile} y_in_tile={y_in_tile}");
+
+        let access_key_id= std::env::var("AWS_ACCESS_KEY_ID").expect("AWS_ACCESS_KEY_ID not set");
+        let secret_access_key= std::env::var("AWS_SECRET_ACCESS_KEY").expect("AWS_SECRET_ACCESS_KEY not set");
+        let url = "https://warm.storage.heigit.org".to_string();
+        let bucket = "heigit-highres-elevation-data".to_string();
+        let key = "mapterhorn/0.0.8/6-33-21.pmtiles".to_string();
+        let credentials = Credentials::new(
+            Some(access_key_id.as_str()),
+            Some(secret_access_key.as_str()),
+            None, None, None)
+            .expect("failed to get credentials");
+
+        let region = Region::Custom {
+            region: "eu-central-1".to_owned(),
+            endpoint: url,
+        };
+        let reader = get_reader_for_key(&*bucket, key, credentials, region).await;
+        let mut stopwatch = StopWatch::new();
+        stopwatch.start();
+        let bytes = get_tile_from_reader(&reader, zoom, tile_x, tile_y).await.unwrap();
+        println!("{} done, time: {}", "get tile", stopwatch);
+        let (width, height, tile) = bytes_to_rgba(bytes);
+        println!("{} done, time: {}", "read tile", stopwatch);
+        let elevation = get_elevation_for_pixel(tile, width, height, x_in_tile, y_in_tile);
+        println!("{} done, time: {}", "read ele", stopwatch);
+        assert_eq!(elevation, test_utils::loc_hd_gaisberg_peak().ele());
+    }
+
     #[ignore]
-    #[test]
-    fn test_pmtiles_elevation_enricher() {
-        let mut handler = PMTilesElevationEnricher::default();
+    #[tokio::test]
+    async fn test_pmtiles_elevation_enricher() {
+        let mut handler = PMTilesElevationEnricher::default().await;
 
         let mut data = HandlerData::default();
         data.nodes.push(test_utils::simple_node_element_limburg(
