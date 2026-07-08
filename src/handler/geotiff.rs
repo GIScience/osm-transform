@@ -1355,12 +1355,13 @@ mod tests {
     }
 
     #[test]
+    #[cfg_attr(feature = "in-github-ci", ignore)]
     fn test_geotiff_no_data() {
-        //Values and expected results picket from QGIS
+        // Values and expected results picket from QGIS
+        // Needs srtm_36_03.tif to run
         let mut tiff_loader = GeoTiffManager::new();
         let mut geotiff = tiff_loader.load_geotiff("test/srtm_36_03.tif").expect("got error");
         let value = geotiff.get_value_for_pixel_coord(3039u32, 3246u32);
-        dbg!(&value);
         assert_eq!(value, RasterValue::NoData);
     }
 
