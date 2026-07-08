@@ -40,7 +40,12 @@ impl GeoTiff {
     }
 
     fn get_value_for_pixel_coord(&mut self, x: u32, y: u32) -> RasterValue {
-        self.geotiffreader.read_pixel(x, y)
+        let value = self.geotiffreader.read_pixel(x, y);
+        if value == RasterValue::I16(-32768) {
+            RasterValue::NoData
+        } else {
+            value
+        }
     }
 
     fn wgs_84_to_tiff_coord(&self, lon: f64, lat: f64) -> (f64, f64) {
@@ -1348,4 +1353,15 @@ mod tests {
         assert_eq!(HIGHEST_NODE_ID + 2, way.refs()[2]);
         assert_eq!(1001_i64, way.refs()[3]);
     }
+
+    #[test]
+    fn test_geotiff_no_data() {
+        //Values and expected results picket from QGIS
+        let mut tiff_loader = GeoTiffManager::new();
+        let mut geotiff = tiff_loader.load_geotiff("test/srtm_36_03.tif").expect("got error");
+        let value = geotiff.get_value_for_pixel_coord(3039u32, 3246u32);
+        dbg!(&value);
+        assert_eq!(value, RasterValue::NoData);
+    }
+
 }
