@@ -749,7 +749,7 @@ mod tests {
     fn test_find_geotiff_id_for_wgs84_coord_srtm_ma_hd() {
         let _ = SimpleLogger::new().init();
         let mut geotiff_loader = GeoTiffManager::with_file_patterns(vec!["test/srtm*.tif".to_string(), "test/region*.tif".to_string(), "test/*gmted*.tif".to_string()]);
-        assert_eq!(6, geotiff_loader.index.get_geotiff_count());
+        assert_eq!(7, geotiff_loader.index.get_geotiff_count());
 
         let test_point = wgs84_coordinate_hd_river();
         let geotiffs = geotiff_loader.index.find_geotiff_id_for_wgs84_coord(test_point.lon(), test_point.lat());
@@ -899,7 +899,7 @@ mod tests {
         geotiff_loader.index_geotiffs("test/*gmted*.tif");
         assert_eq!(4, geotiff_loader.index.get_geotiff_count());
         geotiff_loader.index_geotiffs("test/srtm*.tif");
-        assert_eq!(6, geotiff_loader.index.get_geotiff_count());
+        assert_eq!(7, geotiff_loader.index.get_geotiff_count());
 
         let test_point = wgs84_coordinate_hd_river();
         let geotiffs = geotiff_loader.index.find_geotiff_id_for_wgs84_coord(test_point.lon(), test_point.lat());

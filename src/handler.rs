@@ -98,8 +98,9 @@ pub struct HandlerData {
 
     /// Country mapping statistics
     pub country_found_node_count: u64,
-    pub multiple_country_found_node_count: u64,
+    pub country_intersect_checks_count: u64,
     pub country_not_found_node_count: u64,
+    pub country_border_nodes_count: u64,
 
     /// Elevation enrichment statistics
     pub elevation_found_node_count: u64,
@@ -140,7 +141,8 @@ impl HandlerData {
             accepted_relation_count: 0,
             country_not_found_node_count: 0,
             country_found_node_count: 0,
-            multiple_country_found_node_count: 0,
+            country_intersect_checks_count: 0,
+            country_border_nodes_count: 0,
             elevation_found_node_count: 0,
             elevation_not_found_node_count: 0,
             elevation_not_relevant_node_count: 0,
@@ -172,7 +174,8 @@ impl HandlerData {
         let no_elevation_node_ids_count = self.no_elevation_node_ids.len();
         let country_not_found_node_count = self.country_not_found_node_count;
         let country_found_node_count = self.country_found_node_count;
-        let multiple_country_found_node_count = self.multiple_country_found_node_count;
+        let country_intersect_checks_count = self.country_intersect_checks_count;
+        let country_border_nodes_count = self.country_border_nodes_count;
         let elevation_found_node_count = self.elevation_found_node_count;
         let elevation_not_found_node_count = self.elevation_not_found_node_count;
         let elevation_not_relevant_node_count = self.elevation_not_relevant_node_count;
@@ -196,7 +199,8 @@ accept_node_ids_count = {accept_node_ids_count}
 no_elevation_node_ids_count = {no_elevation_node_ids_count}
 country_not_found_node_count = {country_not_found_node_count}
 country_found_node_count = {country_found_node_count}
-multiple_country_found_node_count = {multiple_country_found_node_count}
+country_intersect_checks_count = {country_intersect_checks_count}
+country_border_nodes_count = {country_border_nodes_count}
 elevation_found_node_count = {elevation_found_node_count}
 elevation_not_found_node_count = {elevation_not_found_node_count}
 elevation_not_relevant_node_count = {elevation_not_relevant_node_count}
@@ -238,7 +242,8 @@ other = {other}"#)
 
         let country_not_found_node_count = self.country_not_found_node_count;
         let country_found_node_count = self.country_found_node_count;
-        let multiple_country_found_node_count = self.multiple_country_found_node_count;
+        let country_intersect_checks_count = self.country_intersect_checks_count;
+        let country_border_nodes_count = self.country_border_nodes_count;
 
         let elevation_found_node_count = self.elevation_found_node_count;
         let elevation_not_found_node_count = self.elevation_not_found_node_count;
@@ -260,7 +265,8 @@ other = {other}"#)
         let country_detections = country_found_node_count + country_not_found_node_count;
         let country_found_percentage = (country_found_node_count as f64 / country_detections as f64) * 100.0;
         let country_not_found_percentage = (country_not_found_node_count as f64 / country_detections as f64) * 100.0;
-        let multiple_country_found_percentage = (multiple_country_found_node_count as f64 / country_detections as f64) * 100.0;
+        let country_intersect_checks_percentage = (country_intersect_checks_count as f64 / country_detections as f64) * 100.0;
+        let country_border_nodes_percentage = (country_border_nodes_count as f64 / country_detections as f64) * 100.0;
         let elevation_detections = elevation_found_node_count + elevation_not_found_node_count + elevation_not_relevant_node_count;
         let elevation_found_percentage = (elevation_found_node_count as f64 / elevation_detections as f64) * 100.0;
         let elevation_not_found_percentage = (elevation_not_found_node_count as f64 / elevation_detections as f64) * 100.0;
@@ -293,9 +299,9 @@ other = {other}"#)
         }
         if config.get_summary_level() > 1 && config.should_enrich_country() {
             formatted_statistics.push_str(Self::country_enrichment_summary(config,
-                country_not_found_node_count, country_found_node_count, multiple_country_found_node_count,
-                country_detections,
-                country_found_percentage, country_not_found_percentage, multiple_country_found_percentage).as_str());
+                                                                           country_not_found_node_count, country_found_node_count, country_intersect_checks_count, country_border_nodes_count,
+                                                                           country_detections,
+                                                                           country_found_percentage, country_not_found_percentage, country_intersect_checks_percentage, country_border_nodes_percentage).as_str());
         }
         if config.get_summary_level() > 1 && config.should_enrich_elevation() {
             formatted_statistics.push_str(Self::elevation_enrichment_elements_summary(
@@ -378,17 +384,18 @@ accepted |{filt_node:+13} |{a_node_ct:>13} |{filt_ways:+13} |{a_way_cnt:>13} |{f
     }
 
     fn country_enrichment_summary(_config: &Config,
-                                  country_not_found_node_count: u64, country_found_node_count: u64, multiple_country_found_node_count: u64,
+                                  country_not_found_node_count: u64, country_found_node_count: u64, country_intersect_checks_count: u64, country_border_nodes_count: u64,
                                   country_detections: u64,
-                                  country_found_percentage: f64, country_not_found_percentage: f64, multiple_country_found_percentage: f64)
-        -> String {
+                                  country_found_percentage: f64, country_not_found_percentage: f64, country_intersect_checks_percentage: f64, country_border_nodes_percentage: f64)
+                                  -> String {
    format!("
 Country enrichment:
 -------------------
-Country detections total: {country_detections:>13}
-Country found for         {country_found_node_count:>13} nodes ({country_found_percentage:3.2}%)
-Country not found for     {country_not_found_node_count:>13} nodes ({country_not_found_percentage:3.2}%)
->1 country found for      {multiple_country_found_node_count:>13} nodes ({multiple_country_found_percentage:3.2}%)
+Country detections total:      {country_detections:>13} (should be equals to sum of found and not found)
+Country found for              {country_found_node_count:>13} nodes ({country_found_percentage:3.2}%)
+Country not found for          {country_not_found_node_count:>13} nodes ({country_not_found_percentage:3.2}%)
+Expensive intersect checks for {country_intersect_checks_count:>13} nodes ({country_intersect_checks_percentage:3.2}%) (high percentage indicates too large country tile size)
+Found multiple countries for   {country_border_nodes_count:>13} nodes ({country_border_nodes_percentage:3.2}%) (border nodes)
 ")
     }
 
@@ -444,7 +451,8 @@ relation | {min_neg_re_id:>13} | {max_neg_re_id:>13} | {min_pos_re_id:>13} | {ma
         self.elevation_tiff_count_used = 0;
         self.elevation_flush_count = 0;
         self.elevation_total_buffered_nodes_max_reached_count = 0;
-        self.multiple_country_found_node_count = 0;
+        self.country_intersect_checks_count = 0;
+        self.country_border_nodes_count = 0;
         self.total_processing_time = Duration::from_secs(0);
         self.other.clear();
     }

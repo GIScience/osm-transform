@@ -343,7 +343,8 @@ pub(crate) struct AreaHandler {
     pub(crate) mapping: Mapping,
     country_not_found_node_count: u64,
     country_found_node_count: u64,
-    multiple_country_found_node_count: u64,
+    country_intersect_checks_count: u64,
+    country_border_nodes_count: u64
 }
 
 impl Default for AreaHandler {
@@ -357,7 +358,8 @@ impl AreaHandler {
             mapping,
             country_not_found_node_count: 0,
             country_found_node_count: 0,
-            multiple_country_found_node_count: 0,
+            country_intersect_checks_count: 0,
+            country_border_nodes_count: 0
         }
     }
 
@@ -369,12 +371,11 @@ impl AreaHandler {
         let grid_index = ((node.coordinate().lat() + 90.0) / self.mapping.tile_size) as usize * self.mapping.num_tiles_lon + ((node.coordinate().lon() +180.0) / self.mapping.tile_size) as usize ;
         let coord = Coord {x: node.coordinate().lon(), y: node.coordinate().lat()};
         match self.mapping.index[grid_index] {
-            0 => { // no area
-                self.country_not_found_node_count += 1;
+            0 => {
+                // no area
             }
             AREA_ID_MULTIPLE => { // multiple areas
-                self.country_found_node_count += 1;
-                self.multiple_country_found_node_count +=1;
+                self.country_intersect_checks_count += 1;
                 for area in self.mapping.area.get_vec(&(grid_index as u32)).unwrap() {
                     if area.geo.intersects(&coord) {
                         result_vec.push(self.mapping.id[&area.id].to_string())
@@ -383,12 +384,18 @@ impl AreaHandler {
             }
             area_id => { // single area
                 // debug!("index: {x}");
-                self.country_found_node_count += 1;
                 result_vec.push(self.mapping.id[&area_id].to_string())
             }
         }
         let node = node;
-        if ! result_vec.is_empty() {
+        if result_vec.is_empty() {
+            self.country_not_found_node_count += 1;
+        }
+        else {
+            self.country_found_node_count += 1;
+            if result_vec.len() > 1 {
+                self.country_border_nodes_count += 1;
+            }
             node.tags_mut().push(Tag::new("country".to_string(), result_vec.join(",")));
         }
     }
@@ -405,7 +412,9 @@ impl Handler for AreaHandler {
     fn close(&mut self, data: &mut HandlerData){
         data.country_not_found_node_count = self.country_not_found_node_count;
         data.country_found_node_count = self.country_found_node_count;
-        data.multiple_country_found_node_count = self.multiple_country_found_node_count;
+        data.country_intersect_checks_count = self.country_intersect_checks_count;
+        data.country_border_nodes_count = self.country_border_nodes_count;
+        
         data.other.insert("country-mapping".to_string(), format!("tile_size:{} grid_size:{} num_tiles_lon:{} num_tiles_lat:{} id:{} name:{} index:{} area:{}",
                                                          &self.mapping.tile_size,
                                                          &self.mapping.grid_size,
