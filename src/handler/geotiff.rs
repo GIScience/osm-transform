@@ -1,7 +1,6 @@
 use crate::handler::interpolate::WaySplitter;
 use crate::handler::{Handler, HandlerData, HIGHEST_NODE_ID};
 use crate::srs::DynamicSrsResolver;
-use bit_vec::BitVec;
 use georaster::geotiff::{GeoTiffReader, RasterValue};
 use glob::glob;
 use itertools::Itertools;
@@ -339,7 +338,6 @@ pub(crate) struct BufferingElevationEnricher {
     max_buffer_len: usize,
     total_buffered_nodes_max: usize,
     total_buffered_nodes_count: usize,
-    skip_ele: BitVec,
     node_cache: HashMap<i64, LocationWithElevation>,
     next_node_id: i64,
     resolution_lon: f64,
@@ -360,7 +358,6 @@ impl BufferingElevationEnricher {
     pub fn new(geotiff_manager: GeoTiffManager,
                max_buffer_len: usize,
                total_buffered_nodes_max: usize,
-               skip_ele: BitVec,
                elevation_way_splitting: bool,
                keep_original_elevation: bool,
                resolution_lon: f64,
@@ -373,7 +370,6 @@ impl BufferingElevationEnricher {
             total_buffered_nodes_count: 0,
             max_buffer_len,
             total_buffered_nodes_max,
-            skip_ele,
             next_node_id: HIGHEST_NODE_ID + 1,
             resolution_lon,
             resolution_lat,
@@ -422,9 +418,7 @@ impl BufferingElevationEnricher {
         debug!("Handling and flushing buffer with {} buffered nodes for geotiff '{}'", buffer_vec.len(), buffer_name);
         let geotiff = &mut self.geotiff_manager.load_geotiff(buffer_name.as_str()).expect("could not load geotiff");
         buffer_vec.iter_mut().for_each(|node|
-            if self.skip_elevation(node) {
-                self.ele_lookups_skipped += 1; }
-            else if self.keep_original_elevation && node.tags().iter().any(|tag| { tag.k() == "ele" }) {
+            if self.keep_original_elevation && node.tags().iter().any(|tag| { tag.k() == "ele" }) {
                 self.ele_lookups_skipped += 1;
             }
             else {
@@ -611,10 +605,6 @@ impl BufferingElevationEnricher {
         key_lengths
     }
 
-    fn skip_elevation(&mut self, node: &Node) -> bool {
-            self.skip_ele.get(node.id() as usize).unwrap_or(false)
-    }
-
     fn handle_and_flush_buffers(&mut self, buffers: Vec<String>) -> Vec<Node> {
         let mut result = Vec::new();
         for buffer_name in buffers {
@@ -676,7 +666,6 @@ impl Handler for BufferingElevationEnricher {
         data.other.insert("node_cache size".to_string(), format!("{}", self.node_cache.len()));
         data.elevation_found_node_count = self.ele_lookups_successful as u64;
         data.elevation_not_found_node_count = self.ele_lookups_failed as u64;
-        data.elevation_not_relevant_node_count = self.ele_lookups_skipped as u64;
         data.splitted_way_count = self.splitted_way_count as u64;
         data.elevation_tiff_count_total = self.geotiff_manager.index.get_geotiff_count() as u64;
         data.elevation_tiff_count_used = self.elevation_tiffs_used.len() as u64;
@@ -730,7 +719,6 @@ mod tests {
     use crate::handler::geotiff::{format_as_elevation_string, round_f32, round_f64, transform, BufferingElevationEnricher, GeoTiff, GeoTiffManager, LocationWithElevation};
     use crate::handler::{Handler, HandlerData, HIGHEST_NODE_ID};
     use crate::srs::DynamicSrsResolver;
-    use bit_vec::BitVec;
     use epsg::CRS;
     use georaster::geotiff::{GeoTiffReader, RasterValue};
     use log::LevelFilter;
@@ -1166,7 +1154,6 @@ mod tests {
             GeoTiffManager::with_file_pattern("test/region*.tif"),
             4,
             5,
-            BitVec::from_elem(10usize, false),
             false,
             false,
             0.01,
@@ -1213,7 +1200,6 @@ mod tests {
             GeoTiffManager::with_file_pattern("test/region*.tif"),
             5,
             6,
-            BitVec::from_elem(10usize, false),
             false,
             false,
             0.01,
@@ -1249,7 +1235,6 @@ mod tests {
             GeoTiffManager::with_file_pattern("test/region*.tif"),
             4,
             5,
-            BitVec::from_elem(10usize, false),
             false,
             true,
             0.01,
@@ -1280,7 +1265,6 @@ mod tests {
             GeoTiffManager::with_file_pattern("test/region*.tif"),
             5,
             6,
-            BitVec::from_elem(10usize, false),
             false,
             false,
             0.01,
@@ -1306,7 +1290,6 @@ mod tests {
             GeoTiffManager::with_file_pattern("test/region*.tif"),
             5,
             6,
-            BitVec::from_elem(10usize, false),
             true,
             false,
             0.01,
@@ -1331,7 +1314,6 @@ mod tests {
             GeoTiffManager::with_file_pattern("test/region*.tif"),
             5,
             6,
-            BitVec::from_elem(10usize, false),
             true,
             false,
             0.005,
