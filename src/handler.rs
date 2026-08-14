@@ -5,7 +5,6 @@ pub(crate) mod info;
 pub(crate) mod modify;
 pub mod geotiff;
 pub(crate) mod interpolate;
-pub(crate) mod skip_ele;
 
 use std::collections::HashMap;
 use std::time::Duration;
@@ -105,7 +104,6 @@ pub struct HandlerData {
     /// Elevation enrichment statistics
     pub elevation_found_node_count: u64,
     pub elevation_not_found_node_count: u64,
-    pub elevation_not_relevant_node_count: u64,
     pub elevation_flush_count: u64,
     pub elevation_total_buffered_nodes_max_reached_count: u64,
     pub splitted_way_count: u64,
@@ -145,7 +143,6 @@ impl HandlerData {
             country_border_nodes_count: 0,
             elevation_found_node_count: 0,
             elevation_not_found_node_count: 0,
-            elevation_not_relevant_node_count: 0,
             splitted_way_count: 0,
             output_node_count: 0,
             output_way_count: 0,
@@ -178,7 +175,6 @@ impl HandlerData {
         let country_border_nodes_count = self.country_border_nodes_count;
         let elevation_found_node_count = self.elevation_found_node_count;
         let elevation_not_found_node_count = self.elevation_not_found_node_count;
-        let elevation_not_relevant_node_count = self.elevation_not_relevant_node_count;
         let splitted_way_count = self.splitted_way_count;
         let elevation_tiff_count_total = self.elevation_tiff_count_total;
         let elevation_tiff_count_used = self.elevation_tiff_count_used;
@@ -203,7 +199,6 @@ country_intersect_checks_count = {country_intersect_checks_count}
 country_border_nodes_count = {country_border_nodes_count}
 elevation_found_node_count = {elevation_found_node_count}
 elevation_not_found_node_count = {elevation_not_found_node_count}
-elevation_not_relevant_node_count = {elevation_not_relevant_node_count}
 splitted_way_count = {splitted_way_count}
 elevation_tiff_count_total = {elevation_tiff_count_total}
 elevation_tiff_count_used = {elevation_tiff_count_used}
@@ -247,7 +242,6 @@ other = {other}"#)
 
         let elevation_found_node_count = self.elevation_found_node_count;
         let elevation_not_found_node_count = self.elevation_not_found_node_count;
-        let elevation_not_relevant_node_count = self.elevation_not_relevant_node_count;
         let splitted_way_count = self.splitted_way_count;
         let elevation_tiff_count_total = self.elevation_tiff_count_total;
         let elevation_tiff_count_used = self.elevation_tiff_count_used;
@@ -267,10 +261,9 @@ other = {other}"#)
         let country_not_found_percentage = (country_not_found_node_count as f64 / country_detections as f64) * 100.0;
         let country_intersect_checks_percentage = (country_intersect_checks_count as f64 / country_detections as f64) * 100.0;
         let country_border_nodes_percentage = (country_border_nodes_count as f64 / country_detections as f64) * 100.0;
-        let elevation_detections = elevation_found_node_count + elevation_not_found_node_count + elevation_not_relevant_node_count;
+        let elevation_detections = elevation_found_node_count + elevation_not_found_node_count;
         let elevation_found_percentage = (elevation_found_node_count as f64 / elevation_detections as f64) * 100.0;
         let elevation_not_found_percentage = (elevation_not_found_node_count as f64 / elevation_detections as f64) * 100.0;
-        let elevation_not_relevant_percentage = (elevation_not_relevant_node_count as f64 / elevation_detections as f64) * 100.0;
         let elevation_tiff_used_percentage = (elevation_tiff_count_used as f64 / elevation_tiff_count_total as f64) * 100.0;
         let unsplitted_way_count = o_way_cnt - splitted_way_count;
         let splitted_way_percentage = (splitted_way_count as f64 / a_way_cnt as f64) * 100.0;
@@ -305,9 +298,9 @@ other = {other}"#)
         }
         if config.get_summary_level() > 1 && config.should_enrich_elevation() {
             formatted_statistics.push_str(Self::elevation_enrichment_elements_summary(
-                elevation_found_node_count, elevation_not_found_node_count, elevation_not_relevant_node_count,
+                elevation_found_node_count, elevation_not_found_node_count,
                 elevation_detections,
-                elevation_found_percentage, elevation_not_found_percentage, elevation_not_relevant_percentage).as_str());
+                elevation_found_percentage, elevation_not_found_percentage).as_str());
         }
         if config.get_summary_level() > 2 && config.should_enrich_elevation() {
                     formatted_statistics.push_str(Self::elevation_tiff_summary(
@@ -342,14 +335,13 @@ Total max buffered nodes reached: {elevation_total_buffered_nodes_max_reached_co
 ")
     }
 
-    fn elevation_enrichment_elements_summary(elevation_found_node_count: u64, elevation_not_found_node_count: u64, elevation_not_relevant_node_count: u64, elevation_detections: u64, elevation_found_percentage: f64, elevation_not_found_percentage: f64, elevation_not_relevant_percentage: f64) -> String {
+    fn elevation_enrichment_elements_summary(elevation_found_node_count: u64, elevation_not_found_node_count: u64, elevation_detections: u64, elevation_found_percentage: f64, elevation_not_found_percentage: f64) -> String {
         format!("
 Elevation enrichment:
 ---------------------
 Elevation detections total: {elevation_detections:>13}
 Elevation found for         {elevation_found_node_count:>13} nodes ({elevation_found_percentage:.2}%)
 Elevation not found for     {elevation_not_found_node_count:>13} nodes ({elevation_not_found_percentage:.2}%)
-Elevation not relevant for  {elevation_not_relevant_node_count:>13} nodes ({elevation_not_relevant_percentage:.2}% tunnels, bridges, etc.)
 ")
     }
 
@@ -442,7 +434,6 @@ relation | {min_neg_re_id:>13} | {max_neg_re_id:>13} | {min_pos_re_id:>13} | {ma
         self.country_found_node_count = 0;
         self.elevation_found_node_count = 0;
         self.elevation_not_found_node_count = 0;
-        self.elevation_not_relevant_node_count = 0;
         self.splitted_way_count = 0;
         self.output_node_count = 0;
         self.output_way_count = 0;
@@ -1134,7 +1125,6 @@ pub(crate) mod tests {
                 GeoTiffManager::with_file_pattern("test/region*.tif"),
                 5,
                 6,
-                BitVec::from_elem(10usize, false),
                 true,
                 false,
                 0.01,

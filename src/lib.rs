@@ -29,7 +29,6 @@ use crate::handler::filter::{AllElementsFilter, ComplexElementsFilter, FilterTyp
 use crate::handler::geotiff::{BufferingElevationEnricher, GeoTiffManager};
 use crate::handler::info::{ElementCountResultType, ElementCounter, ElementPrinter};
 use crate::handler::modify::MetadataRemover;
-use crate::handler::skip_ele::SkipElevationNodeCollector;
 use crate::output::{SimpleOutputHandler, SplittingOutputHandler};
 
 // Initialize only once to prevent integration tests from trying
@@ -223,10 +222,6 @@ fn run_filter_chain(config: &Config, data: &mut HandlerData){
         handler_chain = handler_chain.add(ReferencedNodeIdCollector::default());
     }
 
-    if &config.elevation_tiffs.len() > &0 {
-        handler_chain = handler_chain.add(SkipElevationNodeCollector::default())
-    }
-
     handler_chain = handler_chain.add(IdCollector{handle_types: OsmElementTypeSelection::way_relation()});
     let info_msg = "1.Pass: Filtering pbf elements";
     run_chain(config, data, &mut handler_chain, info_msg);
@@ -266,7 +261,6 @@ fn run_processing_chain(config: &Config, data: &mut HandlerData) {
             geotiff_manager,
             config.elevation_batch_size,
             config.elevation_total_buffer_size,
-            data.no_elevation_node_ids.clone(),//todo avoid cloning - pass HandlerData to fn where needed
             config.elevation_way_splitting,
             config.keep_original_elevation,
             config.resolution_lon,
